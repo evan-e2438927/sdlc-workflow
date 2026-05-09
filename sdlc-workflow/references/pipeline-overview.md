@@ -36,9 +36,12 @@ graph TD
       P_C3 --> P_S1
 
       P_S1["① requirements-ingestion<br/>→ requirements.md"] --> P_TG1["📱 TG: 需求已收录"]
-      P_TG1 --> P_S2["② requirements-clarifier<br/>混合模式澄清"]
-      P_S2 -->|低置信度问题| P_TG2["📱 TG: 需确认问题"]
-      P_S2 --> P_S3["③ design-generator<br/>→ design.md"]
+      P_TG1 --> P_S2["② requirements-clarifier<br/>交互式选择询问"]
+      P_S2 -->|低置信度 · proposal/mini| P_ASK["💬 主会话：AskUserQuestion 选择询问"]
+      P_S2 -->|低置信度 · doit / TG 触发| P_AUTO["⚠️ 无人值守：auto-assume fallback"]
+      P_ASK --> P_TG2["📱 TG: 需求澄清完成（状态摘要）"]
+      P_AUTO --> P_TG2
+      P_TG2 --> P_S3["③ design-generator<br/>→ design.md"]
       P_S3 --> P_S4["④ task-generator<br/>→ tasks.md"]
 
       P_S4 --> P_S5["⑤ design-reviewer · Gate 1<br/>Codex CLI 审查设计"]

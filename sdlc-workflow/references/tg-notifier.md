@@ -68,19 +68,18 @@ openclaw message send --channel telegram --target "$TG_USERNAME" --message "$MSG
 📂 迭代目录: docs/iterations/<date>/<seq>-<slug>-<type>/
 ```
 
-### 3. 需求澄清（低置信度时）
+### 3. 需求澄清完成（状态摘要，非提问）
 
 ```
-❓ 需确认以下问题（已标注假设，流程继续）：
-
-[ASM-001] <问题1>
-  假设: <假设内容>
-
-[ASM-002] <问题2>
-  假设: <假设内容>
-
-请通过 TG 回复确认。
+❓ 需求澄清完成
+✅ 已确认（用户交互/无歧义）: <N>
+⚠️ 已假设（流程继续）: <M>
+📂 详见: <iter_dir>/requirements.md > 假设记录
 ```
+
+> **TG 通道仅做单向通知，不承载交互提问**。低置信度需求的澄清已在主会话内通过
+> AskUserQuestion 选择询问完成（见 `references/requirements-clarifier.md`）。
+> 此处仅在澄清结束后发一条状态摘要，不要求用户回复。
 
 ### 4. 设计文档生成
 

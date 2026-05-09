@@ -326,7 +326,11 @@ MKDIR -p "$ITER_DIR"
 - 逐条分析 confidence：
   - 高(≥0.8): 添加 [✅ 已确认]
   - 中(0.5-0.8): 添加 [⚠️ 假设: ...]
-  - 低(<0.5): TG 提问 + 假设标注（不阻塞）
+  - 低(<0.5):
+    - **交互模式**（proposal / mini，且非 OPENCLAW_TRIGGER_USER）：主会话内通过 AskUserQuestion 发起选择询问，用户作答后写入需求并标注 [✅ 已确认（用户选择）]
+    - **无人值守模式**（doit / TG 触发）：fallback 为 auto-assume，标注 [⚠️ 假设: ...]，不阻塞
+  - 用户跳过/工具不可用 → fallback 为 auto-assume
+- TG 仅作完成状态摘要（"❓ 需求澄清完成: 已确认N / 已假设M"），不发起提问
 - 输出：更新后的 requirements.md
 
 #### ③ design-generator
@@ -721,7 +725,7 @@ openclaw message send --channel telegram --target "$TG_USERNAME" --message "$MSG
 通知列表（共 15 个通知点，覆盖所有关键环节）：
 1. 初始化完成：🚀 项目初始化完成（fresh/existing）
 2. 需求收录：📥 需求已收录: <摘要前50字>
-3. 需求澄清：❓ 需确认: <问题列表>（已标注假设，流程继续）
+3. 需求澄清：❓ 需求澄清完成: 已确认 <N> / 已假设 <M>（澄清在主会话内交互完成；TG 不承载提问）
 4. 设计生成：🎨 设计文档已生成
 5. 任务分解：📋 任务分解完成: <任务数> 个任务 | 预估工时: <总工时>
 6. 设计 Review：🔍 设计 Review: PASS ✅ 或 🔍 设计 Review 第N轮: <问题摘要>

@@ -36,6 +36,8 @@
 
 ② requirements-clarifier
    → 标注版 requirements.md
+   ※ proposal 模式下，对低置信度需求会**在主会话内通过 AskUserQuestion 发起选择询问**
+     （而非通过 TG 回复）。详见 references/requirements-clarifier.md §4。
 
 ③ design-generator
    → docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/design.md
