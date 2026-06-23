@@ -17,15 +17,11 @@ graph TD
       P_INIT_RUN --> P_MODE{"fresh 还是 existing?"}
       P_INIT -->|是| P_MODE
 
-      P_MODE -->|fresh| P_TG_DETECT
+      P_MODE -->|fresh| P_SLUG
       P_MODE -->|existing| P_INTAKE["existing-project-intake<br/>→ PROJECT_BASELINE / EXISTING_STRUCTURE / TEST_BASELINE"]
-      P_INTAKE --> P_TG_DETECT
+      P_INTAKE --> P_SLUG
 
-      P_TG_DETECT["TG_USERNAME 自动检测<br/>OPENCLAW_TRIGGER_USER → .env"]
-      P_TG_DETECT --> P_ENV_CHECK{".env 配置完整?"}
-      P_ENV_CHECK -->|缺 TG_USERNAME| P_STOP["⏸ 提示用户配置 .env"]
-      P_ENV_CHECK -->|完整| P_SLUG["生成迭代目录<br/>docs/iterations/YYYY-MM-DD/001-slug-type/"]
-
+      P_SLUG["生成迭代目录<br/>docs/iterations/YYYY-MM-DD/001-slug-type/"]
       P_SLUG --> P_ROUTE{输入类型路由}
       P_ROUTE -->|文本| P_C1[直接解析]
       P_ROUTE -->|"file://"| P_C2[读取文件]
@@ -35,26 +31,25 @@ graph TD
       P_C2 --> P_S1
       P_C3 --> P_S1
 
-      P_S1["① requirements-ingestion<br/>→ requirements.md"] --> P_TG1["📱 TG: 需求已收录"]
-      P_TG1 --> P_S2["② requirements-clarifier<br/>交互式选择询问"]
+      P_S1["① requirements-ingestion<br/>→ requirements.md"]
+      P_S1 --> P_S2["② requirements-clarifier<br/>交互式选择询问"]
       P_S2 -->|低置信度 · proposal/mini| P_ASK["💬 主会话：AskUserQuestion 选择询问"]
-      P_S2 -->|低置信度 · doit / TG 触发| P_AUTO["⚠️ 无人值守：auto-assume fallback"]
-      P_ASK --> P_TG2["📱 TG: 需求澄清完成（状态摘要）"]
-      P_AUTO --> P_TG2
-      P_TG2 --> P_S3["③ design-generator<br/>→ design.md"]
+      P_S2 -->|低置信度 · doit| P_AUTO["⚠️ 无人值守：auto-assume fallback"]
+      P_ASK --> P_S3["③ design-generator<br/>→ design.md"]
+      P_AUTO --> P_S3
+
       P_S3 --> P_S4["④ task-generator<br/>→ tasks.md"]
 
-      P_S4 --> P_S5["⑤ design-reviewer · Gate 1<br/>Codex CLI 审查设计"]
-      P_S5 --> P_TG3["📱 TG: 设计 Review 结果"]
-      P_TG3 -->|FAIL & round ≤ N| P_S3
-      P_TG3 -->|PASS 经修订| P_S5_1["⑤.1 增量文档同步<br/>ARCHITECTURE / SECURITY"]
-      P_TG3 -->|PASS 首轮通过| P_STATUS
-      P_TG3 -->|"FAIL & round > N"| P_ESCALATE["📱 TG: ⚠️ 需人工介入 → 中止"]
+      P_S4 -->|默认| P_STATUS
+      P_S4 -->|"--review"| P_S5["⑤ design-reviewer · Gate 1<br/>Codex CLI 审查设计（可选）"]
+      P_S5 -->|FAIL & round ≤ N| P_S3
+      P_S5 -->|PASS 经修订| P_S5_1["⑤.1 增量文档同步<br/>ARCHITECTURE / SECURITY"]
+      P_S5 -->|PASS 首轮通过| P_STATUS
+      P_S5 -->|"FAIL & round > N"| P_ESCALATE["❌ 需人工介入 → 中止"]
       P_S5_1 --> P_STATUS
 
       P_STATUS["写入 status.json<br/>phase: pending_review"]
-      P_STATUS --> P_NOTIFY["📱 TG: 📋 需求拆解完成<br/>等待人工审核"]
-      P_NOTIFY --> P_END["⏸ 暂停，等待 apply"]
+      P_STATUS --> P_END["⏸ 暂停，等待 apply"]
     end
 
     subgraph APPLY_FLOW [apply 流程]
@@ -69,22 +64,28 @@ graph TD
       A_S6_SEQ --> A_S6["⑥.4 tasks.md 回写"]
 
       A_S6 --> A_S7["⑦ test-generator<br/>→ tests/unit/ + tests/e2e/"]
-      A_S7 --> A_S8["⑧ code-reviewer · Gate 2<br/>Codex CLI 审查代码"]
-      A_S8 --> A_TG4["📱 TG: Code Review 结果"]
-      A_TG4 -->|FAIL & round ≤ N| A_S6
-      A_TG4 -->|PASS| A_S9["⑨ test-pipeline<br/>lint → unit → Playwright → MCP → CDP"]
-      A_TG4 -->|"FAIL & round > N"| A_ESCALATE["📱 TG: ⚠️ 需人工介入"]
+      A_S7 -->|默认| A_S9
+      A_S7 -->|"--review"| A_S8["⑧ code-reviewer · Gate 2<br/>Codex CLI 审查代码（可选）"]
+      A_S8 -->|FAIL & round ≤ N| A_S6
+      A_S8 -->|PASS| A_S9["⑨ test-pipeline<br/>lint → unit → Playwright E2E"]
+      A_S8 -->|"FAIL & round > N"| A_ESCALATE["❌ 需人工介入 → 中止"]
 
-      A_S9 --> A_TG5["📱 TG: 测试报告"]
-      A_TG5 -->|失败 & round ≤ N| A_S9_1{"修复涉及<br/>design/tasks 变更?"}
+      A_S9 -->|失败 & round ≤ N| A_S9_1{"修复涉及<br/>design/tasks 变更?"}
       A_S9_1 -->|是| A_S9_SYNC["⑨.1 增量文档同步"] --> A_S6
       A_S9_1 -->|否| A_S6
-      A_TG5 -->|全部通过| A_S10["⑩ docs-updater<br/>更新文档"]
-      A_TG5 -->|"失败 & round > N"| A_ESCALATE
+      A_S9 -->|全部通过| A_S10["⑩ docs-updater<br/>更新文档"]
+      A_S9 -->|"失败 & round > N"| A_ESCALATE
 
       A_S10 --> A_S11["⑪ git-committer<br/>branch → commit → push → PR"]
       A_S11 --> A_STATUS["更新 status.json<br/>phase: applied"]
-      A_STATUS --> A_TG7["📱 TG: ✅ 迭代完成 + PR 链接"]
+    end
+
+    subgraph ACCEPT_FLOW [accept 验收流程（可选，人工触发）]
+      AC_CHECK["校验 phase == applied"]
+      AC_CHECK --> AC_DEV["启动 dev server"]
+      AC_DEV --> AC_MCP["Playwright MCP 功能验收<br/>navigate → snapshot → click → screenshot"]
+      AC_MCP -->|全部 PASS| AC_OK["更新 status.json<br/>phase: accepted"]
+      AC_MCP -->|有 FAIL| AC_FAIL["记录失败原因，phase 保持 applied"]
     end
 
     subgraph DOIT_FLOW [doit 全自动流程]
@@ -97,9 +98,11 @@ graph TD
 | 命令 | 说明 | 执行范围 | 暂停点 |
 |------|------|----------|--------|
 | `init` | 初始化项目 | ⓪ | — |
-| `proposal` | 需求拆解 | ①②③④⑤ | Gate 1 后暂停，写入 status.json |
-| `apply` | 需求开发 | ⑥⑦⑧⑨⑩⑪ | 读取 status.json 后继续 |
-| `doit` | 全自动（proposal + apply） | ①-⑪ | 不暂停 |
+| `proposal [--review]` | 需求拆解；`--review` 时执行 Gate 1 | ①②③④[⑤] | 写入 status.json 后暂停 |
+| `apply [--review]` | 需求开发；`--review` 时执行 Gate 2 | ⑥⑦[⑧]⑨⑩⑪ | 读取 status.json 后继续 |
+| `review proposal\|code` | 单独运行 Codex 审查 | ⑤ 或 ⑧ | — |
+| `accept` | Playwright MCP 功能验收（可选） | — | — |
+| `doit [--review]` | 全自动（proposal + apply） | ①-⑪ | 不暂停 |
 | `mini` | 小任务轻量流程 | 参见 mini-pipeline.md | — |
 
 ## 3. 步骤详解表
@@ -111,17 +114,17 @@ graph TD
 | ② | requirements-clarifier | Evaluator | requirements.md | requirements.md (标注版) | Claude Code 内置 | proposal/doit |
 | ③ | design-generator | Generator | requirements.md + .claude/ARCHITECTURE.md + .claude/SECURITY.md + 历史 | design.md | Claude Code | proposal/doit |
 | ④ | task-generator | Generator | design.md | tasks.md | Claude Code | proposal/doit |
-| ⑤ | design-reviewer | Evaluator-Optimizer | design.md + tasks.md + .claude/ARCHITECTURE.md + .claude/SECURITY.md | PASS/FAIL | Codex CLI | proposal/doit |
-| ⑤.1 | 增量文档同步 | Tool Wrapper | design.md 修订 diff | 更新后的 ARCHITECTURE/SECURITY | Claude Code | proposal/doit |
+| [⑤] | design-reviewer | Evaluator-Optimizer | design.md + tasks.md | PASS/FAIL | Codex CLI | proposal --review |
+| [⑤.1] | 增量文档同步 | Tool Wrapper | design.md 修订 diff | 更新后的 ARCHITECTURE/SECURITY | Claude Code | proposal --review |
 | — | **status.json 写入** | — | proposal 摘要 | status.json (pending_review) | — | **仅 proposal** |
 | ⑥ | Claude Code 开发 | Orchestrator-Workers | tasks.md（依赖分析→拓扑分层） | 代码变更 | Claude Code + Agent Team（并行层） | apply/doit |
 | ⑦ | test-generator | Generator | tasks.md + git diff | tests/unit/ + tests/e2e/ | Claude Code | apply/doit |
-| ⑧ | code-reviewer | Evaluator-Optimizer | git diff + .claude/CODING_GUIDELINES.md + .claude/SECURITY.md | PASS/FAIL | Codex CLI | apply/doit |
-| ⑨ | test-pipeline | Pipeline | tests/ | tests/reports/ | Lint + Playwright 预检 + Playwright MCP + CDP 最终验收 | apply/doit |
+| [⑧] | code-reviewer | Evaluator-Optimizer | git diff + .claude/CODING_GUIDELINES.md + .claude/SECURITY.md | PASS/FAIL | Codex CLI | apply --review |
+| ⑨ | test-pipeline | Pipeline | tests/ | tests/reports/ | Lint → Unit → Playwright E2E（三阶段） | apply/doit |
 | ⑨.1 | 测试修复文档同步 | Tool Wrapper | design.md/tasks.md 修复 diff | 更新后的 ARCHITECTURE/SECURITY | Claude Code | apply/doit |
 | ⑩ | docs-updater | Tool Wrapper | 代码变更 + 迭代产物 | 更新后的文档 | Claude Code | apply/doit |
 | ⑪ | git-committer | Tool Wrapper | 所有变更 | PR URL | Git + GitHub CLI | apply/doit |
-| ⑫ | 最终通知 | — | PR URL + 变更摘要 | TG 消息 | OpenClaw CLI | apply/doit |
+| [⑫] | accept | — | tasks.md 验收标准 | 验收记录 + status accepted | Playwright MCP | accept（可选） |
 
 ## 4. Google Cloud 5 Agent Pattern 映射
 
@@ -238,9 +241,9 @@ git diff (代码变更)   ──────→  🔍 Gate 2: code-reviewer
 - 使 Claude 在后续交互中可自动读取历史迭代上下文
 - 避免重复设计和冲突方案
 
-### 7.4 TG_USERNAME 自动检测
-- TG/OpenClaw 触发场景下从 `OPENCLAW_TRIGGER_USER` 自动获取
-- 免去手动配置步骤
+### 7.4 accept 可选验收
+- apply 完成后，人工运行 `/sdlc-workflow accept` 触发 Playwright MCP 功能验收
+- 通过后 status.json 更新为 `phase: accepted`
 
 ### 7.5 全栈目录约束
 - 默认遵循 Better-T-Stack 风格 monorepo：`apps/web`、`apps/server`、`packages/*`
@@ -268,10 +271,9 @@ git diff (代码变更)   ──────→  🔍 Gate 2: code-reviewer
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| TG_USERNAME | (必需) | Telegram 用户名 |
 | TEST_FRAMEWORK | jest | 单元测试框架 |
 | E2E_FRAMEWORK | playwright | 固定 E2E 测试框架 |
 | LINT_TOOL | eslint | Lint 工具 |
-| REVIEW_MAX_ROUNDS | 1 | 审查最大轮数 |
+| REVIEW_MAX_ROUNDS | 1 | Codex 审查最大轮数（`--review` 时生效） |
 | GIT_BRANCH_PREFIX | feat/ | Git 分支前缀 |
 | COMMIT_SCOPE | (空) | Commit scope |

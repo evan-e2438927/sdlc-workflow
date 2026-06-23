@@ -7,13 +7,13 @@ description: >-
   running automated development workflow.
   Triggers: start workflow, new feature, process requirement, run pipeline,
   SDLC, digital worker, development automation, requirements to PR.
-argument-hint: "init [配置] | proposal <需求> | apply <迭代目录> | doit <需求> | mini <小任务> | worktree <create|list|status|remove|gc>"
+argument-hint: "init [配置] | proposal <需求> | apply [--review] <迭代目录> | review [proposal|code] <迭代目录> | accept <迭代目录> | doit [--review] <需求> | mini <小任务> | worktree <create|list|status|remove|gc>"
 homepage: https://github.com/evan-taojiangcb/sdlc-workflow
 metadata:
   openclaw:
     emoji: "🏭"
     requires:
-      bins: ["codex", "gh", "openclaw"]
+      bins: ["codex", "gh"]
     install:
       - id: codex
         kind: npm
@@ -25,11 +25,6 @@ metadata:
         formula: "gh"
         bins: ["gh"]
         label: "Install GitHub CLI"
-      - id: openclaw
-        kind: npm
-        package: "openclaw"
-        bins: ["openclaw"]
-        label: "Install OpenClaw CLI"
 ---
 
 ## 命令分工
@@ -37,9 +32,11 @@ metadata:
 当前稳定入口是单入口多模式：
 
 - `/sdlc-workflow init`：初始化或接入项目
-- `/sdlc-workflow proposal`：需求拆解（到 Gate 1 通过），产出 proposal 产物后暂停，等待人工审核
-- `/sdlc-workflow apply`：人工审核通过后，从 proposal 产物继续执行开发到 PR
-- `/sdlc-workflow doit`：全自动模式（内部 proposal + apply 不停顿）
+- `/sdlc-workflow proposal`：需求拆解（①-④），产出 proposal 产物后暂停，等待人工审核
+- `/sdlc-workflow apply [--review]`：人工审核通过后，从 proposal 产物继续执行开发到 PR；加 `--review` 则在开发前/后触发 Codex 审查（Gate 1 + Gate 2）
+- `/sdlc-workflow review [proposal|code] <迭代目录>`：单独运行 Codex 审查，不触发其他流程
+- `/sdlc-workflow accept <迭代目录>`：**可选**，apply 完成后人工触发 Playwright MCP 功能验收
+- `/sdlc-workflow doit [--review]`：全自动模式（内部 proposal + apply 不停顿）
 - `/sdlc-workflow mini`：小任务轻量流程
 - `/sdlc-workflow worktree create <slug> <type>`：创建并行工作区（worktree 隔离）
 - `/sdlc-workflow worktree list`：列出所有并行工作区
@@ -55,20 +52,20 @@ metadata:
 
 接受三种输入格式：纯文本、`file:///path` 本地文件、URL（自动 Playwright MCP 提取）。
 
-执行步骤 ①-⑤：
+执行步骤 ①-④（默认跳过 Gate 1，加 `--review` 则执行 ⑤）：
 ```
 ① requirements-ingestion → requirements.md
 ② requirements-clarifier → 标注版 requirements.md
 ③ design-generator       → design.md
 ④ task-generator          → tasks.md
-⑤ design-reviewer (Gate 1)
-⑤.1 增量文档同步（若经修订）
+[⑤ design-reviewer (Gate 1)   ← 仅 --review 模式]
+[⑤.1 增量文档同步              ← 仅 --review 且经修订]
 ```
 
 产出：
 - `docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/` 下的 requirements.md / design.md / tasks.md / status.json
 - `status.json` 标记 `phase: "pending_review"`
-- TG 通知: 📋 需求拆解完成，等待人工审核
+- 控制台输出: 需求拆解完成，等待人工审核
 - ⚓ 暂停，等待 `apply`
 
 详细规范见 `references/proposal.md`。
@@ -76,9 +73,10 @@ metadata:
 ### apply — 需求开发命令
 
 ```bash
-/sdlc-workflow apply <迭代目录>
+/sdlc-workflow apply [--review] <迭代目录>
 # 示例
 /sdlc-workflow apply docs/iterations/2026-04-16/001-user-login-feature/
+/sdlc-workflow apply --review docs/iterations/2026-04-16/001-user-login-feature/
 ```
 
 若不指定路径，自动查找最近一个 `phase == "pending_review" | "approved"` 的迭代目录。
@@ -88,12 +86,12 @@ metadata:
 - `phase == applied` → 拒绝重复执行
 - `phase == rejected` → 提示修改后重新 proposal
 
-执行步骤 ⑥-⑪：
+执行步骤 ⑥-⑪（默认跳过 Gate 2，加 `--review` 则执行 ⑧）：
 ```
 ⑥ Claude Code 开发（支持 Agent Team 并行）
 ⑦ test-generator
-⑧ code-reviewer (Gate 2)
-⑨ test-pipeline
+[⑧ code-reviewer (Gate 2)   ← 仅 --review 模式]
+⑨ test-pipeline（lint → unit → E2E，三阶段）
 ⑩ docs-updater
 ⑪ git-committer → branch → commit → push → PR
 ```
@@ -102,14 +100,34 @@ metadata:
 
 详细规范见 `references/apply.md`。
 
+### review — 独立 Codex 审查命令
+
+```bash
+/sdlc-workflow review proposal <迭代目录>   # 运行 Gate 1：设计审查
+/sdlc-workflow review code <迭代目录>       # 运行 Gate 2：代码审查
+```
+
+在 proposal 或 apply 流程之外，单独触发 Codex CLI 审查，不影响其他步骤。
+审查结果打印到控制台；若 FAIL 则建议修订后重跑对应步骤。
+
+### accept — Playwright MCP 功能验收（可选）
+
+```bash
+/sdlc-workflow accept <迭代目录>
+```
+
+apply 完成后，人工按需触发 Playwright MCP 功能验收，不是必须步骤。
+通过后将 status.json 更新为 `phase: "accepted"`。
+详细规范见 `references/accept.md`。
+
 ### doit — 全自动模式
 
 ```bash
-/sdlc-workflow doit <需求>
+/sdlc-workflow doit [--review] <需求>
 ```
 
 内部等价于 `proposal + apply` 不停顿，适用于完全信任 AI 处理的场景。
-Gate 1 通过后直接继续开发，不写 `status.json`，不暂停。
+默认跳过 Gate 1 / Gate 2；加 `--review` 则两个 Gate 均启用。
 
 ### mini — 小任务轻量流程
 
@@ -119,10 +137,9 @@ Gate 1 通过后直接继续开发，不写 `status.json`，不暂停。
 
 轻量流程，但不是跳过流程。仍必须执行：
 - iteration 产物生成
-- mini Gate 1
+- mini Gate 1（加 `--review` 时）
 - validation capability detection
-- mini Gate 2
-- Playwright MCP + CDP 最终验收
+- mini Gate 2（加 `--review` 时）
 
 详细规范见 `references/mini-pipeline.md`。
 
@@ -196,29 +213,12 @@ sdlc-worktree.sh remove 001
 4. 若任一不存在 → 执行初始化：
    - 运行 `bash <skill-root>/sdlc-workflow/scripts/init-project.sh .`（`<skill-root>` 为 Skill 安装目录，如 `~/.claude/skills`）
    - 生成项目结构（.claude/, docs/, tests/, .env.example）
-   - 提醒用户：若 `.env` 不存在，从 `.env.example` 复制并填写 TG_USERNAME
+   - 提醒用户：若 `.env` 不存在，从 `.env.example` 复制并按需填写配置
 5. 若判定为 existing project，则初始化后必须先执行 `references/existing-project-intake.md`：
    - 生成 `.claude/PROJECT_BASELINE.md`
    - 生成 `.claude/EXISTING_STRUCTURE.md`
    - 生成 `.claude/TEST_BASELINE.md`
    - 在基线完成前，不得直接进入 requirements/design/tasks
-
-## TG_USERNAME 自动检测
-
-Pipeline 启动时按以下优先级确定 TG_USERNAME：
-
-1. **运行时上下文检测**（TG/OpenClaw 触发场景）：
-   - 检查环境变量 `OPENCLAW_TRIGGER_USER`（OpenClaw 触发时自动注入）
-   - 若存在 → 初始化阶段自动创建 `.env`（若缺失）并写入 `TG_USERNAME`
-   - 日志: "📱 检测到 TG 用户: <user_id>，已自动配置"
-
-2. **读取 `.env` 文件**：
-   - 若 `.env` 存在且 TG_USERNAME 已设置 → 使用该值
-   - 若 `.env` 不存在且未处于 TG 触发场景 → 提示用户从 `.env.example` 复制
-   - 若 TG_USERNAME 为空 → 提示用户手动配置
-
-3. **兜底**：
-   - 若以上均无法获取 → 提示 "请在 .env 中设置 TG_USERNAME" → 暂停
 
 ## 配置读取
 
@@ -226,11 +226,10 @@ Pipeline 启动时按以下优先级确定 TG_USERNAME：
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| TG_USERNAME | (空) | 必需，Telegram 账号数字 ID 或 chat_id |
 | TEST_FRAMEWORK | jest | 单元测试框架 |
 | E2E_FRAMEWORK | playwright | 固定 E2E 测试框架 |
 | LINT_TOOL | eslint | Lint 工具 |
-| REVIEW_MAX_ROUNDS | 1 | 审查最大轮数 |
+| REVIEW_MAX_ROUNDS | 1 | Codex 审查最大轮数（--review 时生效） |
 | GIT_BRANCH_PREFIX | feat/ | Git 分支前缀 |
 | COMMIT_SCOPE | (空) | Commit scope |
 
@@ -260,19 +259,20 @@ Pipeline 启动时按以下优先级确定 TG_USERNAME：
 
 | 步骤 | 名称 | 说明 | 命令归属 |
 |------|------|------|----------|
-| ⓪ | 初始化 + 模式识别 | fresh/existing 分流 → init-project.sh → existing intake → TG_USERNAME → .env → 迭代目录 | proposal/doit |
+| ⓪ | 初始化 + 模式识别 | fresh/existing 分流 → init-project.sh → existing intake → .env → 迭代目录 | proposal/doit |
 | ① | requirements-ingestion | 识别输入类型 → 提取/读取/解析 → requirements.md | proposal/doit |
 | ② | requirements-clarifier | 逐条分析置信度，标注确认/假设/提问 | proposal/doit |
 | ③ | design-generator | 生成 design.md（引用历史 iterations） | proposal/doit |
 | ④ | task-generator | design.md → tasks.md（任务级 AC 必须引用需求级 AC-ID，保留 Given-When-Then + 场景维度） | proposal/doit |
-| ⑤ | design-reviewer | **Gate 1**: Codex CLI 审查设计 + AC 覆盖度检查 | proposal/doit |
-| — | **proposal 暂停点** | 写入 status.json → TG 通知 → 等待人工审核 | **仅 proposal** |
+| [⑤] | design-reviewer | **Gate 1（可选）**: Codex CLI 审查设计 + AC 覆盖度检查；仅 `--review` 时执行 | proposal --review |
+| — | **proposal 暂停点** | 写入 status.json → 控制台输出 → 等待人工审核 | **仅 proposal** |
 | ⑥ | Claude Code 开发 | 按 tasks.md 逐任务实现代码 | apply/doit |
 | ⑦ | test-generator | 生成 tests/unit/ + tests/e2e/ | apply/doit |
-| ⑧ | code-reviewer | **Gate 2**: Codex CLI 审查代码 | apply/doit |
-| ⑨ | test-pipeline | lint → unit → Playwright 预检 → Playwright MCP 功能验收（不可跳过）→ CDP 复核 → 生成 HTML 验收报告 | apply/doit |
+| [⑧] | code-reviewer | **Gate 2（可选）**: Codex CLI 审查代码；仅 `--review` 时执行 | apply --review |
+| ⑨ | test-pipeline | lint → unit → Playwright E2E（三阶段） | apply/doit |
 | ⑩ | docs-updater | 更新文档 + CLAUDE.md iterations 引用 | apply/doit |
 | ⑪ | git-committer | branch → commit → push → PR | apply/doit |
+| [⑫] | accept | **可选**：Playwright MCP 功能验收，人工触发 | accept |
 
 ### 详细流程
 
@@ -289,14 +289,8 @@ IF MODE == existing:
   REQUIRE .claude/EXISTING_STRUCTURE.md
   REQUIRE .claude/TEST_BASELINE.md
 
-IF OPENCLAW_TRIGGER_USER:
-  ENSURE .env EXISTS (copy from .env.example if missing)
-  WRITE .env TG_USERNAME=OPENCLAW_TRIGGER_USER
-  LOG "📱 检测到 TG 用户: @<username>，已自动配置"
-
 IF NOT .env:
   COPY .env.example TO .env
-  LOG "请编辑 .env 设置 TG_USERNAME"
 
 READ .env
 
@@ -320,17 +314,15 @@ MKDIR -p "$ITER_DIR"
 - 输入类型路由：文本 → 直接解析；file:// → 读取文件；URL → Playwright MCP
 - **验收标准生成**：每个 Requirement 必须按 5 个维度系统化枚举 AC（happy-path / error / boundary / ui-state / security），禁止只写 happy path
 - 输出：docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/requirements.md
-- 通知 TG：📥 需求已收录
 
 #### ② requirements-clarifier
 - 逐条分析 confidence：
   - 高(≥0.8): 添加 [✅ 已确认]
   - 中(0.5-0.8): 添加 [⚠️ 假设: ...]
   - 低(<0.5):
-    - **交互模式**（proposal / mini，且非 OPENCLAW_TRIGGER_USER）：主会话内通过 AskUserQuestion 发起选择询问，用户作答后写入需求并标注 [✅ 已确认（用户选择）]
-    - **无人值守模式**（doit / TG 触发）：fallback 为 auto-assume，标注 [⚠️ 假设: ...]，不阻塞
+    - **交互模式**（proposal / mini）：主会话内通过 AskUserQuestion 发起选择询问，用户作答后写入需求并标注 [✅ 已确认（用户选择）]
+    - **无人值守模式**（doit）：fallback 为 auto-assume，标注 [⚠️ 假设: ...]，不阻塞
   - 用户跳过/工具不可用 → fallback 为 auto-assume
-- TG 仅作完成状态摘要（"❓ 需求澄清完成: 已确认N / 已假设M"），不发起提问
 - 输出：更新后的 requirements.md
 
 #### ③ design-generator
@@ -339,7 +331,6 @@ MKDIR -p "$ITER_DIR"
 - 设计必须声明代码落位：默认遵循 Better-T-Stack 风格 `apps/web` / `apps/server` / 条件启用的 `packages/*`
 - 若为 existing project，必须明确说明"沿用既有结构"还是"本轮经批准的结构调整"
 - 输出：docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/design.md
-- 通知 TG: 🎨 设计文档已生成
 
 #### ④ task-generator
 - 输入：design.md
@@ -350,10 +341,14 @@ MKDIR -p "$ITER_DIR"
   - 补充实现层面的具体判定条件（HTTP 状态码、响应体结构、UI 选择器、数值约束）
   - 每个 Requirement 至少覆盖 happy-path + error 两个维度
   - 禁止退化为模糊 checkbox（如 "功能正常"、"数据正确"）
-- 通知 TG: 📋 任务分解完成: <任务数> 个任务 | 预估工时: <总工时>
+- 控制台输出：任务分解完成: <任务数> 个任务 | 预估工时: <总工时>
 
-#### ⑤ design-reviewer (Gate 1)
+#### ⑤ design-reviewer (Gate 1) — 仅 `--review` 模式
+
 ```
+IF NOT --review:
+  SKIP Gate 1
+
 round=1
 WHILE round <= REVIEW_MAX_ROUNDS:
   result=$(codex exec --full-auto "审查设计...
@@ -363,14 +358,14 @@ WHILE round <= REVIEW_MAX_ROUNDS:
     - 是否存在模糊不可验证的 AC
     - 每个 Requirement 是否至少覆盖 happy-path + error")
   IF result == PASS:
-    通知 TG: 🔍 设计 Review: PASS ✅
+    LOG "✅ 设计 Review PASS"
     BREAK
   ELSE:
     IF round < REVIEW_MAX_ROUNDS:
-      通知 TG: 🔍 设计 Review 第{round}轮: <问题>
+      LOG "⚠️ 设计 Review 第{round}轮: <问题>"
       CLAUDE 修订 design.md + tasks.md
     ELSE:
-      通知 TG: ⚠️ 设计 Review 超过 {N} 轮，需人工介入
+      LOG "❌ 设计 Review 超过 {N} 轮，需人工介入"
       ABORT
   round+=1
 ```
@@ -421,10 +416,10 @@ IF 当前为 proposal 模式:
     }
   }
 
-  通知 TG: 📋 需求拆解完成，等待人工审核
-    📂 迭代目录: $ITER_DIR
-    📝 需求数: $REQ_COUNT | 任务数: $TASK_COUNT | 预估工时: ${TOTAL_HOURS}h
-    👉 审阅后请运行: /sdlc-workflow apply $ITER_DIR
+  LOG "📋 需求拆解完成，等待人工审核"
+  LOG "   📂 迭代目录: $ITER_DIR"
+  LOG "   📝 需求数: $REQ_COUNT | 任务数: $TASK_COUNT | 预估工时: ${TOTAL_HOURS}h"
+  LOG "   👉 审阅后请运行: /sdlc-workflow apply $ITER_DIR"
 
   STOP  # proposal 到此结束
 
@@ -455,10 +450,10 @@ IF 当前为 apply 模式:
   IF PHASE == "pending_review":
     # 用户直接 apply 视为审核通过
     UPDATE STATUS_FILE: phase="approved", reviewed_at=now, reviewer="cli-apply"
-    通知 TG: 🚀 Proposal 审核通过，开始开发
+    LOG "🚀 Proposal 审核通过，开始开发"
 
   ELSE IF PHASE == "approved":
-    通知 TG: 🚀 开始执行需求开发
+    LOG "🚀 开始执行需求开发"
 
   ELSE IF PHASE == "applied":
     ERROR "该 proposal 已执行过 apply"
@@ -470,7 +465,6 @@ IF 当前为 apply 模式:
 ```
 
 #### ⑥ Claude Code 开发
-- 通知 TG: 🔨 开始实现: <需求摘要前50字>
 
 ##### ⑥.1 依赖分析与并行分组
 
@@ -493,10 +487,10 @@ PARALLEL_ELIGIBLE = any(len(layer) > 1 for layer in LAYERS) AND total_tasks >= 3
 ```
 IF PARALLEL_ELIGIBLE:
   MODE = "agent-team"
-  通知 TG: 🔨 开始实现（Agent Team 并行模式）: <层数> 层 / <总任务数> 任务
+  LOG "🔨 Agent Team 并行模式: <层数> 层 / <总任务数> 任务"
 ELSE:
   MODE = "sequential"
-  通知 TG: 🔨 开始实现（顺序模式）: <总任务数> 任务
+  LOG "🔨 顺序模式: <总任务数> 任务"
 ```
 
 ##### ⑥.3a 顺序模式（默认）
@@ -560,7 +554,7 @@ FOR layer IN LAYERS:
 - 未完成或部分完成的任务不得提前勾选
 - 实现偏离 design.md 时同步修订 design/tasks，避免 Gate 2 审查对象与真实代码脱节
 
-- 通知 TG: 🔨 实现完成: <已完成任务数>/<总任务数>
+- LOG: 实现完成: <已完成任务数>/<总任务数>
 
 #### ⑦ test-generator
 - 输入：tasks.md + git diff
@@ -569,22 +563,26 @@ FOR layer IN LAYERS:
   - tests/unit/web|server|packages/...
   - tests/e2e/<slug>/E2E-<nnn>-<scenario>.e2e.ts
   - tests/reports/<slug>-coverage.md（含 AC 覆盖率汇总和场景维度覆盖统计）
-- 通知 TG: 🧪 测试用例已生成
+- LOG: 🧪 测试用例已生成
 
-#### ⑧ code-reviewer (Gate 2)
+#### ⑧ code-reviewer (Gate 2) — 仅 `--review` 模式
+
 ```
+IF NOT --review:
+  SKIP Gate 2
+
 round=1
 WHILE round <= REVIEW_MAX_ROUNDS:
   result=$(codex exec --full-auto "审查代码...")
   IF result == PASS:
-    通知 TG: 🔍 Code Review: PASS ✅
+    LOG "✅ Code Review PASS"
     BREAK
   ELSE:
     IF round < REVIEW_MAX_ROUNDS:
-      通知 TG: 🔍 Code Review 第{round}轮: <问题>
+      LOG "⚠️ Code Review 第{round}轮: <问题>"
       CLAUDE 修复代码
     ELSE:
-      通知 TG: ⚠️ Code Review 超过 {N} 轮，需人工介入
+      LOG "❌ Code Review 超过 {N} 轮，需人工介入"
       ABORT
   round+=1
 ```
@@ -611,50 +609,20 @@ UPDATE "$ITER_DIR/status.json": pipeline_stage="test-pipeline"
 ```
 
 #### ⑨ test-pipeline
+
 ```
 STAGE 1: npx $LINT_TOOL .        # 快速失败
 STAGE 2: npx $TEST_FRAMEWORK     # unit tests
-STAGE 3: npx playwright test     # Playwright 预检
-STAGE 4: Playwright MCP 功能验收（⚠️ 不可跳过）
-  ⚠️ 前置：Agent 必须自行启动 dev server
-    → 读取 package.json scripts 检测启动命令（dev > start > serve）
-    → 后台启动 dev server，等待 ready/listening 关键词
-    → 从输出中提取实际 URL 和端口
-    → ❌ 禁止因 "dev server 未运行" 跳过或标记 Pending
-  → 必须真正调用 Playwright MCP 工具:
-    browser_navigate → browser_snapshot → browser_click/type
-    → browser_console_messages → browser_screenshot
-  → 产出: tests/reports/playwright/<slug>-<scenario>.md + 截图
-STAGE 5: CDP 交互复核（Chrome DevTools Protocol）
-  → 产出: tests/reports/cdp/<slug>-<scenario>.md
-STAGE 6: 生成最终验收报告（HTML 图表）
-  → 产出: tests/reports/<slug>-acceptance-report.html
-
-# ⑨.artifact-gate: 产物验证门禁（必须在标记完成前执行）
-REQUIRED_ARTIFACTS = [
-  "tests/reports/playwright/<slug>-*.md",
-  "tests/reports/<slug>-acceptance-report.html"
-]
-FOR artifact IN REQUIRED_ARTIFACTS:
-  IF NOT glob_exists(artifact):
-    LOG "❌ 产物缺失: $artifact"
-    IF token_budget_low:
-      UPDATE status.json: pipeline_stage="test-pipeline-incomplete"
-      通知 TG: ⚠️ test-pipeline 未完成，缺少产物: $artifact，需下轮会话继续
-      ABORT  # 不能标记 completed
-    ELSE:
-      RETRY from missing STAGE
-LOG "✅ 产物验证通过"
+STAGE 3: npx playwright test     # Playwright E2E
 
 IF any failure:
   IF round < REVIEW_MAX_ROUNDS:
-    通知 TG: 🧪 失败用例: <列表>
+    LOG "⚠️ 失败用例: <列表>"
     CLAUDE 修复
 
     # ⑨.1 测试修复后增量文档同步
     IF 修复过程中修改了 design.md 或 tasks.md:
       同步 .claude/ARCHITECTURE.md / .claude/SECURITY.md 受影响章节
-      LOG "📄 测试修复引起的设计/任务变更已同步到基线文档"
 
     # ⑨.2 上下文检查点
     IF context_usage > 80%:
@@ -663,13 +631,13 @@ IF any failure:
 
     retry
   ELSE:
-    通知 TG: ⚠️ 测试修复超过 {N} 轮
+    LOG "❌ 测试修复超过 {N} 轮，需人工介入"
     ABORT
 
-通知 TG: 🧪 测试结果: <通过数>/<总数>
+LOG "✅ 测试通过: <通过数>/<总数>"
 ```
 
-> **规则**：测试修复阶段如果涉及 design.md（技术方案调整）或 tasks.md（任务范围变更），必须在 retry 前同步更新 .claude/ARCHITECTURE.md / .claude/SECURITY.md / EXISTING_STRUCTURE.md 中受影响的章节，防止文档与实际实现脱节。
+> **规则**：测试修复阶段如果涉及 design.md 或 tasks.md 变更，必须在 retry 前同步更新 .claude/ARCHITECTURE.md / .claude/SECURITY.md 中受影响的章节。
 
 #### ⑩ docs-updater
 按变更更新：
@@ -678,7 +646,6 @@ IF any failure:
 - .claude/SECURITY.md — 安全相关变更
 - .claude/CODING_GUIDELINES.md — 新模式/约定
 - .claude/CLAUDE.md — **更新 iterations 引用列表**
-- 通知 TG: 📝 文档已更新: <更新文件列表>
 
 #### ⑪ git-committer
 ```bash
@@ -711,67 +678,42 @@ IF 当前为 apply 模式:
   UPDATE status.json: phase="applied", applied_at=now
 ```
 
-#### 最终通知
-通知 TG: ✅ PR: <url> | 变更: N files | 测试: 全部通过
+#### ⑪.2 完成输出
 
-## TG 通知命令
-
-所有通知统一使用 OpenClaw CLI（用户需提前配置：`openclaw auth login && openclaw channel connect telegram`）：
-```bash
-# TG_USERNAME 为 Telegram 账号数字 ID 或 chat_id
-openclaw message send --channel telegram --target "$TG_USERNAME" --message "$MSG"
 ```
-
-通知列表（共 15 个通知点，覆盖所有关键环节）：
-1. 初始化完成：🚀 项目初始化完成（fresh/existing）
-2. 需求收录：📥 需求已收录: <摘要前50字>
-3. 需求澄清：❓ 需求澄清完成: 已确认 <N> / 已假设 <M>（澄清在主会话内交互完成；TG 不承载提问）
-4. 设计生成：🎨 设计文档已生成
-5. 任务分解：📋 任务分解完成: <任务数> 个任务 | 预估工时: <总工时>
-6. 设计 Review：🔍 设计 Review: PASS ✅ 或 🔍 设计 Review 第N轮: <问题摘要>
-7. **Proposal 完成**：📋 需求拆解完成，等待人工审核（仅 proposal 命令）
-8. **Apply 启动**：🚀 开始执行需求开发（仅 apply 命令）
-9. 开始实现：🔨 开始实现: <需求摘要> → 实现完成: <已完成>/<总数>
-10. 测试生成：🧪 测试用例已生成
-11. Code Review：🔍 Code Review: PASS ✅ 或 🔍 Code Review 第N轮: <问题列表>
-12. 测试结果：🧪 测试结果: <通过数>/<总数> 通过 或 🧪 失败用例: <列表>
-13. 文档更新：📝 文档已更新: <更新文件列表>
-14. 迭代完成：✅ PR: <url> | 变更: N files | 测试: 全部通过
-
-超限通知（任何 Gate/测试循环超限时触发）：
-- ⚠️ 需人工介入: <Gate名称> 超过 N 轮未通过
+LOG "✅ PR: <url> | 变更: N files | 测试: 全部通过"
+```
 
 ## 循环与回退规则
 
 | 循环点 | 触发条件 | 回退到 | 最大轮数 | 超限行为 |
 |--------|----------|--------|----------|----------|
-| Gate 1 (⑤) | Codex 返回 FAIL | 步骤③ design-generator | REVIEW_MAX_ROUNDS | 📱 TG 中止通知 |
-| Gate 2 (⑧) | Codex 返回 FAIL | 步骤⑥ Claude Code 开发 | REVIEW_MAX_ROUNDS | 📱 TG 中止通知 |
-| Test (⑨) | 测试失败 | 步骤⑥ Claude Code 开发 | REVIEW_MAX_ROUNDS | 📱 TG 中止通知 |
+| Gate 1 (⑤) | Codex 返回 FAIL（--review 时） | 步骤③ design-generator | REVIEW_MAX_ROUNDS | 控制台报错，中止 |
+| Gate 2 (⑧) | Codex 返回 FAIL（--review 时） | 步骤⑥ Claude Code 开发 | REVIEW_MAX_ROUNDS | 控制台报错，中止 |
+| Test (⑨) | 测试失败 | 步骤⑥ Claude Code 开发 | REVIEW_MAX_ROUNDS | 控制台报错，中止 |
 
 ## 全局规则
 
 1. **单 Agent 模式**：所有步骤由一个 Claude Code Agent 执行
-2. **双模型把关**：Claude Code 生成，Codex CLI 审查
-3. **循环上限**：每个 Gate/Test ≤ REVIEW_MAX_ROUNDS（默认 1）
+2. **双模型把关（可选）**：Claude Code 生成，Codex CLI 审查；`--review` 时启用 Gate 1 + Gate 2
+3. **循环上限**：每个 Gate/Test ≤ REVIEW_MAX_ROUNDS（默认 1，--review 时生效）
 4. **Conventional Commits**：`<type>(scope): description`
 5. **禁止直推**：所有变更通过 feature branch + PR
-6. **通知不中断**：TG 通知失败只 log，不影响 Pipeline
-7. **安全优先**：禁止在通知/日志中泄露敏感信息
-8. **文件隔离**：所有文件操作限项目根目录内
-9. **渐进式加载**：SKILL.md ≤500 行，详细规范按需从 references/ 加载
-10. **模板不覆盖**：init-project.sh 不覆盖已存在的文件
-11. **统一测试目录**：单元测试只能写入 `tests/unit/web|server|packages`，E2E 只能写入 `tests/e2e/`，报告写入 `tests/reports/`
-12. **E2E 证据要求**：关键用户路径的最终报告必须以 Playwright MCP 和 CDP 的交互验证结果为准；Playwright 仅作为预检
-13. **需求到测试唯一映射**：requirements、tasks、E2E 场景必须有唯一 ID 映射，禁止重复覆盖同一需求路径
-14. **迭代可追溯**：docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/
-15. **审查门禁不可降级**：Codex CLI 不可用时必须中止，不能自动跳过 Gate
-16. **全栈目录约束**：默认采用 Better-T-Stack 风格 monorepo，业务代码不应随意落到根目录级 `web/`/`api/`/`server/`
-17. **文档统一放置**：ARCHITECTURE.md、SECURITY.md、CODING_GUIDELINES.md 与 CLAUDE.md 统一放在 `.claude/` 目录
-18. **proposal 状态管理**：proposal 完成后必须写入 status.json；apply 启动前必须校验 status.json
-19. **上下文管理**：Pipeline 步骤间检测上下文占用，超过 80% 时执行 `/compact`。关键检查点：Gate 1 通过后进入开发前（⑤→⑥）、Gate 2 通过后进入测试前（⑧→⑨）、测试修复 retry 前（⑨ 内）。compact 前必须确保当前步骤产物已写入文件（requirements.md / design.md / tasks.md / status.json / git add），compact 后显式重新加载迭代目录产物 + .claude/ 基线文档恢复工作上下文
-20. **Agent Team 并行**：在步骤 ⑦ test-generator（单元测试 + E2E 可并行生成）、⑨ test-pipeline Stage 2-3（unit + Playwright 预检可并行）、⑩ docs-updater（多文档可并行更新）使用 Agent Team 分发子任务以加速执行；Gate 审查（⑤⑧）和顺序依赖步骤（①→②→③→④）不适合并行
-21. **Worktree 并行开发**：通过 `worktree create` 创建隔离工作区，每个 worktree 独立运行 pipeline；详见 `references/parallel-dev.md`
-22. **Worktree 端口隔离**：并行工作区的 dev server 端口按 `PORT=3000+seq, API_PORT=4000+seq` 分配，避免冲突
-23. **Worktree 注册表**：`.worktrees/worktree-registry.json` 记录所有并行工作区元数据，`git-committer` 完成后更新 `pr_url`
-24. **Worktree 文件冲突检测**：创建并行工作区前检查目标文件与已有工作区的交集，存在冲突时警告
+6. **安全优先**：禁止在日志中泄露敏感信息
+7. **文件隔离**：所有文件操作限项目根目录内
+8. **渐进式加载**：SKILL.md ≤500 行，详细规范按需从 references/ 加载
+9. **模板不覆盖**：init-project.sh 不覆盖已存在的文件
+10. **统一测试目录**：单元测试只能写入 `tests/unit/web|server|packages`，E2E 只能写入 `tests/e2e/`，报告写入 `tests/reports/`
+11. **需求到测试唯一映射**：requirements、tasks、E2E 场景必须有唯一 ID 映射，禁止重复覆盖同一需求路径
+12. **迭代可追溯**：docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/
+13. **审查门禁不可降级**：Codex CLI 不可用时若指定 `--review` 必须中止，不能自动跳过 Gate
+14. **全栈目录约束**：默认采用 Better-T-Stack 风格 monorepo，业务代码不应随意落到根目录级 `web/`/`api/`/`server/`
+15. **文档统一放置**：ARCHITECTURE.md、SECURITY.md、CODING_GUIDELINES.md 与 CLAUDE.md 统一放在 `.claude/` 目录
+16. **proposal 状态管理**：proposal 完成后必须写入 status.json；apply 启动前必须校验 status.json
+17. **上下文管理**：Pipeline 步骤间检测上下文占用，超过 80% 时执行 `/compact`。关键检查点：开发前（④→⑥）、测试前（⑦→⑨）、测试修复 retry 前（⑨ 内）。compact 前必须确保当前步骤产物已写入文件，compact 后显式重新加载迭代目录产物 + .claude/ 基线文档
+18. **Agent Team 并行**：在步骤 ⑦ test-generator、⑨ test-pipeline Stage 2-3（unit + E2E 可并行）、⑩ docs-updater 使用 Agent Team 并行；顺序依赖步骤（①→②→③→④）不适合并行
+19. **Worktree 并行开发**：通过 `worktree create` 创建隔离工作区，每个 worktree 独立运行 pipeline；详见 `references/parallel-dev.md`
+20. **Worktree 端口隔离**：并行工作区的 dev server 端口按 `PORT=3000+seq, API_PORT=4000+seq` 分配，避免冲突
+21. **Worktree 注册表**：`.worktrees/worktree-registry.json` 记录所有并行工作区元数据，`git-committer` 完成后更新 `pr_url`
+22. **Worktree 文件冲突检测**：创建并行工作区前检查目标文件与已有工作区的交集，存在冲突时警告
+23. **accept 可选性**：Playwright MCP 功能验收是可选步骤，通过 `/sdlc-workflow accept` 人工触发，不在自动流程中执行

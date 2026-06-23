@@ -99,11 +99,11 @@ fi
 ⑦ test-generator
    生成单元测试 + E2E 测试
 
-⑧ code-reviewer (Gate 2)
+[⑧ code-reviewer (Gate 2)   ← 仅 --review 模式]
    Codex CLI 审查代码
 
 ⑨ test-pipeline
-   lint → unit → Playwright 预检 → Playwright MCP → CDP → HTML 报告
+   lint → unit → Playwright E2E（三阶段）
 
 ⑩ docs-updater
    更新 .claude/ARCHITECTURE.md / .claude/SECURITY.md 等
@@ -145,9 +145,9 @@ if [ -z "$ITER_DIR" ]; then
 fi
 ```
 
-## TG 通知文案
+## 控制台输出
 
-### Apply 启动通知
+### Apply 启动
 
 ```
 🚀 开始执行需求开发
@@ -157,9 +157,7 @@ fi
 🔍 Proposal 审核通过 ✅
 ```
 
-### Apply 完成通知
-
-复用现有的 git-committer 最终通知：
+### Apply 完成
 
 ```
 ✅ PR: <url> | 变更: N files | 测试: 全部通过
@@ -174,8 +172,8 @@ fi
 | phase 为 rejected | 中止，提示修改后重新 proposal |
 | phase 为 applied | 中止，提示已执行过（需手动重置） |
 | 产物文件缺失 | 中止，提示重新 proposal |
-| Gate 2 超限 | 中止，TG 通知人工介入 |
-| 测试修复超限 | 中止，TG 通知人工介入 |
+| Gate 2 超限（--review 时） | 中止，控制台输出错误，提示人工介入 |
+| 测试修复超限 | 中止，控制台输出错误，提示人工介入 |
 
 ## status.json 更新
 

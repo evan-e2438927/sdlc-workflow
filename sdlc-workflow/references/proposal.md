@@ -37,7 +37,7 @@
 ② requirements-clarifier
    → 标注版 requirements.md
    ※ proposal 模式下，对低置信度需求会**在主会话内通过 AskUserQuestion 发起选择询问**
-     （而非通过 TG 回复）。详见 references/requirements-clarifier.md §4。
+     详见 references/requirements-clarifier.md §4。
 
 ③ design-generator
    → docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/design.md
@@ -45,16 +45,16 @@
 ④ task-generator
    → docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/tasks.md
 
-⑤ design-reviewer (Gate 1)
+[⑤ design-reviewer (Gate 1)   ← 仅 --review 模式]
    循环审查，最大 REVIEW_MAX_ROUNDS 轮
 
-⑤.1 增量文档同步（若 Gate 1 经 ≥1 轮修订）
+[⑤.1 增量文档同步              ← 仅 --review 且经修订]
    同步影响到的 .claude/ARCHITECTURE.md / .claude/SECURITY.md 等
 
 ⑥ 写入 status.json
    → phase: "pending_review"
 
-⑦ 通知 TG: 📋 需求拆解完成，等待人工审核
+⑦ 控制台输出: 需求拆解完成，等待人工审核
 
 ⏸ 停止
 ```
@@ -104,9 +104,9 @@ TASK_COUNT=$(grep -c "^### \[" "$ITER_DIR/tasks.md" || echo 0)
 TOTAL_HOURS=$(grep -oP '预估工时: \K[0-9]+' "$ITER_DIR/tasks.md" | awk '{s+=$1}END{print s}')
 ```
 
-## TG 通知文案
+## 控制台输出
 
-### Proposal 完成通知
+### Proposal 完成
 
 ```
 📋 需求拆解完成，等待人工审核
@@ -128,8 +128,8 @@ TOTAL_HOURS=$(grep -oP '预估工时: \K[0-9]+' "$ITER_DIR/tasks.md" | awk '{s+=
 | 错误场景 | 处理方式 |
 |----------|----------|
 | 项目未初始化 | 自动执行 init-project.sh |
-| 需求采集失败 | 中止，TG 通知 |
-| Gate 1 超限 | 中止，TG 通知人工介入 |
+| 需求采集失败 | 中止，控制台输出错误 |
+| Gate 1 超限（--review 时） | 中止，提示人工介入 |
 | status.json 写入失败 | LOG warning，不阻塞（产物已生成） |
 
 ## 与 doit 的关系
