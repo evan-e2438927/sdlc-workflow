@@ -8,20 +8,36 @@
 
 `tests/reports/<slug>-<timestamp>.md` — 测试执行报告
 
+## 默认行为
+
+**默认只运行 Stage 1 + Stage 2（Lint + Unit）**。Stage 3 Playwright E2E 需要显式开启，加 `--e2e` 参数：
+
+```bash
+# 默认（lint + unit）
+/sdlc-workflow apply
+/sdlc-workflow doit
+
+# 开启 E2E（启动浏览器，消耗 token）
+/sdlc-workflow apply --e2e
+/sdlc-workflow doit --e2e
+```
+
+功能验收（Playwright MCP）始终需要人工触发：`/sdlc-workflow accept <iter-dir>`
+
 ## 详细行为
 
-### 1. 三阶段执行
+### 1. 执行阶段
 
 ```mermaid
 graph LR
     LINT["Stage 1: Lint<br/>$LINT_TOOL"]
     UNIT["Stage 2: Unit<br/>$TEST_FRAMEWORK"]
-    E2E["Stage 3: E2E<br/>$E2E_FRAMEWORK"]
+    E2E["Stage 3: E2E（--e2e）<br/>Playwright"]
 
     LINT --> UNIT
-    LINT --> E2E
-    UNIT --> REPORT["测试报告"]
-    E2E --> REPORT
+    UNIT --> E2E
+    E2E --> REPORT["测试报告"]
+    UNIT --> REPORT
 ```
 
 ### 2. Stage 1: Lint
@@ -70,46 +86,18 @@ case "$TEST_FRAMEWORK" in
 esac
 ```
 
-### 4. Stage 3: Playwright E2E 测试
+### 4. Stage 3: Playwright E2E 测试（仅 `--e2e`）
+
+**默认跳过**。加 `--e2e` 参数时才执行，会启动真实浏览器进程：
 
 ```bash
-echo "🎭 运行 Playwright E2E 测试..."
-npx playwright test tests/e2e/ --reporter=html,json
+RUN_E2E=${RUN_E2E:-false}
 
-if [ -f "playwright-report/index.html" ]; then
-  echo "📊 Playwright 测试报告已生成"
-fi
-```
-
-### 5. 并行执行
-
-Stage 2 和 Stage 3 可以并行执行（如果无依赖）：
-
-```bash
-PARALLEL_TESTS=${PARALLEL_TESTS:-false}
-
-if [ "$PARALLEL_TESTS" = "true" ]; then
-  echo "🚀 并行执行 Unit 和 E2E..."
-
-  run_unit_tests &
-  PID_UNIT=$!
-
-  run_e2e_tests &
-  PID_E2E=$!
-
-  wait $PID_UNIT || UNIT_EXIT=$?
-  wait $PID_E2E || E2E_EXIT=$?
-
-  UNIT_EXIT=${UNIT_EXIT:-0}
-  E2E_EXIT=${E2E_EXIT:-0}
-
-  if [ "$UNIT_EXIT" -ne 0 ] || [ "$E2E_EXIT" -ne 0 ]; then
-    echo "❌ 部分测试失败"
-    exit 1
-  fi
+if [ "$RUN_E2E" = "true" ]; then
+  echo "🎭 运行 Playwright E2E 测试..."
+  npx playwright test tests/e2e/ --reporter=json
 else
-  run_unit_tests
-  run_e2e_tests
+  echo "ℹ️ E2E 已跳过（加 --e2e 启用）"
 fi
 ```
 
@@ -166,7 +154,7 @@ while [ $round -le $max_rounds ]; do
 
   run_lint
   run_unit_tests
-  run_e2e_tests
+  [ "$RUN_E2E" = "true" ] && run_e2e_tests
 
   if all_tests_pass; then
     echo "✅ 所有测试通过"
@@ -196,6 +184,7 @@ REPORT_FILE="tests/reports/${SLUG}-${TIMESTAMP}.md"
 LINT_TOOL=${LINT_TOOL:-eslint}
 TEST_FRAMEWORK=${TEST_FRAMEWORK:-jest}
 REVIEW_MAX_ROUNDS=${REVIEW_MAX_ROUNDS:-1}
+RUN_E2E=${RUN_E2E:-false}   # 由 --e2e 参数设置为 true
 
 run_lint() {
   case "$LINT_TOOL" in
@@ -215,7 +204,7 @@ run_unit_tests() {
 }
 
 run_e2e_tests() {
-  npx playwright test tests/e2e/ --reporter=html,json
+  npx playwright test tests/e2e/ --reporter=json
 }
 
 round=1
@@ -232,8 +221,12 @@ while [ $round -le $REVIEW_MAX_ROUNDS ]; do
   echo "🧪 Stage 2: Unit Tests..."
   run_unit_tests || UNIT_FAILED=1
 
-  echo "🎭 Stage 3: E2E Tests..."
-  run_e2e_tests || E2E_FAILED=1
+  if [ "$RUN_E2E" = "true" ]; then
+    echo "🎭 Stage 3: E2E Tests..."
+    run_e2e_tests || E2E_FAILED=1
+  else
+    echo "ℹ️ Stage 3: E2E 已跳过（加 --e2e 启用）"
+  fi
 
   if [ "$LINT_FAILED" -eq 0 ] && [ "$UNIT_FAILED" -eq 0 ] && [ "$E2E_FAILED" -eq 0 ]; then
     echo "✅ 所有测试通过"
@@ -243,6 +236,7 @@ while [ $round -le $REVIEW_MAX_ROUNDS ]; do
 - 执行时间: $(date)
 - 迭代: $SLUG
 - 框架: $TEST_FRAMEWORK
+- E2E: $( [ "$RUN_E2E" = "true" ] && echo "已执行" || echo "已跳过" )
 REPORT
     echo "📋 测试报告: $REPORT_FILE"
     exit 0

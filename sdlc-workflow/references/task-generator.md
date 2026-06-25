@@ -366,13 +366,9 @@ if [ "$TASKS_WITH_TRACK" -ne "$TOTAL_TASKS" ]; then
   exit 1
 fi
 
-# 6. TG 通知
 TOTAL_HOURS=$(grep -oP '预估工时: \K[0-9]+' "$TASKS_FILE" | awk '{s+=$1}END{print s}')
 TRACK_BREAKDOWN=$(grep -oP '^\*\*Track\*\*: \K\w+' "$TASKS_FILE" | sort | uniq -c | awk '{print $2"="$1}' | paste -sd' ' -)
-notify_tg "📋 任务分解完成: $TOTAL_TASKS 个任务
-⏱ 预估工时: ${TOTAL_HOURS}h
-👥 Track 分布: $TRACK_BREAKDOWN
-📂 详见: docs/iterations/$DATE/$SEQ-$SLUG-$TYPE/tasks.md"
+echo "✅ 任务分解完成: $TOTAL_TASKS 个任务 | 预估工时: ${TOTAL_HOURS}h | Track: $TRACK_BREAKDOWN"
 ```
 
 ## 错误处理
@@ -384,17 +380,6 @@ notify_tg "📋 任务分解完成: $TOTAL_TASKS 个任务
 | 任务数超过 20 | 建议拆分为多个子需求 |
 | 任务缺少 Track 字段 | 中止生成，要求补全后重试 |
 | Track 与目标文件路径不自洽 | 由 Gate 1 报告，触发修订 |
-
-## TG 通知文案
-
-任务生成完成后：
-
-```
-📋 任务分解完成: <任务总数> 个任务
-⏱ 预估工时: <总工时>
-👥 Track 分布: frontend=N backend=N shared=N infra=N test=N
-📂 详见: docs/iterations/<date>/<seq>-<slug>-<type>/tasks.md
-```
 
 ## 相关文件
 

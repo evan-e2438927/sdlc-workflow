@@ -139,13 +139,12 @@ EOF
   if ! result=$(codex exec --full-auto "$PROMPT" 2> /tmp/code-review-codex.stderr); then
     echo "❌ Codex 代码审查调用失败"
     cat /tmp/code-review-codex.stderr
-    notify_tg "⚠️ Code Review 调用失败，已中止 Pipeline"
+    echo "⚠️ Code Review 调用失败，已中止 Pipeline"
     exit 1
   fi
 
   if echo "$result" | grep -qiE "^PASS$|^\*\*结论\*\*: PASS$|^结论: PASS$"; then
     echo "✅ Code Review 通过"
-    notify_tg "🔍 Code Review: PASS ✅"
     exit 0
   else
     # 提取问题列表
@@ -154,8 +153,6 @@ EOF
     if [ $round -lt $max_rounds ]; then
       echo "⚠️ Code Review 失败，第 $round 轮问题："
       echo "$issues"
-
-      notify_tg "🔍 Code Review 第${round}轮: $(echo "$issues" | head -c 200)..."
 
       # Claude Code 根据反馈修复代码
       echo "📝 Claude Code 修复代码..."
@@ -166,7 +163,6 @@ EOF
 
     else
       echo "❌ Code Review 超过 $max_rounds 轮，需人工介入"
-      notify_tg "⚠️ Code Review 超过 ${max_rounds} 轮，需人工介入 → 中止 Pipeline"
       exit 1
     fi
   fi
@@ -272,32 +268,6 @@ done
 | 审查超时 | 重试最多 3 次，仍失败则中止 |
 | 严重安全漏洞 | 高优先级通知，立即修复 |
 | 文件落位违反 monorepo 约定 | FAIL，要求回退修复目录结构 |
-
-## TG 通知文案
-
-### 审查通过
-
-```
-🔍 Code Review: PASS ✅
-📋 <通过轮数> 轮审查通过
-🛡️ 代码安全检查通过
-```
-
-### 审查失败（循环中）
-
-```
-🔍 Code Review 第 {N} 轮: <问题摘要前100字>
-📝 Claude 正在修复，请稍候...
-```
-
-### 审查超限
-
-```
-⚠️ Code Review 超过 {N} 轮，需人工介入
-🛡️ 主要问题: <问题摘要>
-📂 保留当前代码待人工修复
-💡 修复后可从步骤⑧手动恢复
-```
 
 ## 相关文件
 

@@ -103,24 +103,9 @@ intake 至少要分析以下 6 类内容：
 4. 设计模型已明确现有结构的保护边界
 5. 不存在“先写需求，后补基线”的倒序行为
 
-### 5. TG 通知
-
-intake 完成后发送通知：
+### 5. 完成输出
 
 ```bash
-notify_tg "🚀 项目初始化完成（existing project）
-📄 PROJECT_BASELINE.md ✅
-📄 EXISTING_STRUCTURE.md ✅
-📄 TEST_BASELINE.md ✅
-🔒 结构保护规则已生效"
-```
-
-fresh project 初始化完成后发送通知：
-
-```bash
-notify_tg "🚀 项目初始化完成（fresh project）
-📂 .claude/CLAUDE.md ✅
-📂 .claude/rules/workflow-rules.md ✅
-📂 docs/ 基础文档 ✅
-⚙️ .env 配置已就绪"
+echo "✅ 项目初始化完成（existing project）"
+echo "   PROJECT_BASELINE.md / EXISTING_STRUCTURE.md / TEST_BASELINE.md 已生成"
 ```

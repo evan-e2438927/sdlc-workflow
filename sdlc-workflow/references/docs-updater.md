@@ -256,13 +256,7 @@ update_iterations_reference
 
 echo "✅ 文档更新完成"
 
-# TG 通知
-notify_tg "📝 文档已更新:
-📄 README.md
-📄 .claude/ARCHITECTURE.md
-📄 .claude/SECURITY.md
-📄 .claude/CODING_GUIDELINES.md
-📄 .claude/CLAUDE.md (iterations 引用已更新)"
+echo "✅ 文档已更新: README.md, ARCHITECTURE.md, SECURITY.md, CODING_GUIDELINES.md, CLAUDE.md"
 ```
 
 ## 错误处理
@@ -272,19 +266,6 @@ notify_tg "📝 文档已更新:
 | README.md 不存在 | 跳过，或创建基础版本 |
 | CLAUDE.md 缺少章节 | 自动添加 iterations 章节 |
 | 文档合并冲突 | 保留双方内容，标记待人工解决 |
-
-## TG 通知文案
-
-文档更新完成后：
-
-```
-📝 文档已更新:
-📄 README.md
-📄 .claude/ARCHITECTURE.md
-📄 .claude/SECURITY.md
-📄 .claude/CODING_GUIDELINES.md
-📄 .claude/CLAUDE.md (iterations 引用已更新)
-```
 
 ## 相关文件
 

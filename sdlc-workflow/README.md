@@ -1,16 +1,17 @@
 # SDLC Workflow Suite — AI 驱动的自动化开发流水线
 
-基于 Claude Code Skills、Codex CLI 审查门禁和浏览器 MCP 验收构建的可编排 SDLC 工作流。
+基于 Claude Code Skills、可选 Codex CLI 审查门禁和浏览器 MCP 验收构建的可编排 SDLC 工作流。
 
 当前推荐入口是单入口多模式：
 
 - `/sdlc-workflow init ...`
 - `/sdlc-workflow proposal ...` — 需求拆解，等待人工审核
-- `/sdlc-workflow apply ...` — 审核通过后执行开发
-- `/sdlc-workflow doit ...` — 全自动模式
-- `/sdlc-workflow mini ...` — 小任务轻量流程
+- `/sdlc-workflow apply [--review] ...` — 审核通过后执行开发
+- `/sdlc-workflow review proposal|code ...` — 单独运行 Codex 设计/代码审查
+- `/sdlc-workflow accept ...` — 可选，Playwright MCP 功能验收
+- `/sdlc-workflow doit [--review] ...` — 全自动模式
 
-**单 Agent 模式** + **双模型把关**（Claude Code 生成 / Codex CLI 审查）
+**单 Agent 模式** + **可选双模型审查**（Claude Code 生成 / Codex CLI 审查，加 `--review` 时启用）
 
 默认面向 Better-T-Stack 风格的全栈目录约定：
 
@@ -26,13 +27,12 @@
 ## 功能特性
 
 - **Proposal / Apply 分离**：需求拆解与开发执行分离，中间可插入人工审核
-- **单入口多模式**：init / proposal / apply / doit / mini 分流
-- **12 步完整 Pipeline**：从需求到 PR 的全流程自动化
-- **双模型审核**：Claude Code 生成 + Codex CLI 独立审查
-- **TG 通知**：关键节点实时推送 Telegram 通知
+- **单入口多模式**：init / proposal / apply / review / accept / doit / mini 分流
+- **完整 Pipeline**：从需求到 PR 的全流程自动化（Lint → Unit → E2E）
+- **可选双模型审查**：加 `--review` 时启用 Codex CLI 独立审查（Gate 1 + Gate 2）
+- **可选 Playwright MCP 验收**：`accept` 命令人工触发，不强制
 - **自动初始化**：首次运行自动检测并生成项目结构
 - **旧项目接入模式**：existing project 先做 baseline intake，再进入需求流程
-- **TG_USERNAME 自动检测**：TG/OpenClaw 触发时自动获取用户名
 - **iterations 可追溯**：完整保留每次迭代的 requirements/design/tasks
 
 ---
@@ -41,11 +41,9 @@
 
 | 工具 | 用途 | 安装 |
 |------|------|------|
-| Codex CLI | 双模型审查 (Gate 1 + Gate 2) | `npm i -g @openai/codex` |
+| Codex CLI | Codex 审查（--review 时可选） | `npm i -g @openai/codex` |
 | GitHub CLI (gh) | PR 创建 | `brew install gh` → `gh auth login` |
-| OpenClaw CLI | TG 通知 | `npm i -g openclaw` |
-| Playwright MCP | URL 内容提取 + 浏览器验证 | 已在用户环境配置 |
-| CDP (Chrome DevTools Protocol) | 关键交互链路最终复核验证 | chrome-cdp skill（`~/.claude/skills/chrome-cdp`） |
+| Playwright MCP | URL 内容提取 + accept 命令浏览器验收 | 已在用户环境配置 |
 
 ---
 
@@ -86,21 +84,24 @@ git clone https://github.com/evan-taojiangcb/sdlc-workflow ~/.agents/skills/sdlc
 # 审核通过后执行开发
 /sdlc-workflow apply docs/iterations/2026-04-13/001-user-login-feature/
 
+# 或者带 Codex 审查
+/sdlc-workflow apply --review docs/iterations/2026-04-13/001-user-login-feature/
+
 # 或者使用全自动模式（不停顿）
 /sdlc-workflow doit 创建一个用户登录模块
 
 # 小任务
 /sdlc-workflow mini 把首页背景改成红色
+
+# 可选：apply 完成后做 Playwright MCP 功能验收
+/sdlc-workflow accept docs/iterations/2026-04-13/001-user-login-feature/
 ```
 
 自动流程：
 1. 识别是 fresh project 还是 existing project
 2. 检测项目未初始化 → 执行 `init-project.sh` → 生成 `.claude/` + `docs/` + `tests/` + `.env.example`
 3. 若为 existing project → 先生成 `.claude/PROJECT_BASELINE.md`、`.claude/EXISTING_STRUCTURE.md`、`.claude/TEST_BASELINE.md`
-4. 检测 TG_USERNAME：
-   - 若 TG 触发且存在 `OPENCLAW_TRIGGER_USER` → 自动创建 `.env`（若缺失）并写入
-   - 若手动触发 → 提示用户 `cp .env.example .env` → 编辑 `.env` 设置 `TG_USERNAME`
-5. 配置完成后 → 进入 Pipeline
+4. 读取 `.env`（若不存在则从 `.env.example` 复制）→ 进入 Pipeline
 
 ### 接入已存在项目
 
@@ -121,6 +122,13 @@ git clone https://github.com/evan-taojiangcb/sdlc-workflow ~/.agents/skills/sdlc
 # ... 审阅产物 ...
 /sdlc-workflow apply   # 自动定位最近的 pending proposal
 
+# 带 Codex 审查
+/sdlc-workflow apply --review
+
+# 单独运行 Codex 审查（不触发其他步骤）
+/sdlc-workflow review proposal docs/iterations/2026-04-13/001-user-login-feature/
+/sdlc-workflow review code docs/iterations/2026-04-13/001-user-login-feature/
+
 # 全自动模式
 /sdlc-workflow doit 添加密码重置功能
 /sdlc-workflow doit file:///path/to/requirements.txt
@@ -138,9 +146,9 @@ git clone https://github.com/evan-taojiangcb/sdlc-workflow ~/.agents/skills/sdlc
 
 用于初始化或接入 existing project。
 
-### `/sdlc-workflow proposal`
+### `/sdlc-workflow proposal [--review]`
 
-需求拆解命令（参考 OpenSpec 模式）。执行步骤 ①-⑤（需求采集 → 澄清 → 设计 → 任务分解 → Gate 1），产出 proposal 产物后暂停，等待人工审核。
+需求拆解命令（参考 OpenSpec 模式）。执行步骤 ①-④（需求采集 → 澄清 → 设计 → 任务分解），产出 proposal 产物后暂停，等待人工审核。加 `--review` 时额外执行 Gate 1（Codex 设计审查）。
 
 产出物：
 - `requirements.md` — 结构化需求
@@ -148,18 +156,25 @@ git clone https://github.com/evan-taojiangcb/sdlc-workflow ~/.agents/skills/sdlc
 - `tasks.md` — 任务分解
 - `status.json` — 状态标记 (`pending_review`)
 
-### `/sdlc-workflow apply`
+### `/sdlc-workflow apply [--review]`
 
-需求开发命令。在 proposal 产物经人工审核后，继续执行步骤 ⑥-⑪（开发 → 测试 → Gate 2 → 测试流水线 → 文档 → PR）。
+需求开发命令。在 proposal 产物经人工审核后，继续执行步骤 ⑥-⑪（开发 → 测试 → 文档 → PR）。加 `--review` 时额外执行 Gate 2（Codex 代码审查）。
 
-### `/sdlc-workflow doit`
+### `/sdlc-workflow review proposal|code <迭代目录>`
+
+单独运行 Codex 审查，不触发其他步骤。适合在 proposal 或 apply 之后手动触发审查。
+
+### `/sdlc-workflow accept <迭代目录>`
+
+**可选**：apply 完成后，人工触发 Playwright MCP 功能验收。通过后 status.json 更新为 `accepted`。
+
+### `/sdlc-workflow doit [--review]`
 
 全自动模式。内部等价于 `proposal + apply` 不停顿，适用于完全信任 AI 处理的场景。
 
 ### `/sdlc-workflow mini`
 
-用于微小任务，最终验收仍基于 Playwright MCP + CDP。
-它不会跳过 gate；mini 模式仍需执行精简版 Gate 1、验证能力检测、Gate 2 和最终 MCP 验收。
+用于微小任务。最终验收通过 `accept` 命令人工触发，不强制。
 
 ---
 
@@ -168,12 +183,15 @@ git clone https://github.com/evan-taojiangcb/sdlc-workflow ~/.agents/skills/sdlc
 ```mermaid
 graph TD
     START["/sdlc-workflow"] --> CMD{命令?}
-    CMD -->|proposal| P1["①-⑤ 需求拆解 + Gate 1"]
+    CMD -->|proposal| P1["①-④ 需求拆解 [+Gate 1]"]
     P1 --> P_STOP["⏸ 暂停 (status.json: pending_review)"]
     P_STOP -->|人工审核| APPLY
 
-    CMD -->|apply| APPLY["⑥-⑪ 开发 → 测试 → PR"]
+    CMD -->|apply| APPLY["⑥-⑪ 开发 → 测试 → PR [+Gate 2]"]
     APPLY --> END["✅ 迭代完成 + PR"]
+
+    CMD -->|accept| ACCEPT["Playwright MCP 验收（可选）"]
+    ACCEPT --> END2["✅ phase: accepted"]
 
     CMD -->|doit| DOIT["①-⑪ 全自动（不停顿）"]
     DOIT --> END
@@ -192,6 +210,7 @@ graph TD
 │   ├── pipeline-overview.md
 │   ├── proposal.md             # 需求拆解命令
 │   ├── apply.md                # 需求开发命令
+│   ├── accept.md               # Playwright MCP 验收（可选）
 │   ├── existing-project-intake.md
 │   ├── micro-change-mode.md
 │   ├── requirements-ingestion.md
@@ -203,8 +222,7 @@ graph TD
 │   ├── code-reviewer.md
 │   ├── test-pipeline.md
 │   ├── docs-updater.md
-│   ├── git-committer.md
-│   └── tg-notifier.md
+│   └── git-committer.md
 ├── templates/                  # 项目初始化模板
 │   ├── CLAUDE.md.tpl
 │   ├── workflow-rules.md.tpl
@@ -244,6 +262,7 @@ your-project/
 │   ├── unit/
 │   ├── e2e/
 │   └── reports/
+│       └── playwright/         # accept 命令验收记录
 ├── .env
 └── .env.example
 ```
@@ -255,14 +274,11 @@ your-project/
 `.env` 文件配置：
 
 ```bash
-# 必需
-TG_USERNAME=your_telegram_username
-
 # 可选（默认值）
 TEST_FRAMEWORK=jest        # jest | vitest | mocha
-E2E_FRAMEWORK=playwright   # 固定使用 Playwright，配合 Playwright MCP + CDP
+E2E_FRAMEWORK=playwright   # 固定使用 Playwright
 LINT_TOOL=eslint           # eslint | biome
-REVIEW_MAX_ROUNDS=1        # 1-10
+REVIEW_MAX_ROUNDS=1        # 1-10，--review 时生效
 GIT_BRANCH_PREFIX=feat/    # 分支前缀
 ```
 
@@ -277,7 +293,7 @@ docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/
 ├── requirements.md    # 结构化需求
 ├── design.md          # 技术设计
 ├── tasks.md           # 任务分解
-└── status.json        # proposal/apply 状态
+└── status.json        # proposal/apply/accept 状态
 ```
 
 其中 `<seq>` 为当日顺序号，从 `001` 开始递增，保证同一天多个需求按执行顺序可追踪。
@@ -286,10 +302,11 @@ docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/
 
 ```json
 {
-  "phase": "pending_review | approved | rejected | applied",
+  "phase": "pending_review | approved | rejected | applied | accepted",
   "proposal_at": "2026-04-13T14:00:00+08:00",
   "reviewed_at": null,
   "applied_at": null,
+  "accepted_at": null,
   "iter_dir": "docs/iterations/2026-04-13/001-user-login-feature/"
 }
 ```

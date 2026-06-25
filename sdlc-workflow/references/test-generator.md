@@ -248,11 +248,7 @@ EOF
 echo "✅ 测试用例生成完成"
 ls -la "tests/unit/web/logic/${SLUG}.test.ts" "tests/e2e/${SLUG}/E2E-001-${SLUG}.e2e.ts"
 
-# TG 通知
-notify_tg "🧪 测试用例已生成:
-📂 tests/unit/web|server|packages/...
-📂 tests/e2e/${SLUG}/E2E-001-${SLUG}.e2e.ts
-📋 详见: tests/reports/${SLUG}-coverage.md"
+echo "✅ 测试用例已生成: tests/unit/ + tests/e2e/${SLUG}/ + tests/reports/${SLUG}-coverage.md"
 ```
 
 ## 错误处理
@@ -263,17 +259,6 @@ notify_tg "🧪 测试用例已生成:
 | tests/ 目录不存在 | 自动创建 unit/e2e/reports 子目录 |
 | 代码与测试不匹配 | 生成 TODO 标记，待 Claude Code 实现后补充 |
 | 覆盖率目标未达成 | 在报告中标注，待后续迭代补充 |
-
-## TG 通知文案
-
-测试生成完成后：
-
-```
-🧪 测试用例已生成:
-📂 tests/unit/web|server|packages/...
-📂 tests/e2e/<slug>/E2E-<nnn>-<scenario>.e2e.ts
-📋 详见: tests/reports/<slug>-coverage.md
-```
 
 ## 相关文件
 

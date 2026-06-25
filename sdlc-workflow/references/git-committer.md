@@ -197,20 +197,9 @@ echo "$PR_URL" > /tmp/sdlc-pr-url.txt
 2. **禁止强制推送已存在 PR 的分支** — 避免覆盖协作历史
 3. **提交信息规范** — 必须符合 Conventional Commits
 
-## TG 通知文案
-
-PR 创建完成后：
-
-```
-🔗 PR 已创建: <PR URL>
-🌿 分支: <branch-name>
-📝 提交: <commit-message>
-```
-
 ## 相关文件
 
 - 输入：所有代码 + 文档变更
 - 输出：PR URL
 - 参考：
-  - references/tg-notifier.md（最终通知）
   - SKILL.md Part 4（Pipeline 完成）

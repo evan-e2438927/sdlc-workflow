@@ -174,13 +174,12 @@ while [ $round -le $max_rounds ]; do
   if ! result=$(codex exec --full-auto "$PROMPT" 2> /tmp/design-review-codex.stderr); then
     echo "❌ Codex 设计审查调用失败"
     cat /tmp/design-review-codex.stderr
-    notify_tg "⚠️ 设计 Review 调用失败，已中止 Pipeline"
+    echo "⚠️ 设计 Review 调用失败，已中止 Pipeline"
     exit 1
   fi
 
   if echo "$result" | grep -qiE "^PASS$|^\*\*结论\*\*: PASS$|^结论: PASS$"; then
     echo "✅ 设计审查通过"
-    notify_tg "🔍 设计 Review: PASS ✅"
     exit 0
   else
     # 提取问题列表
@@ -190,15 +189,12 @@ while [ $round -le $max_rounds ]; do
       echo "⚠️ 设计审查失败，第 $round 轮问题："
       echo "$issues"
 
-      notify_tg "🔍 设计 Review 第${round}轮: $(echo "$issues" | head -c 200)..."
-
       # Claude Code 根据反馈修订
       echo "📝 Claude Code 修订 design.md + tasks.md..."
       # ... 修订逻辑 ...
 
     else
       echo "❌ 设计审查超过 $max_rounds 轮，需人工介入"
-      notify_tg "⚠️ 设计 Review 超过 ${max_rounds} 轮，需人工介入 → 中止 Pipeline"
       exit 1
     fi
   fi
@@ -323,31 +319,6 @@ done
 | .env 未设置 | 使用默认 max_rounds=1 |
 | 设计文档不存在 | 回退到步骤③ |
 | 目录结构偏离默认约定 | FAIL，回退到步骤③补充目录影响声明 |
-
-## TG 通知文案
-
-### 审查通过
-
-```
-🔍 设计 Review: PASS ✅
-📋 <通过轮数> 轮审查通过
-📂 设计文档已确认
-```
-
-### 审查失败（循环中）
-
-```
-🔍 设计 Review 第 {N} 轮: <问题摘要前100字>
-📝 Claude 正在修订，请稍候...
-```
-
-### 审查超限
-
-```
-⚠️ 设计 Review 超过 {N} 轮，需人工介入
-📂 保留当前所有产物待人工修复
-💡 修复后可从步骤③手动恢复
-```
 
 ## Gate 1 通过后：增量文档同步（⑤.1）
 

@@ -2,7 +2,6 @@
 set -euo pipefail
 
 PROJECT_ROOT="."
-TG_USERNAME_VALUE=""
 REVIEW_MAX_ROUNDS_VALUE=""
 GIT_BRANCH_PREFIX_VALUE=""
 TEST_BOOTSTRAP_POLICY_VALUE=""
@@ -11,10 +10,6 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --project-root)
       PROJECT_ROOT="$2"
-      shift 2
-      ;;
-    --tg)
-      TG_USERNAME_VALUE="${2#@}"
       shift 2
       ;;
     --review-rounds)
@@ -76,10 +71,6 @@ sync_env_var() {
 
   mv "$tmp" "$file"
 }
-
-if [ -n "$TG_USERNAME_VALUE" ]; then
-  sync_env_var "$ENV_FILE" "TG_USERNAME" "$TG_USERNAME_VALUE"
-fi
 
 if [ -n "$REVIEW_MAX_ROUNDS_VALUE" ]; then
   sync_env_var "$ENV_FILE" "REVIEW_MAX_ROUNDS" "$REVIEW_MAX_ROUNDS_VALUE"

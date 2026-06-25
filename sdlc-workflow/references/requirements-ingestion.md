@@ -274,13 +274,10 @@ if echo "$CONTENT" | grep -qE "(https?://|file://)"; then
 fi
 ```
 
-### 8. TG 通知
+### 8. 完成输出
 
 ```bash
-openclaw message send \
-  --channel telegram \
-  --target "$TG_USERNAME" \
-  --message "[项目名] 📥 需求已收录: $(echo "$CONTENT" | head -c 50)..."
+echo "✅ 需求已收录: $(echo "$CONTENT" | head -c 50)..."
 ```
 
 ## 命令模板
@@ -324,8 +321,7 @@ cat > "$ITER_DIR/requirements.md" << 'EOF'
 ...
 EOF
 
-# 5. TG 通知
-notify_tg "📥 需求已收录: $(echo "$CONTENT" | head -c 50)..."
+echo "✅ 需求已收录: $(echo "$CONTENT" | head -c 50)..."
 ```
 
 ## 错误处理
@@ -336,16 +332,6 @@ notify_tg "📥 需求已收录: $(echo "$CONTENT" | head -c 50)..."
 | URL 无法访问 | 记录日志，保留 URL 引用待人工处理 |
 | Playwright MCP 失败 | 降级为手动复制粘贴，提示用户 |
 | 目录创建失败 | 中止 Pipeline，提示权限问题 |
-| TG 通知发送失败 | 只记录日志，继续执行 |
-
-## TG 通知文案
-
-**需求收录通知**：
-```
-📥 需求已收录: <需求摘要前50字>
-📂 迭代目录: docs/iterations/<date>/<seq>-<slug>-<type>/
-```
-
 ## 相关文件
 
 - 输入：用户提供的需求（文本/文件/URL）

@@ -2,21 +2,21 @@
 
 ## 目的
 
-定义 `/sdlc-doit-mini` 的强制执行顺序，避免模型直接改代码而跳过：
+定义 `/sdlc-workflow mini` 的强制执行顺序，避免模型直接改代码而跳过：
 
 - iteration 产物
-- Gate 1
+- Gate 1（加 `--review` 时）
 - validation capability detection
-- Gate 2
-- 最终浏览器验收
+- Gate 2（加 `--review` 时）
+- 最终浏览器验收（可选，通过 `accept` 命令触发）
 
 ## 强制顺序
 
 ### Step 0. Preconditions
 
-1. 项目必须已完成 `/sdlc-init`
-2. 若缺少 baseline 文档且项目为 existing project，先回退执行 `/sdlc-init`
-3. 判断是否满足 mini 条件；不满足立即升级到 `/sdlc-doit`
+1. 项目必须已完成 `/sdlc-workflow init`
+2. 若缺少 baseline 文档且项目为 existing project，先回退执行 `init`
+3. 判断是否满足 mini 条件；不满足立即升级到 `/sdlc-workflow doit`
 
 ### Step 1. Create Iteration
 
@@ -35,12 +35,6 @@ docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/
 3. 写明验收条件
 4. 标注 `Change Size: Micro`
 
-**TG 通知**：
-
-```bash
-notify_tg "📥 mini 需求已收录: <需求摘要前50字>"
-```
-
 ### Step 3. Write design.md
 
 要求：
@@ -58,12 +52,11 @@ notify_tg "📥 mini 需求已收录: <需求摘要前50字>"
 2. 至少包含：
    - 修改目标文件
    - 验证能力检测
-   - 最终浏览器验收
    - 回写任务状态
 
-### Step 5. Gate 1
+### Step 5. Gate 1（仅 `--review`）
 
-在修改业务代码前，必须先做 mini Gate 1：
+在修改业务代码前，若指定 `--review`，执行 mini Gate 1：
 
 检查：
 
@@ -72,31 +65,11 @@ notify_tg "📥 mini 需求已收录: <需求摘要前50字>"
 3. 是否无目录结构调整
 4. 是否目标文件范围足够小
 
-若失败：
-
-- 立即中止或升级到 `/sdlc-doit`
-
-**TG 通知**：
-
-```bash
-# 通过
-notify_tg "🔍 mini Gate 1: PASS ✅
-📋 确认为微变更，无架构影响"
-
-# 失败 → 升级
-notify_tg "⚠️ mini Gate 1: FAIL → 自动升级到 doit 模式
-📋 原因: <影响范围超出 mini 标准>"
-```
+若失败：立即中止或升级到 `/sdlc-workflow doit`
 
 ### Step 6. Implement
 
-只有 Gate 1 通过后，才允许开始修改业务代码。
-
-**TG 通知**：
-
-```bash
-notify_tg "🔨 mini 开始实现: <需求摘要前50字>"
-```
+Gate 1 通过（或跳过）后，开始修改业务代码。
 
 ### Step 7. Validation Capability Detection
 
@@ -104,15 +77,13 @@ notify_tg "🔨 mini 开始实现: <需求摘要前50字>"
 
 1. lint 能力
 2. unit test 能力
-3. Playwright 预检能力
-4. Playwright MCP 能力
-5. CDP 能力（Chrome DevTools Protocol）
+3. Playwright E2E 能力
 
 并输出到 mini 报告。
 
-### Step 8. Gate 2
+### Step 8. Gate 2（仅 `--review`）
 
-实现后必须做 mini Gate 2：
+实现后若指定 `--review`，执行 mini Gate 2：
 
 检查：
 
@@ -121,43 +92,13 @@ notify_tg "🔨 mini 开始实现: <需求摘要前50字>"
 3. `tasks.md` 是否已同步回写
 4. 是否存在不必要的测试或基础设施改动
 
-**TG 通知**：
+### Step 9. Automated Tests
 
-```bash
-# 通过
-notify_tg "🔍 mini Gate 2: PASS ✅
-🛡️ 代码变更已确认安全"
+执行三阶段自动化测试：
 
-# 失败
-notify_tg "🔍 mini Gate 2 第{N}轮: <问题摘要>
-📝 Claude 正在修复..."
-
-# 超限
-notify_tg "⚠️ mini Gate 2 超过 {N} 轮，需人工介入"
-```
-
-### Step 9. Final Validation
-
-最终必须执行：
-
-1. Playwright 预检（若适用）
-2. Playwright MCP
-3. CDP
-
-最终通过结论只能由 Playwright MCP + CDP 给出。
-
-**TG 通知**：
-
-```bash
-# 全部通过
-notify_tg "🧪 mini 验收通过 ✅
-📊 Playwright MCP: ✅ | CDP: ✅"
-
-# 失败
-notify_tg "🧪 mini 验收失败:
-📋 失败项: <列表>
-📝 Claude 正在修复..."
-```
+1. Lint
+2. Unit Tests
+3. Playwright E2E 预检
 
 ### Step 10. Final Report
 
@@ -165,31 +106,18 @@ notify_tg "🧪 mini 验收失败:
 
 1. Scope
 2. Changed Files
-3. Gate 1 result
+3. Gate 1 result（若执行）
 4. Validation Capability Detection
-5. Gate 2 result
-6. Playwright MCP findings
-7. CDP findings
-8. Tasks status
-9. Residual risks
+5. Gate 2 result（若执行）
+6. Test results (Lint / Unit / E2E)
+7. Tasks status
+8. Residual risks
 
-**TG 通知（最终）**：
-
-```bash
-notify_tg "✅ mini 迭代完成!
-📝 提交: <commit-message>
-📊 变更: <N> files
-🧪 验收: Playwright MCP ✅ | CDP ✅
-📂 报告: docs/iterations/<date>/<seq>-<slug>-<type>/"
-```
+可选：运行 `/sdlc-workflow accept` 进行 Playwright MCP 功能验收。
 
 ## Hard Rules
 
 1. 不得在 Step 1-4 之前直接编辑业务代码
-2. 不得跳过 Gate 1
+2. `--review` 时不得跳过 Gate 1 / Gate 2
 3. 不得跳过 validation capability detection
-4. 不得跳过 Gate 2
-5. 不得用"手工观察页面"替代最终 MCP 验收
-6. 关键步骤（Gate 1/2、验收、完成）必须发送 TG 通知
-7. **Artifact Gate**：标记验收完成前，必须验证 Playwright MCP 验收记录和最终报告文件存在于磁盘；Todo 状态必须与磁盘产物交叉验证
-8. **Token 耗尽保护**：context_usage > 70% 时先 /compact 再进入验收；token 不足时写入 `status.json: pipeline_stage="mini-test-incomplete"` + ABORT，禁止静默标记完成
+4. **Token 耗尽保护**：context_usage > 70% 时先 /compact 再继续；token 不足时写入 `status.json: pipeline_stage="mini-incomplete"` + ABORT，禁止静默标记完成

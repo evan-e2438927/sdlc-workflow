@@ -20,7 +20,7 @@ const confidenceCriteria = {
   HIGH: 0.8,    // ≥0.8: 高置信度，直接确认
   MEDIUM: 0.5,  // 0.5-0.8: 中置信度，假设标注
   LOW: 0.5      // <0.5: 低置信度，主会话内交互式选择询问
-                //        (doit / OPENCLAW_TRIGGER_USER 等无人值守场景 fallback 为 auto-assume)
+                //        (doit 无人值守场景 fallback 为 auto-assume)
 };
 
 // 评分因素
@@ -61,10 +61,10 @@ function assessConfidence(requirement) {
 |--------|------|----------|----------|
 | 高 | ≥0.8 | 直接确认，不阻塞流程 | `[✅ 已确认]` |
 | 中 | 0.5-0.8 | 自行假设，不阻塞流程 | `[⚠️ 假设: <具体假设内容>]` |
-| 低 | <0.5 | **交互模式**：主会话内选择询问 → 用户选择写入需求；**无人值守模式**（doit / TG 触发）：fallback 为标注假设 | 交互后已确认 → `[✅ 已确认（用户选择）]`；否则 `[⚠️ 假设: <具体假设内容>]` |
+| 低 | <0.5 | **交互模式**：主会话内选择询问 → 用户选择写入需求；**无人值守模式**（doit）：fallback 为标注假设 | 交互后已确认 → `[✅ 已确认（用户选择）]`；否则 `[⚠️ 假设: <具体假设内容>]` |
 
-> **模式判定**：`INTERACTIVE = (mode in ["proposal", "mini"]) AND (NOT OPENCLAW_TRIGGER_USER)`。
-> 仅交互模式下才发起选择询问；其余情况低置信度项一律按 MEDIUM 一样自行假设并写入"假设记录"。
+> **模式判定**：`INTERACTIVE = (mode in ["proposal", "mini"])`。
+> 仅交互模式下才发起选择询问；doit 模式低置信度项一律自行假设并写入"假设记录"。
 > 无论模式如何，流程**不阻塞**——用户跳过/取消询问也立即 fallback 为 auto-assume。
 
 ### 3. 假设管理
@@ -84,16 +84,15 @@ const assumptions = {
 
 ### 4. 交互式选择询问策略
 
-> **TG 通道是单向通知**——不存在 TG 回复解析。低置信度需求**禁止依赖 TG 提问 + 用户回复**完成澄清，
-> 必须改用主会话内的选择询问，让用户在同一会话里直接作答。
+> 低置信度需求必须通过主会话内的选择询问完成澄清，让用户在同一会话里直接作答。
 
 #### 4.1 触发条件
 
 ```
-INTERACTIVE = (mode in ["proposal", "mini"]) AND (NOT OPENCLAW_TRIGGER_USER)
+INTERACTIVE = (mode in ["proposal", "mini"])
 
 IF NOT INTERACTIVE:
-  # doit 全自动模式 / OpenClaw TG 触发的远程运行 → 无人值守
+  # doit 全自动模式 → 无人值守
   → 全部低置信度项按假设处理（同 MEDIUM 流程），写入"假设记录"，confirmedBy="auto-assumed"
   → 不发起任何询问，流程继续
 ELSE:
@@ -141,15 +140,10 @@ FOR each low_conf_item:
 - 工具自动追加"Other"选项处理自由回答场景
 - 用户作答后，主会话直接拿到结构化答案并写入 requirements.md
 
-#### 4.6 澄清完成后通知
+#### 4.6 澄清完成后输出
 
-澄清结束后通过 TG 发**状态摘要**（非提问，不要求回复）：
-
-```
-❓ 需求澄清完成
-✅ 已确认（用户交互/无歧义）: <N>
-⚠️ 已假设（流程继续）: <M>
-📂 详见: <iter_dir>/requirements.md > 假设记录
+```bash
+echo "✅ 需求澄清完成: 已确认 $CONFIRMED_COUNT / 已假设 $ASSUMED_COUNT"
 ```
 
 ### 5. 更新 requirements.md
@@ -228,7 +222,7 @@ MEDIUM_CONF=$(jq -r '.requirements[] | select(.confidence >= 0.5 and .confidence
 LOW_CONF=$(jq -r '.requirements[] | select(.confidence < 0.5)')
 
 # 4. 低置信度需求 → 交互式选择询问 / 无人值守 fallback
-INTERACTIVE_MODE = (MODE in ["proposal", "mini"]) AND (-z "$OPENCLAW_TRIGGER_USER")
+INTERACTIVE_MODE = (MODE in ["proposal", "mini"])
 
 if [ -n "$LOW_CONF" ]; then
   if [ "$INTERACTIVE_MODE" = "1" ]; then
@@ -236,7 +230,7 @@ if [ -n "$LOW_CONF" ]; then
     ASK_USER(low_conf_items)
     # 用户选择 → 写入 description / 标注 ✅；取消 → fallback 为 auto-assume
   else
-    # doit 全自动 / OPENCLAW_TRIGGER_USER 远程触发 → 全部 auto-assume
+    # doit 全自动模式 → 全部 auto-assume
     mark_all_as_auto_assumed(low_conf_items)
   fi
 fi
@@ -244,11 +238,7 @@ fi
 # 5. 更新 requirements.md
 # 添加置信度标注和假设记录（含 confirmedBy: interactive / auto-assumed）
 
-# 6. TG 状态摘要（非提问、不要求回复）
-notify_tg "❓ 需求澄清完成
-✅ 已确认（用户交互/无歧义）: $CONFIRMED_COUNT
-⚠️ 已假设（流程继续）: $ASSUMED_COUNT
-📂 详见: $ITER_DIR/requirements.md > 假设记录"
+echo "✅ 需求澄清完成: 已确认 $CONFIRMED_COUNT / 已假设 $ASSUMED_COUNT"
 ```
 
 ## 错误处理
@@ -257,24 +247,9 @@ notify_tg "❓ 需求澄清完成
 |----------|----------|
 | requirements.md 不存在 | 回退到步骤①，重新执行 requirements-ingestion |
 | 置信度分析失败 | 默认为中置信度，添加假设标注 |
-| TG 通知发送失败 | 记录日志，继续执行（不阻塞） |
 | AskUserQuestion 不可用 / 工具调用失败 | fallback 为 auto-assume，confirmedBy="auto-assumed"，不阻塞 |
 | 用户跳过 / 取消选择询问 | fallback 为 auto-assume，confirmedBy="auto-assumed"，不阻塞 |
-| 处于 doit / TG 触发等无人值守模式 | 不发起询问，全部 auto-assume |
-
-## TG 通知文案
-
-### 需求澄清完成通知（流程结束时统一发送）
-
-```
-❓ 需求澄清完成
-✅ 已确认（用户交互/无歧义）: <N>
-⚠️ 已假设（流程继续）: <M>
-📂 详见: <iter_dir>/requirements.md > 假设记录
-```
-
-> 此通知**仅作状态同步**，不要求回复。低置信度项的澄清已经在主会话内通过
-> 选择询问完成；TG 只用于事后告知，不再承载交互职能。
+| 处于 doit 无人值守模式 | 不发起询问，全部 auto-assume |
 
 ## 相关文件
 

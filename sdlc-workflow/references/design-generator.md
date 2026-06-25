@@ -244,9 +244,7 @@ if ! grep -q "## 1. 技术方案概要" "$DESIGN_FILE"; then
   exit 1
 fi
 
-# 5. TG 通知
-notify_tg "🎨 设计文档已生成: docs/iterations/$DATE/$SEQ-$SLUG-$TYPE/design.md
-📋 包含: 技术方案、API 设计、数据模型、安全考量"
+echo "✅ 设计文档已生成: docs/iterations/$DATE/$SEQ-$SLUG-$TYPE/design.md"
 ```
 
 ## 错误处理
@@ -257,15 +255,6 @@ notify_tg "🎨 设计文档已生成: docs/iterations/$DATE/$SEQ-$SLUG-$TYPE/de
 | ARCHITECTURE.md 不存在 | 跳过，生成简化版设计 |
 | 历史迭代读取失败 | 记录日志，使用空上下文继续 |
 | 设计文档生成失败 | 保留部分内容，提示用户补充 |
-
-## TG 通知文案
-
-设计生成完成后（供 design-reviewer 阶段参考）：
-
-```
-🎨 设计文档已生成: docs/iterations/<date>/<seq>-<slug>-<type>/design.md
-📋 包含: 技术方案、API 设计、数据模型、安全考量
-```
 
 ## 相关文件
 

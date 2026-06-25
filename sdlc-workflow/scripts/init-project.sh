@@ -69,13 +69,6 @@ sync_env_var() {
   mv "$tmp" "$file"
 }
 
-# TG/OpenClaw 场景下自动创建 .env 并写入 TG_USERNAME
-if [ -n "${OPENCLAW_TRIGGER_USER:-}" ]; then
-  copy_if_not_exists "$PROJECT_ROOT/.env.example" "$PROJECT_ROOT/.env"
-  sync_env_var "$PROJECT_ROOT/.env" "TG_USERNAME" "$OPENCLAW_TRIGGER_USER"
-  echo "📱 检测到 TG 用户: @$OPENCLAW_TRIGGER_USER，已写入 .env"
-fi
-
 # 添加 .env 到 .gitignore
 if [ -f "$PROJECT_ROOT/.gitignore" ]; then
   grep -q "^\.env$" "$PROJECT_ROOT/.gitignore" || echo ".env" >> "$PROJECT_ROOT/.gitignore"
@@ -87,6 +80,6 @@ echo "✅ SDLC Workflow 项目初始化完成"
 if [ -f "$PROJECT_ROOT/.env" ]; then
   echo "📝 已生成 .env，请检查其余配置项"
 else
-  echo "📝 请执行: cp .env.example .env && 编辑 .env 设置 TG_USERNAME"
+  echo "📝 请执行: cp .env.example .env 并编辑配置"
 fi
 echo "📝 请编辑 .claude/CLAUDE.md 填写项目信息"
