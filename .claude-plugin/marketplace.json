@@ -5,20 +5,17 @@
     "email": "e2438927@gmail.com"
   },
   "metadata": {
-    "description": "AI-driven 24h SDLC automation pipeline with dual-model review gates and Telegram notifications",
+    "description": "AI-driven SDLC automation pipeline (proposal → apply → qa → accept → pr) with dual-model review gates",
     "version": "1.0.0"
   },
   "plugins": [
     {
       "name": "sdlc-full",
-      "description": "Full SDLC workflow suite: init project onboarding, standard 12-step pipeline (doit), and lightweight mini pipeline (doit-mini) with dual Codex review gates and Telegram notifications",
+      "description": "Full SDLC workflow suite: five-stage pipeline (proposal → apply → qa → accept → pr) plus doit/mini/worktree, with optional dual Codex review gates and Playwright browser QA",
       "source": "./",
-      "strict": false,
-      "skills": [
-        "./sdlc-workflow",
-        "./sdlc-init",
-        "./sdlc-doit",
-        "./sdlc-doit-mini"
+      "strict": true,
+      "commands": [
+        "./commands"
       ]
     }
   ]

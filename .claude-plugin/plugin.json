@@ -1,0 +1,8 @@
+{
+  "name": "sdlc-workflow",
+  "description": "Full SDLC automation pipeline with dual-model review gates (Claude Code generates, Codex CLI reviews). Five-stage main line: proposal → apply → qa → accept → pr, plus init, update, doit, mini, review, and worktree commands.",
+  "author": {
+    "name": "evan",
+    "email": "6dwcbttbsf@privaterelay.appleid.com"
+  }
+}

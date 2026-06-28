@@ -1,0 +1,7 @@
+{
+  "name": "sdlc-workflow",
+  "version": "dev",
+  "pi": {
+    "skills": ["./sdlc-workflow"]
+  }
+}
