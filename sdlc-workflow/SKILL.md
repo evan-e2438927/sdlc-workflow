@@ -29,25 +29,24 @@ metadata:
 
 ## 命令分工
 
-当前稳定入口是单入口多模式：
+**统一入口**：每个阶段是一个 skill（见 `skills/sdlc-*`），Claude Code 与 Codex **共用同一套 skill** 触发——
+说出意图（如「用 sdlc 跑 proposal：…」）或在 Claude Code 里 `/sdlc-proposal` 即可。不再维护单独的 slash 命令集。
 
 主线：**proposal → apply → qa → accept → pr**
 
-- `/sdlc-workflow init`：初始化或接入项目
-- `/sdlc-workflow update [项目目录]`：两阶段升级同步——阶段一安全同步最新脚手架（结构/配置/规则模板，不覆盖用户内容）；阶段二读真实代码做漂移感知增量刷新（基线自动刷新、用户文档逐项确认）
-- `/sdlc-workflow proposal`：需求拆解（①-④，按 track 拆分），产出 proposal 产物后暂停，等待人工审核
-- `/sdlc-workflow apply [--review]`：人工审核通过后，开发 + 单元测试 + lint（⑥-⑨）；**不提交、不推 PR**；`--review` 触发 Codex 审查（Gate 1 + Gate 2）
-- `/sdlc-workflow qa [<迭代目录>]`：编写并执行 qa track 的 Playwright 浏览器功能验收（⑩）
-- `/sdlc-workflow accept [<迭代目录>]`：总结变更 → 更新文档 → 本地 commit（⑪⑫）；**不 push、不建 PR**
-- `/sdlc-workflow pr [<迭代目录>]`：push 当前分支 → gh pr create（⑬）；唯一与远程交互的命令
-- `/sdlc-workflow review [proposal|code] <迭代目录>`：单独运行 Codex 审查，不触发其他流程
-- `/sdlc-workflow doit [--review] [--qa]`：全自动模式（proposal + apply + [qa] + accept + pr 不停顿）；`--qa` 含浏览器验收
-- `/sdlc-workflow mini [--review] [--qa]`：小任务轻量流程；`--qa` 含浏览器验收
-- `/sdlc-workflow worktree create <slug> <type>`：创建并行工作区（worktree 隔离）
-- `/sdlc-workflow worktree list`：列出所有并行工作区
-- `/sdlc-workflow worktree status`：全局并行状态总览
-- `/sdlc-workflow worktree remove <seq|slug>`：移除已完成的并行工作区
-- `/sdlc-workflow worktree gc`：清理已合并的并行工作区
+- `sdlc-init`：初始化或接入项目
+- `sdlc-update`：两阶段升级同步——阶段一安全同步最新脚手架（结构/配置/规则模板，不覆盖用户内容）；阶段二读真实代码做漂移感知增量刷新（基线自动刷新、用户文档逐项确认）
+- `sdlc-proposal`：需求拆解（①-④，按 track 拆分），产出 proposal 产物后暂停，等待人工审核
+- `sdlc-apply` `[--review]`：人工审核通过后，开发 + 单元测试 + lint（⑥-⑨）；**不提交、不推 PR**；`--review` 触发 Codex 审查（Gate 1 + Gate 2）
+- `sdlc-qa`：编写并执行 qa track 的 Playwright 浏览器功能验收（⑩）
+- `sdlc-accept`：总结变更 → 更新文档 → 本地 commit（⑪⑫）；**不 push、不建 PR**
+- `sdlc-pr`：push 当前分支 → gh pr create（⑬）；唯一与远程交互的阶段
+- `sdlc-review` `[proposal|code]`：单独运行 Codex 审查，不触发其他流程
+- `sdlc-doit` `[--review] [--qa]`：全自动模式（proposal + apply + [qa] + accept + pr 不停顿）；`--qa` 含浏览器验收
+- `sdlc-mini` `[--review] [--qa]`：小任务轻量流程；`--qa` 含浏览器验收
+- `sdlc-worktree`：并行工作区管理（create / list / status / remove / gc，worktree 隔离）
+
+> `sdlc-workflow`（本 skill）是总览与编排，详细步骤规范在 `references/`；各阶段 skill 是薄入口，指向同一批 references，逻辑单源不重复。
 
 ### proposal — 需求拆解命令
 

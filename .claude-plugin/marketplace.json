@@ -12,11 +12,7 @@
     {
       "name": "sdlc-full",
       "description": "Full SDLC workflow suite: five-stage pipeline (proposal → apply → qa → accept → pr) plus doit/mini/worktree, with optional dual Codex review gates and Playwright browser QA",
-      "source": "./",
-      "strict": true,
-      "commands": [
-        "./commands"
-      ]
+      "source": "./"
     }
   ]
 }

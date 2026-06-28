@@ -14,7 +14,7 @@
 
 ## 这是什么？
 
-一套用在 [Claude Code](https://claude.ai/code) 中的 **Skill 插件**，把软件交付拆成五个可审、可恢复、有产物的阶段，让 AI 按工程 contract 而非 prompt 技巧来推进：
+一套用在 [Claude Code](https://claude.ai/code) 与 [Codex](https://github.com/openai/codex) 中的 **Skill 插件**（两端共用同一套 skill，单一入口），把软件交付拆成五个可审、可恢复、有产物的阶段，让 AI 按工程 contract 而非 prompt 技巧来推进：
 
 ```
 主线：proposal → apply → qa → accept → pr
@@ -109,7 +109,9 @@
 npx skills add evan-e2438927/sdlc-workflow -g -y
 ```
 
-安装后即可使用 `/sdlc-workflow` 系列命令（init / update / proposal / apply / qa / accept / pr / doit / mini / review / worktree）。
+安装后即可使用 `sdlc-*` 系列 skill：`sdlc-init` / `sdlc-update` / `sdlc-proposal` / `sdlc-apply` / `sdlc-qa` / `sdlc-accept` / `sdlc-pr` / `sdlc-doit` / `sdlc-mini` / `sdlc-review` / `sdlc-worktree`。
+
+> **统一入口**：Claude Code 与 Codex **共用同一套 skill**，不再维护单独的 slash 命令集。触发方式：说出意图（如「用 sdlc 跑 proposal：…」），或在 Claude Code 里 `/sdlc-proposal`。`sdlc-workflow` 是总览/编排 skill，各阶段 skill 是薄入口，指向同一批 `references/`，逻辑单源。
 
 ### 手动安装（备选）
 
@@ -137,7 +139,7 @@ ln -sf .claude/sdlc-workflow-repo/sdlc-workflow .claude/skills/sdlc-workflow
 
 ### 更新
 
-- **Claude Code**：`/plugin update sdlc-full@sdlc-workflow`，再在各项目里跑 `/sdlc-workflow update` 同步脚手架
+- **Claude Code**：`/plugin update sdlc-full@sdlc-workflow`，再在各项目里跑 `sdlc-update` 同步脚手架
 - **Codex / 通用**：`npx skills update`，或在 clone 目录 `git pull`
 
 ### 依赖项
@@ -158,47 +160,49 @@ ln -sf .claude/sdlc-workflow-repo/sdlc-workflow .claude/skills/sdlc-workflow
 
 ```bash
 # 1. 初始化 / 接入项目（可选参数：review=1 branch=feat/ test-framework=jest）
-/sdlc-workflow init "review=1"
+sdlc-init "review=1"
 
 # 2. 需求拆解（推荐流程，结束后暂停等人工审核）
-/sdlc-workflow proposal 增加用户登录模块，支持邮箱和手机号注册
+sdlc-proposal 增加用户登录模块，支持邮箱和手机号注册
 
 # 3. 审阅 proposal 产物 → 确认后开发（开发 + 单元测试 + lint，不提交）
-/sdlc-workflow apply
+sdlc-apply
 
 # 4. 浏览器功能验收（Playwright 脚本 + MCP 执行）
-/sdlc-workflow qa
+sdlc-qa
 
 # 5. 验收通过 → 更新文档 + 本地 commit
-/sdlc-workflow accept
+sdlc-accept
 
 # 6. 确认本地提交无误 → 推送并创建 PR
-/sdlc-workflow pr
+sdlc-pr
 
 # —— 或者一把梭 ——
-/sdlc-workflow doit --qa 增加用户登录模块      # 全自动，含浏览器验收，一路到 PR
-/sdlc-workflow mini 把按钮颜色改成蓝色          # 小任务轻量流程
+sdlc-doit --qa 增加用户登录模块      # 全自动，含浏览器验收，一路到 PR
+sdlc-mini 把按钮颜色改成蓝色          # 小任务轻量流程
 ```
 
 **推荐流程**：`proposal → 人工审核 → apply → qa → accept → pr`，确保设计经人工确认、变更经浏览器验收、发布前可在本地复核 commit。
 
 ---
 
-## 命令一览
+## Skill 一览（统一入口）
 
-| 命令 | 适用场景 | 步骤 | phase |
+每个阶段是一个 skill，Claude Code 与 Codex 共用；说出意图或在 Claude Code 里 `/<skill>` 触发。
+
+| Skill | 适用场景 | 步骤 | phase |
 |------|---------|------|-------|
-| `/sdlc-workflow init` | 项目接入，生成配置与 baseline | ⓪ | — |
-| `/sdlc-workflow update` | 两阶段升级同步：阶段一安全同步脚手架（幂等，不覆盖用户内容）；阶段二漂移感知增量刷新（基线自动刷新、用户文档逐项确认） | — | — |
-| `/sdlc-workflow proposal` | 需求拆解 → 等待人工审核 | ①-⑤ | pending_review |
-| `/sdlc-workflow apply [--review]` | 开发 + 单元测试 + lint（不提交） | ⑥-⑨ | applied |
-| `/sdlc-workflow qa` | Playwright 浏览器功能验收 | ⑩ | qa_passed |
-| `/sdlc-workflow accept` | 总结变更 → 更新文档 → 本地 commit | ⑪⑫ | accepted |
-| `/sdlc-workflow pr` | push → 创建 PR（唯一远程动作） | ⑬ | pr_created |
-| `/sdlc-workflow doit [--review] [--qa]` | 全自动，一路到 PR | ①-⑬ | — |
-| `/sdlc-workflow mini [--review] [--qa]` | 微小任务轻量流程 | 精简 | — |
-| `/sdlc-workflow review proposal\|code` | 单独跑 Codex Gate1/Gate2 | ⑤ 或 ⑧ | — |
-| `/sdlc-workflow worktree` | 多需求并行 / 多 Agent | create/list/status/remove/gc | — |
+| `sdlc-init` | 项目接入，生成配置与 baseline | ⓪ | — |
+| `sdlc-update` | 两阶段升级同步：阶段一安全同步脚手架（幂等，不覆盖用户内容）；阶段二漂移感知增量刷新（基线自动刷新、用户文档逐项确认） | — | — |
+| `sdlc-proposal` | 需求拆解 → 等待人工审核 | ①-⑤ | pending_review |
+| `sdlc-apply [--review]` | 开发 + 单元测试 + lint（不提交） | ⑥-⑨ | applied |
+| `sdlc-qa` | Playwright 浏览器功能验收 | ⑩ | qa_passed |
+| `sdlc-accept` | 总结变更 → 更新文档 → 本地 commit | ⑪⑫ | accepted |
+| `sdlc-pr` | push → 创建 PR（唯一远程动作） | ⑬ | pr_created |
+| `sdlc-doit [--review] [--qa]` | 全自动，一路到 PR | ①-⑬ | — |
+| `sdlc-mini [--review] [--qa]` | 微小任务轻量流程 | 精简 | — |
+| `sdlc-review proposal\|code` | 单独跑 Codex Gate1/Gate2 | ⑤ 或 ⑧ | — |
+| `sdlc-worktree` | 多需求并行 / 多 Agent | create/list/status/remove/gc | — |
 
 **为什么 accept 和 pr 分开**：accept 把变更定稿到**本地**（更新文档 + commit），你可以先 review 本地 diff；确认无误后再用 `pr` 推送并发布。本地定稿与远程发布解耦，出错好回退。
 
@@ -275,18 +279,18 @@ graph TD
 
 ```bash
 # 创建并行工作区（自动分配 seq、分支、端口、复制 .claude/.sdlc-config*）
-/sdlc-workflow worktree create user-login feature
-/sdlc-workflow worktree create payment-bug fix
+sdlc-worktree create user-login feature
+sdlc-worktree create payment-bug fix
 
 # 进入工作区跑正常 pipeline
 cd ../wt-001-user-login-feature
-/sdlc-workflow proposal "用户登录功能"
+sdlc-proposal "用户登录功能"
 
 # 全局总览 / 列表 / 清理
-/sdlc-workflow worktree status
-/sdlc-workflow worktree list
-/sdlc-workflow worktree remove 001
-/sdlc-workflow worktree gc
+sdlc-worktree status
+sdlc-worktree list
+sdlc-worktree remove 001
+sdlc-worktree gc
 ```
 
 | 资源 | 隔离方式 |
@@ -372,7 +376,7 @@ your-project/
 
 ## 配置项
 
-统一放在 `.claude/.sdlc-config`（`KEY=VALUE` 格式，`/sdlc-workflow init` 自动生成并加入 `.gitignore`）。全局默认可放 `~/.claude/.sdlc-config`，项目级覆盖全局：
+统一放在 `.claude/.sdlc-config`（`KEY=VALUE` 格式，`sdlc-init` 自动生成并加入 `.gitignore`）。全局默认可放 `~/.claude/.sdlc-config`，项目级覆盖全局：
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|

@@ -55,29 +55,31 @@ pr：git push → gh pr create                              ← 远程发布
 
 ```bash
 # 初始化 / 接入项目（可选参数：review=1 branch=feat/ test-framework=jest）
-/sdlc-workflow init "review=1"
+sdlc-init "review=1"
 
 # 需求拆解 → 暂停等人工审核
-/sdlc-workflow proposal 增加用户登录模块
+sdlc-proposal 增加用户登录模块
 
 # 审核通过后：开发 + 单元测试 + lint（不提交）
-/sdlc-workflow apply
+sdlc-apply
 
 # 浏览器功能验收（Playwright 脚本 + MCP 执行）
-/sdlc-workflow qa
+sdlc-qa
 
 # 验收通过 → 更新文档 + 本地 commit
-/sdlc-workflow accept
+sdlc-accept
 
 # 确认本地无误 → 推送并创建 PR
-/sdlc-workflow pr
+sdlc-pr
 
 # —— 或者一把梭 ——
-/sdlc-workflow doit --qa 增加用户登录模块   # 全自动，含浏览器验收，一路到 PR
-/sdlc-workflow mini 把首页背景改成黑色       # 小任务轻量流程
+sdlc-doit --qa 增加用户登录模块   # 全自动，含浏览器验收，一路到 PR
+sdlc-mini 把首页背景改成黑色       # 小任务轻量流程
 ```
 
 推荐流程：`proposal → 人工审核 → apply → qa → accept → pr`。worktree 不是另一种 pipeline，而是为这些模式提供隔离的并行执行环境。
+
+> **统一入口**：每个阶段是一个 skill（`sdlc-init` / `sdlc-proposal` / …），Claude Code 与 Codex **共用同一套 skill**，不再维护单独的 slash 命令集——说出意图或在 Claude Code 里 `/sdlc-proposal` 触发。
 
 ---
 
@@ -331,7 +333,7 @@ PR_TEMPLATE=                 # 自定义 PR body 模板路径
 npx skills add evan-e2438927/sdlc-workflow -g -y
 ```
 
-验证：在任意项目目录执行 `/sdlc-workflow init`，看到 init 摘要输出即为安装成功。
+验证：在任意项目目录执行 `sdlc-init`，看到 init 摘要输出即为安装成功。
 
 ---
 

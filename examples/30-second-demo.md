@@ -20,7 +20,7 @@
 推荐需求：
 
 ```text
-/sdlc-workflow proposal 增加用户登录模块，支持邮箱和手机号注册
+sdlc-proposal 增加用户登录模块，支持邮箱和手机号注册
 ```
 
 这个需求足够展示：
@@ -32,14 +32,14 @@
 如果时间有限，也可以用 mini：
 
 ```text
-/sdlc-workflow mini 把首页背景改成黑色
+sdlc-mini 把首页背景改成黑色
 ```
 
 ## 30 秒版本
 
 ### 开场一句话
 
-> 这是一个给 Claude Code / OpenClaw 用的 SDLC workflow。它不是直接让模型改代码，而是先拆解需求、等人工审核、再开发。最后用浏览器交互证据做验收。
+> 这是一个给 Claude Code / Codex 用的 SDLC workflow（两端共用同一套 skill）。它不是直接让模型改代码，而是先拆解需求、等人工审核、再开发。最后用浏览器交互证据做验收。
 
 ### 演示步骤
 
@@ -52,7 +52,7 @@
 2. 运行初始化
 
 ```text
-/sdlc-workflow init "tg=123456789 review=1"
+sdlc-init "review=1"
 ```
 
 说明：
@@ -74,7 +74,7 @@
 4. 运行 proposal 需求拆解
 
 ```text
-/sdlc-workflow proposal 增加用户登录模块
+sdlc-proposal 增加用户登录模块
 ```
 
 说明：
@@ -97,26 +97,29 @@ docs/iterations/YYYY-MM-DD/001-user-login-feature/
 
 > 每次需求都有完整的拆解记录。status.json 标记了 pending_review 状态，需要人工审核后才能继续。
 
-6. 审核通过，执行 apply
+6. 审核通过，执行 apply → qa → accept → pr
 
 ```text
-/sdlc-workflow apply
+sdlc-apply     # 开发 + 单元测试 + lint（不提交）
+sdlc-qa        # Playwright 浏览器功能验收
+sdlc-accept    # 总结变更 → 更新文档 → 本地 commit
+sdlc-pr        # push → 创建 PR
 ```
 
 说明：
 
-> apply 会自动找到最近的 pending proposal，开始开发、测试、代码审查、浏览器验收，最后创建 PR。
+> apply 自动找到最近的 pending proposal，做开发 + 单测 + lint；qa 跑浏览器验收；accept 在本地定稿提交；pr 才推送发布。各阶段独立、可单独重跑。
 
 7. 展示最终验收产物
 
 重点展示：
 
-- `tests/reports/playwright/`
-- `tests/reports/cdp/`
+- `tests/reports/<slug>-e2e-report.md`
+- `tests/reports/<slug>/screenshots/`
 
 说明：
 
-> 最终通过不是靠模型说"我改好了"，而是靠 Playwright MCP 和 CDP 的浏览器交互证据。
+> 最终通过不是靠模型说"我改好了"，而是靠 qa 命令通过 Playwright + Playwright MCP 的真实浏览器交互证据。
 
 8. 收尾
 
