@@ -190,19 +190,29 @@ sdlc-mini 把按钮颜色改成蓝色          # 小任务轻量流程
 
 每个阶段是一个 skill，Claude Code 与 Codex 共用；说出意图或在 Claude Code 里 `/<skill>` 触发。
 
-| Skill | 适用场景 | 步骤 | phase |
-|------|---------|------|-------|
-| `sdlc-init` | 项目接入，生成配置与 baseline | ⓪ | — |
-| `sdlc-update` | 两阶段升级同步：阶段一安全同步脚手架（幂等，不覆盖用户内容）；阶段二漂移感知增量刷新（基线自动刷新、用户文档逐项确认） | — | — |
-| `sdlc-proposal` | 需求拆解 → 等待人工审核 | ①-⑤ | pending_review |
-| `sdlc-apply [--review]` | 开发 + 单元测试 + lint（不提交） | ⑥-⑨ | applied |
-| `sdlc-qa` | Playwright 浏览器功能验收 | ⑩ | qa_passed |
-| `sdlc-accept` | 总结变更 → 更新文档 → 本地 commit | ⑪⑫ | accepted |
-| `sdlc-pr` | push → 创建 PR（唯一远程动作） | ⑬ | pr_created |
-| `sdlc-doit [--review] [--qa]` | 全自动，一路到 PR | ①-⑬ | — |
-| `sdlc-mini [--review] [--qa]` | 微小任务轻量流程 | 精简 | — |
-| `sdlc-review proposal\|code` | 单独跑 Codex Gate1/Gate2 | ⑤ 或 ⑧ | — |
-| `sdlc-worktree` | 多需求并行 / 多 Agent | create/list/status/remove/gc | — |
+| Skill | 参数 | 适用场景 | phase |
+|------|------|---------|-------|
+| `sdlc-init` | `[key=value …]` | 项目接入，生成配置与 baseline | — |
+| `sdlc-update` | `[项目目录]` | 两阶段升级同步：阶段一安全同步脚手架（幂等，不覆盖用户内容）；阶段二漂移感知增量刷新（基线自动刷新、用户文档逐项确认） | — |
+| `sdlc-proposal` | `<需求> [--review]` | 需求拆解（①-④）→ 等待人工审核 | pending_review |
+| `sdlc-apply` | `[--review] [迭代目录]` | 开发 + 单元测试 + lint（⑥-⑨，不提交） | applied |
+| `sdlc-qa` | `[迭代目录]` | Playwright 浏览器功能验收（⑩） | qa_passed |
+| `sdlc-accept` | `[迭代目录]` | 总结变更 → 更新文档 → 本地 commit（⑪⑫） | accepted |
+| `sdlc-pr` | `[迭代目录]` | push → 创建 PR（⑬，唯一远程动作） | pr_created |
+| `sdlc-doit` | `[--review] [--qa] <需求>` | 全自动，一路到 PR（①-⑬） | — |
+| `sdlc-mini` | `[--review] [--qa] <小任务>` | 微小任务轻量流程 | — |
+| `sdlc-review` | `<proposal\|code> <迭代目录>` | 单独跑 Codex Gate 1 / Gate 2 | — |
+| `sdlc-worktree` | `create <slug> <type> \| list \| status \| remove <seq\|slug> \| gc` | 多需求并行 / 多 Agent | — |
+
+### 参数说明
+
+- 记号：`< >` 必填，`[ ]` 可选，`|` 多选一。
+- `--review`：启用 Codex 审查门禁（proposal 的 Gate 1 设计审查 + apply 的 Gate 2 代码审查）；不加则跳过 Gate，仅本地 lint/unit。
+- `--qa`：在 doit / mini 流程中插入 Playwright 浏览器功能验收（步骤 ⑩）。
+- `迭代目录`：形如 `docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/`；**省略时自动定位**最近一个匹配 phase 的迭代。
+- `<需求>` / `<小任务>` 输入格式：纯文本、`file:///本地路径`、或 URL（自动经 Playwright MCP 提取正文）。
+- `sdlc-init` 的 `key=value` 配置（均可选）：`review=<n>`（REVIEW_MAX_ROUNDS）、`branch=<prefix>`（GIT_BRANCH_PREFIX）、`test-framework=<jest|vitest|mocha>`、`lint=<eslint|biome>`。
+- `sdlc-worktree` 的 `<type>`：`feature | fix | refactor | docs | test | chore`。
 
 **为什么 accept 和 pr 分开**：accept 把变更定稿到**本地**（更新文档 + commit），你可以先 review 本地 diff；确认无误后再用 `pr` 推送并发布。本地定稿与远程发布解耦，出错好回退。
 
@@ -306,6 +316,20 @@ sdlc-worktree gc
 ---
 
 ## 目录结构
+
+仓库本身是一个**多运行时插件**：Claude Code 与 Codex 共用同一套 `skills/`，逻辑单源在 `sdlc-workflow/references/`。
+
+```
+sdlc-workflow/（repo 根）
+├── skills/                 # 统一入口：每个阶段一个 skill（两端共用）
+│   ├── sdlc-workflow/      # → 软链到 ../sdlc-workflow（总览/编排 skill）
+│   ├── sdlc-init/  sdlc-proposal/  sdlc-apply/  sdlc-qa/  sdlc-accept/
+│   ├── sdlc-pr/  sdlc-doit/  sdlc-mini/  sdlc-review/  sdlc-update/  sdlc-worktree/
+│   └──   每个含 SKILL.md（薄入口，指向 references/）
+├── .claude-plugin/         # Claude Code 清单（marketplace.json + plugin.json，自动发现 skills/）
+├── .codex-plugin/          # Codex 清单（plugin.json，skills: ./skills/）
+└── sdlc-workflow/          # 核心 Skill 内容（被 skills/sdlc-workflow 引用）
+```
 
 ```
 sdlc-workflow/              # 核心 Skill
