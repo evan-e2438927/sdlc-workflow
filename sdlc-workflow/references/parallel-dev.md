@@ -68,7 +68,7 @@ wt-<seq>-<slug>-<type>/
 1. 从 `main` 生成分支名和 slug
 2. `git worktree add ../wt-<seq>-<slug>-<type> -b <branch>`
 3. 在新 worktree 内初始化迭代目录
-4. 复制主仓库所有 `.env*` 文件到新 worktree（`.env`、`.env.local`、`.env.development` 等不受 git 追踪），并覆写 `PORT`/`API_PORT` 实现端口隔离
+4. 复制主仓库 `.claude/.sdlc-config*` 到新 worktree（不受 git 追踪），并覆写其中的 `PORT`/`API_PORT` 实现端口隔离
 5. 注册到 `.worktrees/worktree-registry.json`
 6. 输出：worktree 路径 + 分支名
 
@@ -154,27 +154,30 @@ cd ../wt-001-user-login-feature
 
 ```
 cd ../wt-001-user-login-feature
-/sdlc-workflow apply docs/iterations/2026-04-16/001-user-login-feature
-# → Pipeline ⑥-⑪ 在 worktree 内独立运行
-# → git-committer 直接 push worktree 自己的分支（已 checkout）
-# → PR 创建后更新注册表
+/sdlc-workflow apply docs/iterations/2026-04-16/001-user-login-feature   # ⑥-⑨
+/sdlc-workflow qa docs/iterations/2026-04-16/001-user-login-feature      # ⑩（可选）
+/sdlc-workflow accept docs/iterations/2026-04-16/001-user-login-feature  # ⑪⑫ 本地 commit
+/sdlc-workflow pr docs/iterations/2026-04-16/001-user-login-feature      # ⑬ push + PR
+# → 各命令均在 worktree 内独立运行
+# → pr 直接 push worktree 自己的分支（已 checkout），创建 PR 后更新注册表
 ```
 
-### 5.3 `git-committer` 改动
+### 5.3 `git-committer`（⑫）与 `pr-creator`（⑬）改动
 
-在 worktree 模式下，步骤 ⑪ 的行为变化：
+在 worktree 模式下，accept 的 git-committer（本地 commit）与 pr 的 pr-creator（push + PR）
+行为变化：
 
 ```bash
-# 传统模式：需要 创建新分支
+# git-committer（⑫，accept）— 仅本地提交
+# 传统模式：创建新分支
 git checkout -b "$BRANCH_NAME"
-
-# Worktree 模式：分支在 worktree create 时已创建，直接使用
-CURRENT_BRANCH=$(git branch --show-current)
-# 确认 CURRENT_BRANCH 与注册表一致
-
+# Worktree 模式：分支在 worktree create 时已创建，直接复用
+CURRENT_BRANCH=$(git branch --show-current)   # 确认与注册表一致
 git add -A
 git commit -m "<type>(scope): <摘要>"
-git push origin "$CURRENT_BRANCH"
+
+# pr-creator（⑬，pr）— push + 创建 PR
+git push -u origin "$CURRENT_BRANCH"
 gh pr create --base main --title "..." --body "..."
 ```
 
@@ -261,7 +264,7 @@ Worktree 003: PORT=3003, API_PORT=4003
 公式: PORT = 3000 + seq, API_PORT = 4000 + seq
 ```
 
-在 worktree 的 `.env` 中自动设置：
+在 worktree 的 `.claude/.sdlc-config` 中自动设置：
 ```bash
 PORT=$((3000 + seq))
 API_PORT=$((4000 + seq))

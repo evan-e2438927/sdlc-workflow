@@ -60,8 +60,11 @@ function assessConfidence(requirement) {
 | 置信度 | 条件 | 处理方式 | 标注标记 |
 |--------|------|----------|----------|
 | 高 | ≥0.8 | 直接确认，不阻塞流程 | `[✅ 已确认]` |
-| 中 | 0.5-0.8 | 自行假设，不阻塞流程 | `[⚠️ 假设: <具体假设内容>]` |
+| 中 | 0.5-0.8 | 自行假设，不阻塞流程；**但若该假设有设计影响（会决定 design.md 的技术选型 / 数据模型 / 交互行为 / 边界语义），交互模式下必须升级为低置信度处理并发起提问** | `[⚠️ 假设: <具体假设内容>]` |
 | 低 | <0.5 | **交互模式**：主会话内选择询问 → 用户选择写入需求；**无人值守模式**（doit）：fallback 为标注假设 | 交互后已确认 → `[✅ 已确认（用户选择）]`；否则 `[⚠️ 假设: <具体假设内容>]` |
+
+> **设计影响升级规则**：置信度只是分流信号，不是放行许可。任何假设——无论评分落在中还是低——只要会**直接决定一项设计决策**，
+> 在交互模式（proposal / mini）下都**必须**走 §4.2 提问，不得静默假设。"自评成中置信度"不能成为跳过提问的逃逸口。
 
 > **模式判定**：`INTERACTIVE = (mode in ["proposal", "mini"])`。
 > 仅交互模式下才发起选择询问；doit 模式低置信度项一律自行假设并写入"假设记录"。
@@ -76,8 +79,10 @@ const assumptions = {
   requirement: "原始需求描述",
   assumption: "所做的假设内容",
   confidence: "medium | low",
+  designImpact: false, // 该假设是否会直接决定一项设计决策（true → 交互模式必须提问）
   status: "pending | confirmed | rejected",
-  confirmedBy: null, // "interactive"（主会话选择询问）/ "auto-assumed"（无人值守 fallback）/ "human-review"（事后人工评审）
+  confirmedBy: null, // "interactive"（已作答）/ "user-skipped"（交互模式问了但用户跳过/取消）/ "auto-assumed"（doit 无人值守）/ "human-review"（事后人工评审）
+  provenance: null,  // "asked"（已发起询问）/ "never-asked"（从未发起询问——仅 doit 无人值守模式允许）
   confirmedAt: null
 };
 ```
@@ -92,11 +97,14 @@ const assumptions = {
 INTERACTIVE = (mode in ["proposal", "mini"])
 
 IF NOT INTERACTIVE:
-  # doit 全自动模式 → 无人值守
-  → 全部低置信度项按假设处理（同 MEDIUM 流程），写入"假设记录"，confirmedBy="auto-assumed"
+  # doit 全自动模式 → 无人值守（唯一允许 never-asked 的场景）
+  → 全部低置信度项按假设处理（同 MEDIUM 流程），写入"假设记录"
+  → confirmedBy="auto-assumed", provenance="never-asked"
   → 不发起任何询问，流程继续
 ELSE:
   → 进入 §4.2 批量选择询问
+  → 交互模式下，低置信度项以及"有设计影响"的中置信度项，provenance 必须为 "asked"
+    （即必须真正发起过 AskUserQuestion）；不存在"交互模式 + never-asked"的合法组合
 ```
 
 #### 4.2 选择题生成规则
@@ -129,7 +137,9 @@ FOR each low_conf_item:
   ELSE （用户取消 / 跳过 / 工具不可用）:
     → fallback 为 auto-assume：保留 Claude 的最佳假设
     → 标注 [⚠️ 假设: <具体假设内容>]
-    → assumption record: status="pending", confirmedBy="auto-assumed", confirmedAt=now()
+    → assumption record: status="pending", confirmedBy="user-skipped", provenance="asked", confirmedAt=now()
+    # 关键：交互模式下"问了被跳过"(provenance=asked) 与"压根没问"(provenance=never-asked) 必须区分；
+    #       后者在 proposal/mini 模式下不允许出现（见 §4.7 澄清 Gate）
 ```
 
 #### 4.5 实现接口
@@ -144,6 +154,42 @@ FOR each low_conf_item:
 
 ```bash
 echo "✅ 需求澄清完成: 已确认 $CONFIRMED_COUNT / 已假设 $ASSUMED_COUNT"
+```
+
+#### 4.7 澄清 Gate（交互模式强制，进入步骤③前必须通过）
+
+澄清结束、进入 design-generator 之前，**必须**执行下面的门禁检查。它的存在是为了堵住
+"名义上跑完②、却从未真正提问、直接拿假设去做设计决策"这一漏洞：
+
+```
+INTERACTIVE = (mode in ["proposal", "mini"])
+
+IF INTERACTIVE:
+  # 收集所有"必须问过"的项：低置信度项 + designImpact=true 的中置信度项
+  MUST_ASK = low_conf_items ∪ medium_items_with_designImpact
+
+  # 门禁条件：MUST_ASK 中不允许存在 provenance="never-asked"
+  BLOCKERS = [ x for x in MUST_ASK if x.provenance == "never-asked" ]
+
+  IF BLOCKERS 非空:
+    → ❌ Gate 未通过：这些项从未发起过提问
+    → 立即回到 §4.2，对 BLOCKERS 发起 AskUserQuestion（≤4 题/轮）
+    → 用户作答 → provenance="asked"、confirmedBy 相应更新
+    → 用户明确跳过 → provenance="asked"、confirmedBy="user-skipped"（允许放行）
+    → 重新评估门禁，直到 BLOCKERS 为空
+ELSE:
+  # doit 无人值守：never-asked 合法，门禁直接放行
+  → PASS
+```
+
+> **判定要点**：放行的唯一条件是"问过了"（provenance="asked"），无论用户是作答还是明确跳过；
+> "从没问过"（never-asked）在 proposal / mini 模式下一律拦截。下游 design-generator 会复核此门禁
+> （见 03-design-generator.md「前置门禁」），二者形成双保险。
+
+```bash
+# 门禁输出
+echo "🚦 澄清 Gate: MUST_ASK=$MUST_ASK_COUNT / never-asked 拦截=$BLOCKER_COUNT"
+[ "$BLOCKER_COUNT" -eq 0 ] && echo "✅ 澄清 Gate 通过，可进入步骤③" || echo "⛔ 澄清 Gate 未通过，先完成提问"
 ```
 
 ### 5. 更新 requirements.md
@@ -247,12 +293,12 @@ echo "✅ 需求澄清完成: 已确认 $CONFIRMED_COUNT / 已假设 $ASSUMED_CO
 |----------|----------|
 | requirements.md 不存在 | 回退到步骤①，重新执行 requirements-ingestion |
 | 置信度分析失败 | 默认为中置信度，添加假设标注 |
-| AskUserQuestion 不可用 / 工具调用失败 | fallback 为 auto-assume，confirmedBy="auto-assumed"，不阻塞 |
-| 用户跳过 / 取消选择询问 | fallback 为 auto-assume，confirmedBy="auto-assumed"，不阻塞 |
-| 处于 doit 无人值守模式 | 不发起询问，全部 auto-assume |
+| AskUserQuestion 不可用 / 工具调用失败 | fallback：confirmedBy="user-skipped"，provenance="asked"（已尝试发起），不阻塞 |
+| 用户跳过 / 取消选择询问 | fallback：confirmedBy="user-skipped"，provenance="asked"，不阻塞（已问过即放行） |
+| 处于 doit 无人值守模式 | 不发起询问，全部 confirmedBy="auto-assumed"，provenance="never-asked"（仅此模式允许 never-asked） |
 
 ## 相关文件
 
 - 输入：requirements.md（原始）
 - 输出：requirements.md（标注版，含假设记录）
-- 参考：references/design-generator.md（下一步）
+- 参考：references/03-design-generator.md（下一步）

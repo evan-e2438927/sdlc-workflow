@@ -37,7 +37,7 @@
 ② requirements-clarifier
    → 标注版 requirements.md
    ※ proposal 模式下，对低置信度需求会**在主会话内通过 AskUserQuestion 发起选择询问**
-     详见 references/requirements-clarifier.md §4。
+     详见 references/02-requirements-clarifier.md §4。
 
 ③ design-generator
    → docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/design.md
@@ -132,14 +132,18 @@ TOTAL_HOURS=$(grep -oP '预估工时: \K[0-9]+' "$ITER_DIR/tasks.md" | awk '{s+=
 | Gate 1 超限（--review 时） | 中止，提示人工介入 |
 | status.json 写入失败 | LOG warning，不阻塞（产物已生成） |
 
-## 与 doit 的关系
+## 流程中的位置
 
 ```
-proposal = 步骤①-⑤ + 暂停
-doit     = 步骤①-⑪（不暂停，全自动）
-apply    = 步骤⑥-⑪（从 proposal 产物继续）
+proposal → apply → qa → accept → pr
+  ①-⑤      ⑥-⑨    ⑩    ⑪⑫       ⑬
 
-doit 内部等价于 proposal + apply 不停顿
+proposal = 步骤①-⑤ + 暂停（pending_review）
+apply    = 步骤⑥-⑨（开发 + 单元测试 + lint）
+qa       = 步骤⑩（浏览器功能验收）
+accept   = 步骤⑪⑫（更新文档 + 本地 commit）
+pr       = 步骤⑬（push + 创建 PR）
+doit     = 上述五步全自动串联（不暂停；--qa 时含 qa）
 ```
 
 ## 相关文件
@@ -151,6 +155,6 @@ doit 内部等价于 proposal + apply 不停顿
   - docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/tasks.md
   - docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/status.json
 - 参考：
-  - references/apply.md（下一步）
-  - references/requirements-ingestion.md（步骤 ①）
-  - references/design-reviewer.md（Gate 1）
+  - references/flow-apply.md（下一步）
+  - references/01-requirements-ingestion.md（步骤 ①）
+  - references/05-design-reviewer.md（Gate 1）

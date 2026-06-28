@@ -37,6 +37,10 @@ codex exec --full-auto "审查以下设计文档和任务分解。
    - Track 取值是否与"目标文件"路径自洽
    - test Track 任务是否仅出现在 Phase 3
    - "任务 Track 汇总"表是否覆盖所有任务且总数与 Phase 总览一致
+9) 澄清完备性（防止凭未澄清假设做设计决策）:
+   - design.md 中凡解决了 requirements.md 里 [❓待确认] / [⚠️ 假设] 项的技术决策，是否都在「设计假设」小节显式登记（含关联 ASM-ID + 理由 + 假设错误的影响）
+   - 是否存在把假设当既定事实、未经标注就写进设计正文的决策
+   - 交互模式（proposal/mini）下，是否存在 provenance=never-asked（从未提问）却影响设计的低置信度项——若有则 FAIL，要求先澄清
 
 给出 PASS/FAIL 及具体问题列表。
 
@@ -65,6 +69,7 @@ $(cat .claude/SECURITY.md)"
 | 目录结构 | workspace 落位正确 | Web 在 `apps/web`，Server 在 `apps/server`，共享逻辑在 `packages/*` |
 | **AC 覆盖度** | **需求级 AC 到任务级 AC 的映射完整性** | **见下方 AC 覆盖度检查规则** |
 | **Track 一致性** | **每个任务声明 Track 且与目标文件路径自洽** | **见下方 Track 一致性检查规则** |
+| **澄清完备性** | **被假设驱动的设计决策是否已显式登记并澄清** | **交互模式下无 never-asked 的设计影响项；假设决策均登记在「设计假设」小节** |
 
 ### 2.1 AC 覆盖度检查规则（Gate 1 必做）
 
@@ -159,6 +164,10 @@ TRACK_CONSISTENCY_CHECK:
    - Track 取值是否与"目标文件"路径自洽
    - test Track 任务是否仅出现在 Phase 3
    - "任务 Track 汇总"表是否覆盖所有任务且总数与 Phase 总览一致
+9) 澄清完备性（防止凭未澄清假设做设计决策）:
+   - design.md 中凡解决了 requirements.md 里 [❓待确认] / [⚠️ 假设] 项的技术决策，是否都在「设计假设」小节显式登记（含关联 ASM-ID + 理由 + 假设错误的影响）
+   - 是否存在把假设当既定事实、未经标注就写进设计正文的决策
+   - 交互模式（proposal/mini）下，是否存在 provenance=never-asked（从未提问）却影响设计的低置信度项——若有则 FAIL，要求先澄清
 ```
 
 ### 3. 循环逻辑
@@ -268,6 +277,10 @@ while [ $round -le $max_rounds ]; do
    - Track 取值是否与"目标文件"路径自洽
    - test Track 任务是否仅出现在 Phase 3
    - "任务 Track 汇总"表是否覆盖所有任务且总数与 Phase 总览一致
+9) 澄清完备性（防止凭未澄清假设做设计决策）:
+   - design.md 中凡解决了 requirements.md 里 [❓待确认] / [⚠️ 假设] 项的技术决策，是否都在「设计假设」小节显式登记（含关联 ASM-ID + 理由 + 假设错误的影响）
+   - 是否存在把假设当既定事实、未经标注就写进设计正文的决策
+   - 交互模式（proposal/mini）下，是否存在 provenance=never-asked（从未提问）却影响设计的低置信度项——若有则 FAIL，要求先澄清
 
 给出 PASS/FAIL 及具体问题列表。
 
@@ -316,7 +329,7 @@ done
 |----------|----------|
 | Codex CLI 调用失败 | 记录原始 stderr，立即中止 Pipeline，通知人工介入 |
 | 审查超时 | 重试最多 3 次，仍失败则中止 |
-| .env 未设置 | 使用默认 max_rounds=1 |
+| .claude/.sdlc-config 未设置 | 使用默认 max_rounds=1 |
 | 设计文档不存在 | 回退到步骤③ |
 | 目录结构偏离默认约定 | FAIL，回退到步骤③补充目录影响声明 |
 
@@ -356,5 +369,5 @@ round > 1（即 Gate 1 不是首轮直接通过）
 - 输出：审查结果（PASS/FAIL）+ 增量文档同步
 - 参考：
   - SKILL.md Part 4（下一步：步骤⑥ Claude Code 开发）
-  - references/code-reviewer.md（Gate 2）
-  - references/docs-updater.md（最终文档更新）
+  - references/08-code-reviewer.md（Gate 2）
+  - references/10-docs-updater.md（最终文档更新）

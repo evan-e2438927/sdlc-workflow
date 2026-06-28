@@ -336,4 +336,4 @@ echo "✅ 需求已收录: $(echo "$CONTENT" | head -c 50)..."
 
 - 输入：用户提供的需求（文本/文件/URL）
 - 输出：docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/requirements.md
-- 参考：references/requirements-clarifier.md（下一步）
+- 参考：references/02-requirements-clarifier.md（下一步）

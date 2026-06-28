@@ -64,13 +64,14 @@ check_worktree_exists() {
   fi
 }
 
-# 读取 .env 中的变量
-read_env_var() {
+# 读取 .claude/.sdlc-config 中的变量
+read_config_var() {
   local key="$1"
   local default="$2"
-  if [ -f "$PROJECT_ROOT/.env" ]; then
+  local cfg="$PROJECT_ROOT/.claude/.sdlc-config"
+  if [ -f "$cfg" ]; then
     local val
-    val=$(grep "^${key}=" "$PROJECT_ROOT/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
+    val=$(grep "^${key}=" "$cfg" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
     echo "${val:-$default}"
   else
     echo "$default"
@@ -97,7 +98,7 @@ cmd_create() {
   seq=$(next_seq)
 
   local branch_prefix
-  branch_prefix=$(read_env_var "GIT_BRANCH_PREFIX" "feat/")
+  branch_prefix=$(read_config_var "GIT_BRANCH_PREFIX" "feat/")
 
   # type → branch prefix 映射
   case "$type" in
@@ -133,36 +134,27 @@ cmd_create() {
   # 在 worktree 中创建迭代目录
   mkdir -p "$wt_path/$iter_dir"
 
-  # 复制所有 .env* 文件（这些文件在 .gitignore 中，不会被 git worktree 带过去）
-  local env_copied=0
-  for env_file in "$PROJECT_ROOT"/.env*; do
-    [ -f "$env_file" ] || continue
-    local basename
-    basename=$(basename "$env_file")
-    # 跳过 .env.example / .env.*.example（模板文件已受版本控制）
-    case "$basename" in
-      *.example|*.tpl|*.template) continue ;;
-    esac
-    cp "$env_file" "$wt_path/$basename"
-    env_copied=$((env_copied + 1))
+  # 复制本地 SDLC 配置（.claude/.sdlc-config* 在 .gitignore 中，git worktree 不会带过去）
+  local cfg_copied=0
+  mkdir -p "$wt_path/.claude"
+  for cfg_file in "$PROJECT_ROOT"/.claude/.sdlc-config*; do
+    [ -f "$cfg_file" ] || continue
+    cp "$cfg_file" "$wt_path/.claude/$(basename "$cfg_file")"
+    cfg_copied=$((cfg_copied + 1))
   done
-  # 若主仓库无 .env 但有 .env.example，用它生成 .env
-  if [ ! -f "$wt_path/.env" ] && [ -f "$PROJECT_ROOT/.env.example" ]; then
-    cp "$PROJECT_ROOT/.env.example" "$wt_path/.env"
-    env_copied=$((env_copied + 1))
-  fi
-  echo "   📄 已复制 $env_copied 个 .env* 文件到 worktree"
+  echo "   📄 已复制 $cfg_copied 个 .sdlc-config* 文件到 worktree"
 
-  # 端口隔离：覆写 .env 中的 PORT/API_PORT
+  # 端口隔离：覆写 .claude/.sdlc-config 中的 PORT/API_PORT
   local seq_num=$((10#$seq))
   local port=$((3000 + seq_num))
   local api_port=$((4000 + seq_num))
 
-  if [ -f "$wt_path/.env" ]; then
-    grep -v "^PORT=" "$wt_path/.env" | grep -v "^API_PORT=" > "$wt_path/.env.tmp" || true
-    mv "$wt_path/.env.tmp" "$wt_path/.env"
-    echo "PORT=$port" >> "$wt_path/.env"
-    echo "API_PORT=$api_port" >> "$wt_path/.env"
+  local wt_cfg="$wt_path/.claude/.sdlc-config"
+  if [ -f "$wt_cfg" ]; then
+    grep -v "^PORT=" "$wt_cfg" | grep -v "^API_PORT=" > "$wt_cfg.tmp" || true
+    mv "$wt_cfg.tmp" "$wt_cfg"
+    echo "PORT=$port" >> "$wt_cfg"
+    echo "API_PORT=$api_port" >> "$wt_cfg"
   fi
 
   # 更新注册表

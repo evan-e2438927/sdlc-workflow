@@ -277,5 +277,5 @@ done
   - .claude/SECURITY.md
 - 输出：审查结果（PASS/FAIL）
 - 参考：
-  - references/test-pipeline.md（下一步：测试执行）
-  - references/design-reviewer.md（Gate 1）
+  - references/09-test-pipeline.md（下一步：测试执行）
+  - references/05-design-reviewer.md（Gate 1）

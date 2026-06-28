@@ -8,7 +8,7 @@
 - Gate 1（加 `--review` 时）
 - validation capability detection
 - Gate 2（加 `--review` 时）
-- 最终浏览器验收（可选，通过 `accept` 命令触发）
+- 浏览器功能验收（加 `--qa` 时）
 
 ## 强制顺序
 
@@ -94,11 +94,16 @@ Gate 1 通过（或跳过）后，开始修改业务代码。
 
 ### Step 9. Automated Tests
 
-执行三阶段自动化测试：
+执行自动化测试：
 
 1. Lint
 2. Unit Tests
-3. Playwright E2E 预检
+
+（浏览器 E2E 不在此处；加 `--qa` 时见 Step 9.5）
+
+### Step 9.5. QA（仅 `--qa`）
+
+读取 qa track 场景，编写并通过 Playwright MCP 执行浏览器功能验收。
 
 ### Step 10. Final Report
 
@@ -109,11 +114,11 @@ Gate 1 通过（或跳过）后，开始修改业务代码。
 3. Gate 1 result（若执行）
 4. Validation Capability Detection
 5. Gate 2 result（若执行）
-6. Test results (Lint / Unit / E2E)
+6. Test results (Lint / Unit；`--qa` 时含 E2E)
 7. Tasks status
 8. Residual risks
 
-可选：运行 `/sdlc-workflow accept` 进行 Playwright MCP 功能验收。
+随后由 docs-updater 更新文档、git-committer 本地提交，再由 pr-creator push 并创建 PR。
 
 ## Hard Rules
 

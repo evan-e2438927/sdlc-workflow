@@ -276,4 +276,4 @@ echo "✅ 文档已更新: README.md, ARCHITECTURE.md, SECURITY.md, CODING_GUIDE
   - docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/tasks.md
 - 输出：更新后的文档
 - 参考：
-  - references/git-committer.md（下一步）
+  - references/11-git-committer.md（下一步）

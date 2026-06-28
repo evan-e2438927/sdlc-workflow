@@ -3,7 +3,11 @@
 ## 概述
 
 `/sdlc-workflow apply <迭代目录>` 在 proposal 产物经人工审核后，
-继续执行开发、测试、审查和提交流程（步骤 ⑥-⑪）。
+继续执行**开发 + 单元测试 + 静态检查**（步骤 ⑥-⑨）。
+
+**apply 不更新文档、不提交、不推 PR**——这些属于 `accept` 验收流程；
+浏览器功能验收（Playwright）属于 `qa` 命令。apply 只负责把代码写出来并通过
+lint + unit 自检，产物停在 `phase == "applied"`。
 
 ## 入口
 
@@ -91,30 +95,29 @@ fi
 读取 $ITER_DIR/tasks.md → 获取任务列表
 
 ⑥ Claude Code 开发
+   只实现 frontend / backend / unit-test 三类 track 的任务
+   （track: qa 的任务不在此实现，留给 qa 命令）
    解析 tasks.md 依赖关系，构建拓扑分层
    若存在可并行层（层内 >1 任务且无目标文件交集）→ Agent Team 并行
    否则 → 顺序逐任务实现
    每完成一个任务同步回写 tasks.md
 
 ⑦ test-generator
-   生成单元测试 + E2E 测试
+   仅生成单元测试（tests/unit/），处理 track: unit-test 的任务
+   不生成 E2E/浏览器测试（由 qa 命令负责）
 
 [⑧ code-reviewer (Gate 2)   ← 仅 --review 模式]
    Codex CLI 审查代码
 
 ⑨ test-pipeline
-   lint → unit → Playwright E2E（三阶段）
-
-⑩ docs-updater
-   更新 .claude/ARCHITECTURE.md / .claude/SECURITY.md 等
-
-⑪ git-committer
-   branch → commit → push → PR
+   lint → unit（两阶段，不含浏览器 E2E）
 
 更新 status.json:
   phase: "applied"
   applied_at: <当前时间>
 ```
+
+> ⑩ 浏览器功能验收 → `qa` 命令；⑪ docs-updater + ⑫ git-committer → `accept` 命令。
 
 ## 自动查找最近 proposal
 
@@ -160,8 +163,10 @@ fi
 ### Apply 完成
 
 ```
-✅ PR: <url> | 变更: N files | 测试: 全部通过
+✅ 开发完成: N 个任务 | 测试: lint + unit 全部通过
 📂 迭代目录: <iter_dir>
+👉 浏览器验收请运行: /sdlc-workflow:qa
+👉 确认无误后提交: /sdlc-workflow:accept
 ```
 
 ## 错误处理
@@ -173,7 +178,7 @@ fi
 | phase 为 applied | 中止，提示已执行过（需手动重置） |
 | 产物文件缺失 | 中止，提示重新 proposal |
 | Gate 2 超限（--review 时） | 中止，控制台输出错误，提示人工介入 |
-| 测试修复超限 | 中止，控制台输出错误，提示人工介入 |
+| lint / unit 修复超限 | 中止，控制台输出错误，提示人工介入 |
 
 ## status.json 更新
 
@@ -196,15 +201,18 @@ fi
 }
 ```
 
-## 与 proposal / doit 的关系
+## 流程中的位置
 
 ```
-proposal = 步骤①-⑤ + 暂停
-apply    = 步骤⑥-⑪（从 proposal 产物继续）
-doit     = proposal + apply 不停顿
+proposal → 人工审核 → apply → qa → accept → pr
+  ①-⑤              ⑥-⑨    ⑩    ⑪⑫       ⑬
 
-proposal → 人工审核 → apply   (推荐流程)
-doit                          (全自动流程)
+proposal = 步骤①-⑤ + 暂停（pending_review）
+apply    = 步骤⑥-⑨（开发 + 单元测试 + lint，phase: applied）
+qa       = 步骤⑩（浏览器功能验收，phase: qa_passed）
+accept   = 步骤⑪⑫（更新文档 + 本地 commit，phase: accepted）
+pr       = 步骤⑬（push + 创建 PR，phase: pr_created）
+doit     = proposal + apply (+ qa --qa) + accept + pr，不停顿
 ```
 
 ## 相关文件
@@ -216,10 +224,10 @@ doit                          (全自动流程)
   - docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/status.json
 - 输出：
   - 代码变更
-  - tests/unit/ + tests/e2e/ + tests/reports/
-  - PR URL
+  - tests/unit/ + tests/reports/
+  - status.json（phase: applied）
 - 参考：
-  - references/proposal.md（前置步骤）
-  - references/code-reviewer.md（Gate 2）
-  - references/test-pipeline.md（测试流程）
-  - references/git-committer.md（提交流程）
+  - references/flow-proposal.md（前置步骤）
+  - references/08-code-reviewer.md（Gate 2）
+  - references/09-test-pipeline.md（lint + unit）
+  - references/flow-accept.md（后续：更新文档 + 提交）

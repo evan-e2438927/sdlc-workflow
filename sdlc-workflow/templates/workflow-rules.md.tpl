@@ -6,12 +6,16 @@
   - <seq>: 当天内递增的 3 位序号，例 `001`
   - <slug>: 需求名 kebab-case (≤30 字符)
   - <type>: feature | fix | refactor | docs | test | chore
-- Commit: Conventional Commits (feat/fix/docs/refactor/test/chore)
-- 通知统一走 OpenClaw CLI
+- Commit: 遵循 Conventional Commits 1.0.0（见 https://www.conventionalcommits.org/zh-hans/v1.0.0/）
+  - 格式：`<type>[optional scope][!]: <description>`，必要时附 body 与 footer
+  - type 取值：feat | fix | docs | style | refactor | perf | test | build | ci | chore | revert
+  - 破坏性变更：type 后加 `!` 或在 footer 写 `BREAKING CHANGE: <说明>`（触发 MAJOR）
+  - 配置：type 取 `.claude/.sdlc-config` 的 COMMIT_TYPE（留空则按迭代 <type> 推断），scope 取 COMMIT_SCOPE（留空自动推断）
+- 配置统一放 `.claude/.sdlc-config`（KEY=VALUE，gitignored）
 - Review/Test 循环上限由 REVIEW_MAX_ROUNDS 控制（默认 1 轮）
-- 超限通知人工 + 中止 Pipeline
-- 禁止直推 main/master 分支
-- 禁止通知/日志泄露敏感信息（密钥/Token/密码）
+- 超限中止 Pipeline，等待人工介入
+- 禁止直推 main/master 分支（push + PR 仅在 `pr` 命令中执行）
+- 禁止日志泄露敏感信息（密钥/Token/密码）
 - Codex Gate 默认使用 `codex exec --full-auto`
 - Codex CLI 不可用时必须中止，不能自动跳过 Gate
 - 测试文件统一存放 tests/ 目录（unit/ + e2e/ + reports/）
@@ -38,24 +42,23 @@
 - 单元测试必须写入 `tests/unit/`，并按 workspace 镜像落位，如 `tests/unit/web/...`、`tests/unit/server/...`、`tests/unit/packages/...`
 - E2E 测试必须写入 `tests/e2e/`，并维护"需求 ID / 场景 ID / 文件路径"的唯一映射，不得重复覆盖同一需求路径
 - `tasks.md` 是执行状态单据：任务实现完成后，必须将任务标题从 `[ ]` 回写为 `[x]`，并同步勾选真实完成的验收标准
-- 每个任务必须声明 Track 字段（取值：`frontend` | `backend` | `shared` | `infra` | `test`），用于按角色组织阅读和分派
-- Track 必须与目标文件路径自洽：`apps/web/*`/`apps/native/*`/`packages/ui/*` → frontend；`apps/server/*`/`packages/api/*`/`packages/db/*` → backend；`packages/{config,env,auth}/*` → shared；`db/migrations/*` 与根目录配置/CI 文件 → infra；`tests/*` → test
+- 每个任务必须声明 Track 字段（取值：`frontend` | `backend` | `shared` | `infra` | `unit-test` | `qa`），用于按角色组织阅读和分派
+- Track 必须与目标文件路径自洽：`apps/web/*`/`apps/native/*`/`packages/ui/*` → frontend；`apps/server/*`/`packages/api/*`/`packages/db/*` → backend；`packages/{config,env,auth}/*` → shared；`db/migrations/*` 与根目录配置/CI 文件 → infra；`tests/unit/*` → unit-test；`tests/e2e/*` → qa
 - 一个任务只能属于一个 Track；跨端需求（如同时改前端表单与后端 API）必须在拆任务阶段拆为多个任务，禁止一个任务跨 Track
 - `tasks.md` 必须在"任务总览"之后提供"任务 Track 汇总（按角色视图）"表，覆盖所有任务 ID，且总数与 Phase 总览一致
-- `test` Track 仅允许出现在 Phase 3；Phase 1/2 实现任务里随手写的单元测试不计为 test Track
-- 进入 `/sdlc-doit` 或 `/sdlc-doit-mini` 的测试阶段前，必须先检测项目当前具备的验证能力，不能静默跳过测试决策
+- `unit-test` / `qa` Track 仅允许出现在 Phase 3；Phase 1/2 实现任务里随手写的单元测试不计为独立 Track
+- `qa` Track 只写浏览器验收规格（Given-When-Then + 选择器约束），不写实现；脚本由 `qa` 命令生成并执行，apply 阶段跳过
+- 进入测试阶段前，必须先检测项目当前具备的验证能力，不能静默跳过测试决策
 - `TEST_BOOTSTRAP_POLICY` 决定缺少测试基础设施时的行为；existing project 默认推荐 `report`
-- OpenClaw / 远程场景默认不依赖交互式 ask，优先通过报告和 TG 通知输出缺口与后续动作
-- 测试链路为 `Playwright 预检 + Playwright MCP + CDP 最终交互验收`
-- 最终交互测试与最终测试报告以 Playwright MCP 和 CDP 产物为准
-- **Artifact Gate（产物验证门禁）**：标记 test-pipeline 完成前，必须验证以下产物全部存在于磁盘：
-  - `tests/reports/playwright/<slug>-*.md`（至少一份 Playwright MCP 验收记录）
-  - `tests/reports/<slug>-acceptance-report.html`（最终验收报告 HTML）
-  - 缺少任何一项 → 禁止标记 test-pipeline 为 completed
-- **Todo 状态与磁盘产物交叉验证**：`manage_todo_list` 的 completed 状态必须与真实磁盘产物一致，不能只靠内存标记
+- 远程 / 无人值守场景默认不依赖交互式 ask，优先通过报告输出缺口与后续动作
+- apply 的 test-pipeline 只做 lint + unit（步骤 ⑨）；浏览器功能验收由 `qa` 命令（步骤 ⑩，Playwright 脚本 + Playwright MCP）负责
+- **Artifact Gate（产物验证门禁）**：标记 qa 通过前，必须验证以下产物存在于磁盘：
+  - `tests/e2e/<slug>/E2E-*.e2e.ts`（至少一份 Playwright 脚本）
+  - `tests/reports/<slug>-e2e-report.md`（qa 验收报告）
+  - 缺少任何一项 → 禁止标记 qa 为 qa_passed
 - **Token 耗尽保护**：若 context_usage > 70%，必须先执行 /compact 再进入 test-pipeline（步骤 ⑨）
-- **Pipeline 断点续跑**：status.json 新增 `pipeline_stage` 字段，token 耗尽时写入 `test-pipeline-incomplete`；新会话启动时读取此字段，从中断阶段继续执行而非跳过
-- 架构文档 `.claude/ARCHITECTURE.md`、安全规范 `.claude/SECURITY.md`、编码规范 `.claude/CODING_GUIDELINES.md` 与 `CLAUDE.md` 一同位于 `.claude/` 目录
-- `proposal` 命令完成后必须写入 `status.json`，标记 `phase: pending_review`
-- `apply` 命令启动前必须检查 `status.json`，仅当 `phase == approved` 时允许执行
-- `doit` 命令为全自动模式，内部执行 proposal + apply 不停顿
+- **Pipeline 断点续跑**：status.json 用 `phase` 字段记录进度（pending_review → applied → qa_passed → accepted → pr_created）；新会话启动时读取此字段，从中断阶段继续执行而非跳过
+- 架构文档 `.claude/ARCHITECTURE.md`、安全规范 `.claude/SECURITY.md`、编码规范 `.claude/CODING_GUIDELINES.md`、配置 `.claude/.sdlc-config` 与 `CLAUDE.md` 一同位于 `.claude/` 目录
+- 主线五命令：`proposal`（→ pending_review，暂停）→ `apply`（→ applied，不提交）→ `qa`（→ qa_passed，可跳过）→ `accept`（→ accepted，本地 commit）→ `pr`（→ pr_created，push + PR）
+- `apply` 命令启动前必须检查 `status.json`，phase 为 `pending_review`（视为审核通过）或 `approved` 时允许执行
+- `doit` 命令为全自动模式，内部执行 proposal + apply + [qa] + accept + pr 不停顿

@@ -1,28 +1,24 @@
-# 步骤 ⑨: Test Pipeline — 测试执行
+# 步骤 ⑨: Test Pipeline — 静态检查 + 单元测试
 
 ## 输入
 
-`tests/unit/` 和 `tests/e2e/` 内的测试文件
+`tests/unit/` 内的单元测试文件
 
 ## 输出
 
 `tests/reports/<slug>-<timestamp>.md` — 测试执行报告
 
-## 默认行为
+## 范围
 
-**默认只运行 Stage 1 + Stage 2（Lint + Unit）**。Stage 3 Playwright E2E 需要显式开启，加 `--e2e` 参数：
+**test-pipeline 只做 Stage 1（Lint）+ Stage 2（Unit）两阶段**，是 apply 的代码自检环节。
+
+浏览器自动化 / E2E（编写 Playwright 脚本 + 真实浏览器执行）**不在此处**，已独立为
+`qa` 命令（步骤 ⑩）。因此本流程不再有 `--e2e` 参数，也不启动浏览器。
 
 ```bash
-# 默认（lint + unit）
-/sdlc-workflow apply
-/sdlc-workflow doit
-
-# 开启 E2E（启动浏览器，消耗 token）
-/sdlc-workflow apply --e2e
-/sdlc-workflow doit --e2e
+/sdlc-workflow apply     # lint + unit
+/sdlc-workflow qa        # 浏览器功能验收（独立命令）
 ```
-
-功能验收（Playwright MCP）始终需要人工触发：`/sdlc-workflow accept <iter-dir>`
 
 ## 详细行为
 
@@ -32,12 +28,9 @@
 graph LR
     LINT["Stage 1: Lint<br/>$LINT_TOOL"]
     UNIT["Stage 2: Unit<br/>$TEST_FRAMEWORK"]
-    E2E["Stage 3: E2E（--e2e）<br/>Playwright"]
 
     LINT --> UNIT
-    UNIT --> E2E
-    E2E --> REPORT["测试报告"]
-    UNIT --> REPORT
+    UNIT --> REPORT["测试报告"]
 ```
 
 ### 2. Stage 1: Lint
@@ -86,20 +79,7 @@ case "$TEST_FRAMEWORK" in
 esac
 ```
 
-### 4. Stage 3: Playwright E2E 测试（仅 `--e2e`）
-
-**默认跳过**。加 `--e2e` 参数时才执行，会启动真实浏览器进程：
-
-```bash
-RUN_E2E=${RUN_E2E:-false}
-
-if [ "$RUN_E2E" = "true" ]; then
-  echo "🎭 运行 Playwright E2E 测试..."
-  npx playwright test tests/e2e/ --reporter=json
-else
-  echo "ℹ️ E2E 已跳过（加 --e2e 启用）"
-fi
-```
+> 浏览器 / E2E 测试已移至 `qa` 命令（步骤 ⑩），test-pipeline 到 Stage 2 为止。
 
 ### 6. 测试报告生成
 
@@ -122,14 +102,13 @@ cat > "$REPORT_FILE" << 'EOF'
 |------|------|-----------|--------|
 | Lint | ✅ | - | - |
 | Unit | ✅ | 25/25 | 85% |
-| E2E  | ✅ | 8/8 | - |
 
 ## Requirement → Test Matrix
 
-| Requirement ID | Task IDs | Test File | Scenario ID |
-|----------------|----------|-----------|-------------|
-| R-001 | T-001 | tests/unit/... | - |
-| R-003 | T-005 | tests/e2e/... | E2E-001 |
+| Requirement ID | Task IDs | Test File |
+|----------------|----------|-----------|
+| R-001 | T-001 | tests/unit/... |
+| R-003 | T-005 | tests/unit/... |
 
 ## 失败用例（如有）
 
@@ -137,7 +116,7 @@ cat > "$REPORT_FILE" << 'EOF'
 
 ## 后续步骤
 
-如需功能验收，运行 `/sdlc-workflow accept <迭代目录>` 进行 Playwright MCP 人工验收（可选）。
+lint + unit 通过后，运行 `/sdlc-workflow qa` 做浏览器功能验收，再运行 `/sdlc-workflow accept` 更新文档并提交。
 EOF
 
 echo "📋 测试报告: $REPORT_FILE"
@@ -154,7 +133,6 @@ while [ $round -le $max_rounds ]; do
 
   run_lint
   run_unit_tests
-  [ "$RUN_E2E" = "true" ] && run_e2e_tests
 
   if all_tests_pass; then
     echo "✅ 所有测试通过"
@@ -184,7 +162,6 @@ REPORT_FILE="tests/reports/${SLUG}-${TIMESTAMP}.md"
 LINT_TOOL=${LINT_TOOL:-eslint}
 TEST_FRAMEWORK=${TEST_FRAMEWORK:-jest}
 REVIEW_MAX_ROUNDS=${REVIEW_MAX_ROUNDS:-1}
-RUN_E2E=${RUN_E2E:-false}   # 由 --e2e 参数设置为 true
 
 run_lint() {
   case "$LINT_TOOL" in
@@ -203,17 +180,12 @@ run_unit_tests() {
   esac
 }
 
-run_e2e_tests() {
-  npx playwright test tests/e2e/ --reporter=json
-}
-
 round=1
 
 while [ $round -le $REVIEW_MAX_ROUNDS ]; do
   echo "🧪 测试执行第 $round 轮..."
   LINT_FAILED=0
   UNIT_FAILED=0
-  E2E_FAILED=0
 
   echo "🔍 Stage 1: Lint..."
   run_lint || LINT_FAILED=1
@@ -221,14 +193,7 @@ while [ $round -le $REVIEW_MAX_ROUNDS ]; do
   echo "🧪 Stage 2: Unit Tests..."
   run_unit_tests || UNIT_FAILED=1
 
-  if [ "$RUN_E2E" = "true" ]; then
-    echo "🎭 Stage 3: E2E Tests..."
-    run_e2e_tests || E2E_FAILED=1
-  else
-    echo "ℹ️ Stage 3: E2E 已跳过（加 --e2e 启用）"
-  fi
-
-  if [ "$LINT_FAILED" -eq 0 ] && [ "$UNIT_FAILED" -eq 0 ] && [ "$E2E_FAILED" -eq 0 ]; then
+  if [ "$LINT_FAILED" -eq 0 ] && [ "$UNIT_FAILED" -eq 0 ]; then
     echo "✅ 所有测试通过"
     mkdir -p tests/reports
     cat > "$REPORT_FILE" << REPORT
@@ -236,7 +201,6 @@ while [ $round -le $REVIEW_MAX_ROUNDS ]; do
 - 执行时间: $(date)
 - 迭代: $SLUG
 - 框架: $TEST_FRAMEWORK
-- E2E: $( [ "$RUN_E2E" = "true" ] && echo "已执行" || echo "已跳过" )
 REPORT
     echo "📋 测试报告: $REPORT_FILE"
     exit 0
@@ -263,7 +227,6 @@ done
 |----------|----------|
 | 测试框架未安装 | 提示安装，abort |
 | 测试文件不存在 | 警告，跳过该阶段 |
-| E2E 测试超时 | 增加 timeout 配置 |
 | 并行执行失败 | 回退为串行执行 |
 | 修复超限 | 打印失败详情，中止，需人工介入 |
 
@@ -271,10 +234,10 @@ done
 
 - 输入：
   - tests/unit/*.test.ts
-  - tests/e2e/*.e2e.ts
 - 输出：
   - tests/reports/<slug>-<timestamp>.md
 - 参考：
-  - references/accept.md（Playwright MCP 功能验收，可选，人工运行）
-  - references/test-generator.md（测试生成）
-  - references/docs-updater.md（下一步）
+  - references/07-test-generator.md（单元测试生成）
+  - references/flow-qa.md（浏览器功能验收，步骤 ⑩）
+  - references/flow-accept.md（验收提交：文档 + 本地 commit）
+  - references/12-pr-creator.md（push + 创建 PR，步骤 ⑬）

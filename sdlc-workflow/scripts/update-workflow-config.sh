@@ -31,18 +31,19 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-ENV_FILE="$PROJECT_ROOT/.env"
-ENV_EXAMPLE_FILE="$PROJECT_ROOT/.env.example"
+CONFIG_FILE="$PROJECT_ROOT/.claude/.sdlc-config"
+CONFIG_TEMPLATE="$(cd "$(dirname "$0")/.." && pwd)/templates/sdlc-config.tpl"
 
-if [ ! -f "$ENV_FILE" ]; then
-  if [ -f "$ENV_EXAMPLE_FILE" ]; then
-    cp "$ENV_EXAMPLE_FILE" "$ENV_FILE"
+if [ ! -f "$CONFIG_FILE" ]; then
+  mkdir -p "$(dirname "$CONFIG_FILE")"
+  if [ -f "$CONFIG_TEMPLATE" ]; then
+    cp "$CONFIG_TEMPLATE" "$CONFIG_FILE"
   else
-    touch "$ENV_FILE"
+    touch "$CONFIG_FILE"
   fi
 fi
 
-sync_env_var() {
+sync_config_var() {
   local file="$1"
   local key="$2"
   local value="$3"
@@ -73,15 +74,15 @@ sync_env_var() {
 }
 
 if [ -n "$REVIEW_MAX_ROUNDS_VALUE" ]; then
-  sync_env_var "$ENV_FILE" "REVIEW_MAX_ROUNDS" "$REVIEW_MAX_ROUNDS_VALUE"
+  sync_config_var "$CONFIG_FILE" "REVIEW_MAX_ROUNDS" "$REVIEW_MAX_ROUNDS_VALUE"
 fi
 
 if [ -n "$GIT_BRANCH_PREFIX_VALUE" ]; then
-  sync_env_var "$ENV_FILE" "GIT_BRANCH_PREFIX" "$GIT_BRANCH_PREFIX_VALUE"
+  sync_config_var "$CONFIG_FILE" "GIT_BRANCH_PREFIX" "$GIT_BRANCH_PREFIX_VALUE"
 fi
 
 if [ -n "$TEST_BOOTSTRAP_POLICY_VALUE" ]; then
-  sync_env_var "$ENV_FILE" "TEST_BOOTSTRAP_POLICY" "$TEST_BOOTSTRAP_POLICY_VALUE"
+  sync_config_var "$CONFIG_FILE" "TEST_BOOTSTRAP_POLICY" "$TEST_BOOTSTRAP_POLICY_VALUE"
 fi
 
-echo "Updated workflow config in $ENV_FILE"
+echo "Updated workflow config in $CONFIG_FILE"

@@ -33,9 +33,10 @@ copy_if_not_exists "$SKILL_DIR/templates/workflow-rules.md.tpl"      "$PROJECT_R
 copy_if_not_exists "$SKILL_DIR/templates/ARCHITECTURE.md.tpl"        "$PROJECT_ROOT/.claude/ARCHITECTURE.md"
 copy_if_not_exists "$SKILL_DIR/templates/SECURITY.md.tpl"            "$PROJECT_ROOT/.claude/SECURITY.md"
 copy_if_not_exists "$SKILL_DIR/templates/CODING_GUIDELINES.md.tpl"   "$PROJECT_ROOT/.claude/CODING_GUIDELINES.md"
-copy_if_not_exists "$SKILL_DIR/templates/env.example.tpl"            "$PROJECT_ROOT/.env.example"
+# SDLC 配置统一放到 .claude/.sdlc-config（替代旧的项目根 .env）
+copy_if_not_exists "$SKILL_DIR/templates/sdlc-config.tpl"            "$PROJECT_ROOT/.claude/.sdlc-config"
 
-sync_env_var() {
+sync_config_var() {
   local file="$1"
   local key="$2"
   local value="$3"
@@ -69,17 +70,18 @@ sync_env_var() {
   mv "$tmp" "$file"
 }
 
-# 添加 .env 到 .gitignore
-if [ -f "$PROJECT_ROOT/.gitignore" ]; then
-  grep -q "^\.env$" "$PROJECT_ROOT/.gitignore" || echo ".env" >> "$PROJECT_ROOT/.gitignore"
-else
-  echo ".env" > "$PROJECT_ROOT/.gitignore"
-fi
+# 将本地 SDLC 配置加入 .gitignore（含 worktree 注入端口的本地副本）
+ensure_gitignore() {
+  local pattern="$1"
+  if [ -f "$PROJECT_ROOT/.gitignore" ]; then
+    grep -qxF "$pattern" "$PROJECT_ROOT/.gitignore" || echo "$pattern" >> "$PROJECT_ROOT/.gitignore"
+  else
+    echo "$pattern" > "$PROJECT_ROOT/.gitignore"
+  fi
+}
+ensure_gitignore ".claude/.sdlc-config"
+ensure_gitignore ".claude/.sdlc-config.local"
 
 echo "✅ SDLC Workflow 项目初始化完成"
-if [ -f "$PROJECT_ROOT/.env" ]; then
-  echo "📝 已生成 .env，请检查其余配置项"
-else
-  echo "📝 请执行: cp .env.example .env 并编辑配置"
-fi
+echo "📝 已生成 .claude/.sdlc-config，请按需编辑配置项"
 echo "📝 请编辑 .claude/CLAUDE.md 填写项目信息"

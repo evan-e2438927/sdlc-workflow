@@ -13,6 +13,33 @@
 
 ## 详细行为
 
+### 0. 前置门禁：澄清状态复核（置信度感知，必须最先执行）
+
+design-generator 不得在"低置信度项尚未澄清"的前提下凭假设直接做设计决策。进入设计前，先复核
+requirements.md 的"假设记录"，复核 02-requirements-clarifier.md §4.7 的澄清 Gate：
+
+```
+INTERACTIVE = (mode in ["proposal", "mini"])
+
+# 1) 读取假设记录，找出"必须问过"的项
+MUST_ASK = 低置信度项 ∪ designImpact=true 的中置信度项
+
+IF INTERACTIVE AND any(x.provenance == "never-asked" for x in MUST_ASK):
+  → ⛔ 停止生成设计：存在从未澄清、却会影响设计决策的需求项
+  → 回到 02 §4.2，对这些项发起 AskUserQuestion 澄清后再继续
+  → 严禁"先把设计决策做了，再事后补假设"
+```
+
+> 这是 02 §4.7 的下游双保险：即使澄清步骤被跳过或假设记录不完整，设计期仍会在此拦截。
+> doit 无人值守模式（never-asked 合法）下此门禁直接放行，但仍须执行下面的"设计假设显式化"。
+
+**设计假设显式化（所有模式都要做）**：凡 design.md 中**解决了某个 [❓待确认] / [⚠️ 假设] 项**的
+技术决策，都必须：
+
+1. 在 design.md 新增 **「## 设计假设」** 小节集中登记：`决策点 / 关联需求或 ASM-ID / 所做假设 / 理由 / 若假设错误的影响`
+2. 不得把假设当成既定事实静默写进正文——任何被假设驱动的选型都要可追溯到假设记录
+3. 交互模式下若该假设有设计影响且 provenance=never-asked，按上面的门禁先澄清，不在此处静默决定
+
 ### 1. 读取历史上下文
 
 在生成新设计前，读取最近 N 个迭代的 design.md，了解已有设计：
@@ -265,5 +292,5 @@ echo "✅ 设计文档已生成: docs/iterations/$DATE/$SEQ-$SLUG-$TYPE/design.m
   - docs/iterations/*/design.md（历史）
 - 输出：docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/design.md
 - 参考：
-  - references/task-generator.md（下一步）
-  - references/design-reviewer.md（Gate 1）
+  - references/04-task-generator.md（下一步）
+  - references/05-design-reviewer.md（Gate 1）
