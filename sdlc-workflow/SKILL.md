@@ -236,7 +236,8 @@ sdlc-worktree.sh remove 001
 2. 检测 `.claude/CLAUDE.md` 和 `.claude/ARCHITECTURE.md` 是否存在
 3. 若两者都存在 → 项目已初始化，跳过，直接进入 Part 2
 4. 若任一不存在 → 执行初始化：
-   - 运行 `bash ${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/scripts/init-project.sh .`（`${CLAUDE_PLUGIN_ROOT}` 为插件根目录，由 Claude Code 注入；手动安装时替换为实际 skill 路径）
+   - 运行本 skill 目录内的初始化脚本 `scripts/init-project.sh .`（相对 SKILL.md 所在目录）。
+     运行时路径按运行环境取：Claude Code 为 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/scripts/init-project.sh`（变量由 Claude Code 注入）；Codex / 手动安装为该 skill 目录内的 `scripts/init-project.sh`
    - 生成项目结构（.claude/, docs/, tests/）+ 配置文件 `.claude/.sdlc-config`
    - 提醒用户：按需编辑 `.claude/.sdlc-config`（已自动加入 .gitignore）
 5. 若判定为 existing project，则初始化后必须先执行 `references/00-existing-project-intake.md`：

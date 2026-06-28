@@ -1,0 +1,43 @@
+{
+  "name": "sdlc-workflow",
+  "version": "1.0.0",
+  "description": "AI-driven SDLC automation pipeline (proposal → apply → qa → accept → pr) with optional dual-model review gates and Playwright browser QA.",
+  "author": {
+    "name": "Evan",
+    "email": "e2438927@gmail.com",
+    "url": "https://github.com/evan-e2438927"
+  },
+  "homepage": "https://github.com/evan-e2438927/sdlc-workflow",
+  "repository": "https://github.com/evan-e2438927/sdlc-workflow",
+  "license": "MIT",
+  "keywords": [
+    "sdlc",
+    "workflow",
+    "pipeline",
+    "code-review",
+    "tdd",
+    "qa",
+    "playwright",
+    "automation"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "SDLC Workflow",
+    "shortDescription": "Five-stage SDLC pipeline: proposal → apply → qa → accept → pr",
+    "longDescription": "Drive software delivery through a contract-based SDLC: requirement breakdown with a human review gate, optional Codex design/code review, unit tests, Playwright browser QA, local commit, and PR. Existing projects are intake-baselined so the agent doesn't rebuild your structure.",
+    "developerName": "Evan",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "用 sdlc-workflow 给这个项目做 init",
+      "用 sdlc-workflow 跑 proposal：增加用户登录模块"
+    ],
+    "websiteURL": "https://github.com/evan-e2438927/sdlc-workflow",
+    "brandColor": "#F59E0B",
+    "screenshots": []
+  }
+}
