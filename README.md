@@ -106,8 +106,10 @@
 跨运行时安装，Codex 与其他支持 skills 的环境通用：
 
 ```bash
-npx skills add evan-e2438927/sdlc-workflow -g -y
+npx skills add evan-e2438927/sdlc-workflow -y
 ```
+
+> **注**：skills CLI 的 SKILL.md 格式不支持 `-g`（全局）安装；如需全局可用，请用下方「手动安装」方式。
 
 安装后即可使用 `sdlc-*` 系列 skill：`sdlc-init` / `sdlc-update` / `sdlc-proposal` / `sdlc-apply` / `sdlc-qa` / `sdlc-accept` / `sdlc-pr` / `sdlc-doit` / `sdlc-mini` / `sdlc-review` / `sdlc-worktree`。
 
