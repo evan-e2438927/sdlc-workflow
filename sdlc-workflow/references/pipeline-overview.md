@@ -276,7 +276,7 @@ git diff (代码变更)   ──────→  🔍 Gate 2: code-reviewer
 - 取消 `specs/` 目录，v6 中 specs/ 和 tests/ 职责重叠
 - v7 统一为 `tests/`
 - v8 进一步要求单元测试镜像 workspace 目录，不得写回源码目录
-- 测试报告统一写入 `tests/reports/`，其中浏览器验证证据写入 `tests/reports/playwright/` 与 `tests/reports/cdp/`
+- 测试报告统一写入 `tests/reports/`，其中浏览器验证证据写入 `tests/reports/playwright/`；qa 通过截图写入迭代目录 `docs/iterations/<迭代>/evidence/`
 
 ### 7.2 迭代目录命名
 - v6 扁平 `YYYY-MM-DD/` 结构导致同日多需求冲突

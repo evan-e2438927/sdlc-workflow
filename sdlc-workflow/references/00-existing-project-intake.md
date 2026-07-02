@@ -86,7 +86,7 @@ intake 至少要分析以下 6 类内容：
 
 - 现有测试目录和测试工具
 - 现有 lint / typecheck / unit / e2e / browser 验收入口
-- 当前是否已经具备 Playwright MCP / CDP（Chrome DevTools Protocol）最终交互验收能力
+- 当前是否已经具备 Playwright MCP 最终交互验收能力
 - 缺口列表
 
 #### 3.4 ARCHITECTURE.md（填实，不留模板）

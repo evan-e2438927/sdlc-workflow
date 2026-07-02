@@ -22,7 +22,6 @@ mkdir -p "$PROJECT_ROOT/tests/unit/packages"
 mkdir -p "$PROJECT_ROOT/tests/e2e"
 mkdir -p "$PROJECT_ROOT/tests/reports"
 mkdir -p "$PROJECT_ROOT/tests/reports/playwright"
-mkdir -p "$PROJECT_ROOT/tests/reports/cdp"
 
 # 复制模板（不覆盖已存在的文件）
 copy_if_not_exists() {
@@ -86,7 +85,6 @@ ensure_gitignore ".claude/.sdlc-config.local"
 ensure_gitignore "# SDLC qa 二进制产物（保留 tests/reports/*.md）"
 ensure_gitignore "tests/reports/**/screenshots/"
 ensure_gitignore "tests/reports/playwright/"
-ensure_gitignore "tests/reports/cdp/"
 ensure_gitignore "tests/reports/**/*.png"
 
 echo "✅ SDLC Workflow 项目初始化完成"

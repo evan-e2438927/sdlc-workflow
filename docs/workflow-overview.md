@@ -92,43 +92,51 @@ graph LR
 - Gate 2 审查维度：代码质量、安全漏洞（OWASP Top 10）、架构合规、编码规范、错误处理、目录结构、任务回写
 - Gate 2 FAIL 时回退到步骤⑥修复，最多循环 N 轮
 
-### 阶段四：验收交付（⑨⑩⑪）
+### 阶段四：验收交付（qa → accept → pr）
 
-> 五级测试验收 → 文档更新 → Git 提交 → PR 创建。
+> 浏览器功能验收 → 文档更新 + 本地提交 → 推送建 PR。
 
-| 步骤 | 名称 | 执行者 | 产出 |
+| 命令 | 名称 | 执行者 | 产出 |
 |------|------|--------|------|
-| ⑨ | test-pipeline | Claude Code | 五阶段测试：Lint → Unit → E2E → Playwright MCP → CDP |
-| ⑩ | docs-updater | Claude Code | 更新项目文档 + CLAUDE.md iterations 引用 |
-| ⑪ | git-committer | Claude Code | branch → commit → push → PR |
+| qa | 浏览器验收 | Claude Code | Playwright MCP 真实浏览器验收 + `tests/reports/<slug>-e2e-report.md` |
+| accept | 文档更新 + 本地提交 | Claude Code | 更新项目文档 + CLAUDE.md iterations 引用 → 本地 commit |
+| pr | 推送建 PR | Claude Code | push → `gh pr create` |
 
-**五阶段测试流水线**：
+**测试分两处执行（无独立 CDP 阶段）**：
 
 ```
-Stage 1: Lint          快速失败，代码静态检查
-Stage 2: Unit          单元测试 (jest/vitest/mocha)
-Stage 3: E2E           Playwright 预检
-Stage 4: Playwright MCP  页面 / 控制台 / 网络验证（最终验收依据）
-Stage 5: CDP           关键交互链路复核（最终验收依据）
+apply 内（test-pipeline，不含浏览器）：
+  Stage 1: Lint    快速失败，代码静态检查
+  Stage 2: Unit    单元测试 (jest/vitest/mocha)
+
+qa 命令（真实浏览器验收）：
+  Playwright 脚本预检（track: qa 脚本生成）
+  Playwright MCP   页面 / 控制台 / 网络 + 交互验收 ← 唯一最终通过依据
 ```
 
-> ⚠️ Stage 4 和 Stage 5 是最终通过依据，不可跳过。Pipeline 必须验证 `reports/playwright/` 和 `acceptance-report.html` 存在才能标记完成。
+> ⚠️ 最终通过必须有 Playwright MCP 的真实浏览器交互证据，而非模型自述。qa 通过截图存入迭代 `evidence/`，由 pr 嵌入 PR body。
 
 ---
 
-## 三、7 命令 — 操作入口速查
+## 三、命令 — 操作入口速查
 
 ### 总览
 
+主线：**proposal → apply → qa → accept → pr**
+
 ```
 sdlc-workflow
-  ├── init           ← 初始化项目
+  ├── init           ← 初始化 / 接入项目
   ├── proposal       ← 需求拆解（到 Gate 1 后暂停）
-  ├── apply          ← 人工审核后续跑开发
-  ├── doit           ← 全自动（proposal + apply 不停顿）
+  ├── apply          ← 人工审核后开发 + lint + unit
+  ├── qa             ← 浏览器功能验收（Playwright MCP）
+  ├── accept         ← 更新文档 + 本地提交
+  ├── pr             ← 推送 + 建 PR（唯一远程动作）
+  ├── doit           ← 全自动（proposal → pr 不停顿）
   ├── mini           ← 小任务轻量流程
-  ├── worktree create← 创建并行工作区
-  └── worktree manage← list / status / remove / gc
+  ├── review         ← 单独跑 Codex 审查（Gate 1 / Gate 2）
+  ├── update         ← 已初始化项目的升级同步
+  └── worktree       ← create / list / status / remove / gc
 ```
 
 ### ① `init` — 初始化项目
@@ -158,7 +166,7 @@ sdlc-workflow
 | **阶段覆盖** | 阶段一 + 阶段二 |
 | **暂停点** | Gate 1 通过后写入 `status.json (phase: pending_review)`，发送 TG 通知，等待人工审核 |
 
-### ③ `apply` — 续跑开发
+### ③ `apply` — 续跑开发（不含浏览器/提交）
 
 ```bash
 /sdlc-workflow apply [迭代目录路径]
@@ -166,13 +174,52 @@ sdlc-workflow
 
 | 项 | 说明 |
 |-----|------|
-| **何时用** | `proposal` 产出审核通过后，继续执行开发到 PR |
-| **做什么** | 读取 status.json → 开发 → 测试 → Gate 2 → 测试流水线 → 文档更新 → PR |
-| **产物** | 代码变更 + 测试 + PR |
-| **阶段覆盖** | 阶段三 + 阶段四 |
+| **何时用** | `proposal` 产出审核通过后，实现代码 |
+| **做什么** | 读取 status.json → 开发（frontend/backend/unit-test）→ 单元测试 → [Gate 2] → lint + unit |
+| **产物** | 代码变更 + 单元测试（不提交、不 push） |
+| **阶段覆盖** | 阶段三 |
 | **前置条件** | status.json 中 `phase` 为 `pending_review` 或 `approved` |
 
-### ④ `doit` — 全自动模式
+### ④ `qa` — 浏览器功能验收
+
+```bash
+/sdlc-workflow qa [迭代目录路径]
+```
+
+| 项 | 说明 |
+|-----|------|
+| **何时用** | `apply` 完成后，做真实浏览器功能验收 |
+| **做什么** | 生成 Playwright 脚本 → Playwright MCP 真实浏览器执行 → 通过态截图存入迭代 `evidence/` |
+| **产物** | `tests/reports/<slug>-e2e-report.md` + 证据截图 |
+| **前置条件** | `phase` 为 `applied` |
+
+### ⑤ `accept` — 定稿本地提交
+
+```bash
+/sdlc-workflow accept [迭代目录路径]
+```
+
+| 项 | 说明 |
+|-----|------|
+| **何时用** | qa 通过（或跳过 qa）后定稿 |
+| **做什么** | 总结变更 → 更新项目文档 + CLAUDE.md iterations 引用 → **本地 commit（不 push）** |
+| **产物** | 本地 commit |
+| **前置条件** | `phase` 为 `qa_passed` 或 `applied` |
+
+### ⑥ `pr` — 推送建 PR
+
+```bash
+/sdlc-workflow pr [迭代目录路径]
+```
+
+| 项 | 说明 |
+|-----|------|
+| **何时用** | `accept` 完成本地提交后发布 |
+| **做什么** | `git push` → `gh pr create`（唯一与远程交互；证据截图随迭代 `evidence/` 嵌入 PR 正文） |
+| **产物** | 远程分支 + PR URL |
+| **前置条件** | `phase` 为 `accepted` |
+
+### ⑦ `doit` — 全自动模式
 
 ```bash
 /sdlc-workflow doit <需求文本 | file:///path | URL>
@@ -181,11 +228,11 @@ sdlc-workflow
 | 项 | 说明 |
 |-----|------|
 | **何时用** | 完全信任 AI 处理，从需求直达 PR |
-| **做什么** | 等价于 `proposal + apply` 不停顿 |
+| **做什么** | 等价于 `proposal → apply → qa → accept → pr` 不停顿（`--qa` 含浏览器验收） |
 | **产物** | 需求文档 + 设计文档 + 代码 + 测试 + PR |
 | **阶段覆盖** | 阶段一 ~ 阶段四（全跑） |
 
-### ⑤ `mini` — 小任务轻量流程
+### ⑧ `mini` — 小任务轻量流程
 
 ```bash
 /sdlc-workflow mini <小任务描述>
@@ -198,7 +245,7 @@ sdlc-workflow
 | **自动升级** | 若影响文件 > 3 个或涉及 API/数据模型/目录结构变更，自动升级到 `doit` |
 | **阶段覆盖** | 精简版阶段二 ~ 阶段四 |
 
-### ⑥ `worktree create` — 创建并行工作区
+### ⑨ `worktree create` — 创建并行工作区
 
 ```bash
 /sdlc-workflow worktree create <slug> <type>
@@ -212,7 +259,7 @@ sdlc-workflow
 | **做什么** | 从 `main` 分支创建 Git Worktree → 初始化迭代目录 → 分配端口 → 注册到 registry |
 | **产物** | `../wt-<seq>-<slug>-<type>/` 独立工作目录 |
 
-### ⑦ `worktree manage` — 并行工作区管理
+### ⑩ `worktree manage` — 并行工作区管理
 
 ```bash
 /sdlc-workflow worktree list          # 列出所有并行工作区

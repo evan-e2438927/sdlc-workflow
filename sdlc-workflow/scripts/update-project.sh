@@ -157,7 +157,6 @@ ensure_gitignore ".claude/.sdlc-config.local"
 ensure_gitignore "# SDLC qa 二进制产物（保留 tests/reports/*.md）"
 ensure_gitignore "tests/reports/**/screenshots/"
 ensure_gitignore "tests/reports/playwright/"
-ensure_gitignore "tests/reports/cdp/"
 ensure_gitignore "tests/reports/**/*.png"
 
 echo "✅ 同步完成。用户编辑的 ARCHITECTURE.md / SECURITY.md / CODING_GUIDELINES.md 未被改动；"
