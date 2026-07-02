@@ -1,6 +1,6 @@
-# SDLC Workflow 全景：2 模型 · 4 阶段 · 7 命令
+# SDLC Workflow 全景：2 模型 · 4 阶段 · 5 命令主线
 
-> 一句话：Claude Code 生成，Codex CLI 审查，四阶段流水线驱动需求→设计→开发→交付，7 条命令覆盖从初始化到并行开发的全场景。
+> 一句话：Claude Code 生成，Codex CLI 审查，四阶段流水线驱动需求→设计→开发→交付；主线 5 命令 **proposal → apply → qa → accept → pr**，外加 init / doit / mini / review / update / worktree 覆盖从初始化到并行开发的全场景。
 
 ---
 
@@ -10,7 +10,7 @@
 
 | 角色 | 模型 | 职责 | 出现位置 |
 |------|------|------|----------|
-| **生成者** | Claude Code | 需求解析、设计文档、任务分解、代码实现、测试生成、文档更新 | 步骤 ①②③④⑥⑦⑨⑩⑪ |
+| **生成者** | Claude Code | 需求解析、设计文档、任务分解、代码实现、测试生成、浏览器验收、文档更新与提交 | 步骤 ①②③④⑥⑦ 及 qa / accept / pr |
 | **审查者** | Codex CLI | 独立审查设计与代码，输出 PASS / FAIL + 问题列表 | Gate 1（步骤⑤）、Gate 2（步骤⑧） |
 
 ### 双 Gate 把关机制
@@ -40,7 +40,7 @@ Claude Code                              Codex CLI
 
 ## 二、4 阶段 — 流水线生命周期
 
-完整 Pipeline 由 12 个步骤组成，按职责划分为 4 个阶段：
+完整 Pipeline 按职责划分为 4 个阶段：前三阶段是 proposal / apply 内部的 ⓪–⑧ 步骤，第四阶段是 qa / accept / pr 三条独立命令。
 
 ```mermaid
 graph LR
@@ -54,11 +54,10 @@ graph LR
 | 动作 | 说明 |
 |------|------|
 | 项目模式检测 | 自动识别 `fresh project` 或 `existing project` |
-| 脚手架生成 | 运行 `init-project.sh`，生成 `.claude/`、`docs/`、`tests/`、`.env` 等基础结构 |
+| 脚手架生成 | 运行 `init-project.sh`，生成 `.claude/`、`docs/`、`tests/`、`.claude/.sdlc-config` 等基础结构 |
 | 基线采集 | existing project 额外生成 `PROJECT_BASELINE.md`、`EXISTING_STRUCTURE.md`、`TEST_BASELINE.md` |
-| TG 连接 | 检测 / 配置 `TG_USERNAME`，打通 Telegram 通知链路 |
 
-**产物**：`.claude/CLAUDE.md`、`.claude/ARCHITECTURE.md`、`.claude/SECURITY.md`、`.claude/CODING_GUIDELINES.md`、`.env`
+**产物**：`.claude/CLAUDE.md`、`.claude/ARCHITECTURE.md`、`.claude/SECURITY.md`、`.claude/CODING_GUIDELINES.md`、`.claude/.sdlc-config`
 
 ### 阶段二：需求设计（①②③④⑤）
 
@@ -142,14 +141,14 @@ sdlc-workflow
 ### ① `init` — 初始化项目
 
 ```bash
-/sdlc-workflow init [tg=123456789 review=1 branch=feat/ test-bootstrap=report]
+/sdlc-workflow init [review=1 branch=feat/ test-framework=vitest lint=eslint]
 ```
 
 | 项 | 说明 |
 |-----|------|
 | **何时用** | 首次将项目接入 SDLC 工作流 |
-| **做什么** | 检测项目类型 → 生成脚手架 → 采集基线 → 配置 .env |
-| **产物** | `.claude/` 目录、`docs/`、`tests/`、`.env` |
+| **做什么** | 检测项目类型 → 生成脚手架 → 采集基线 → 配置 `.claude/.sdlc-config` |
+| **产物** | `.claude/` 目录、`docs/`、`tests/`、`.claude/.sdlc-config` |
 | **阶段覆盖** | 阶段一 |
 
 ### ② `proposal` — 需求拆解
@@ -164,7 +163,7 @@ sdlc-workflow
 | **做什么** | 需求解析 → 设计 → 任务分解 → Gate 1 审查 → 暂停 |
 | **产物** | `docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/` 下的 requirements.md / design.md / tasks.md / status.json |
 | **阶段覆盖** | 阶段一 + 阶段二 |
-| **暂停点** | Gate 1 通过后写入 `status.json (phase: pending_review)`，发送 TG 通知，等待人工审核 |
+| **暂停点** | Gate 1 通过后写入 `status.json (phase: pending_review)`，等待人工审核 |
 
 ### ③ `apply` — 续跑开发（不含浏览器/提交）
 
