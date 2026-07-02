@@ -153,6 +153,12 @@ ensure_gitignore() {
 }
 ensure_gitignore ".claude/.sdlc-config"
 ensure_gitignore ".claude/.sdlc-config.local"
+# qa 二进制产物不入库（保留 tests/reports/*.md 验收报告）
+ensure_gitignore "# SDLC qa 二进制产物（保留 tests/reports/*.md）"
+ensure_gitignore "tests/reports/**/screenshots/"
+ensure_gitignore "tests/reports/playwright/"
+ensure_gitignore "tests/reports/cdp/"
+ensure_gitignore "tests/reports/**/*.png"
 
 echo "✅ 同步完成。用户编辑的 ARCHITECTURE.md / SECURITY.md / CODING_GUIDELINES.md 未被改动；"
 echo "   CLAUDE.md 仅在缺少「自定义 Skills」小节时追加（不改动既有内容，旧版见 CLAUDE.md.bak）。"

@@ -82,6 +82,12 @@ ensure_gitignore() {
 }
 ensure_gitignore ".claude/.sdlc-config"
 ensure_gitignore ".claude/.sdlc-config.local"
+# qa 二进制产物不入库（保留 tests/reports/*.md 验收报告）
+ensure_gitignore "# SDLC qa 二进制产物（保留 tests/reports/*.md）"
+ensure_gitignore "tests/reports/**/screenshots/"
+ensure_gitignore "tests/reports/playwright/"
+ensure_gitignore "tests/reports/cdp/"
+ensure_gitignore "tests/reports/**/*.png"
 
 echo "✅ SDLC Workflow 项目初始化完成"
 echo "📝 已生成 .claude/.sdlc-config，请按需编辑配置项"
