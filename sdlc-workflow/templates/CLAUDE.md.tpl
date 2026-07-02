@@ -53,3 +53,9 @@ docs/iterations/
 - 推送建 PR 运行 `/sdlc-workflow pr <迭代目录>`
 - 全自动模式运行 `/sdlc-workflow doit <需求>`；小任务运行 `/sdlc-workflow mini <需求>`
 - 配置见 `.claude/.sdlc-config`
+
+## 自定义 Skills
+把项目专属 skill 放到 `.claude/skills/<name>/SKILL.md`（frontmatter 需含 `name` 与 `description`）。SDLC pipeline 会自动发现它们，并在 `description` 与当前阶段相关时**优先调用**（先 skill、后自造）。
+- Claude Code：harness 原生自动发现。
+- Codex：由统一上下文加载入口扫描目录索引后可用。
+- 想让某 skill 只在特定阶段用，在其 `description` 里点明阶段即可，无需额外配置。
