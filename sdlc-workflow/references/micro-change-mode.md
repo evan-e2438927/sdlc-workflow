@@ -67,11 +67,9 @@ mini 模式下：
 2. Gate 2 不取消，只聚焦误改和越界变更
 3. 若改动只涉及纯视觉样式，可不强制新增 unit test
 4. 若改动涉及逻辑，则必须补最小 unit test
-5. 最终通过结论仍然必须基于：
-   - Playwright MCP
-   - CDP
+5. 最终通过结论仍然必须基于 **Playwright MCP** 的真实浏览器验收
 
-Playwright 仍只作为预检，不是最终通过依据。
+Playwright 脚本仍只作为预检，不是最终通过依据。
 
 ## 验证能力检测
 
@@ -81,7 +79,6 @@ Playwright 仍只作为预检，不是最终通过依据。
 2. unit test 命令或框架是否存在
 3. Playwright 预检是否可运行
 4. Playwright MCP 是否可用
-5. CDP 是否可用
 
 检测结果必须在 mini 报告中归类为：
 

@@ -41,8 +41,9 @@
 - 🎯 **阶段分离**：开发（apply）、浏览器验收（qa）、本地定稿（accept）、远程发布（pr）各自独立，边界清晰、可单独重跑
 - 🧍 **人工审核门**：proposal 后暂停，设计经人工确认再开发，避免 AI 全权拍板
 - 🔒 **双模型把关**：Claude Code 生成，Codex CLI 独立审查（`--review` 启用，不降级、不跳过）
-- 🧪 **证据链验收**：qa 用 Playwright 脚本 + Playwright MCP 做浏览器功能验收并出报告，不靠"我测完了"
+- 🧪 **证据链验收**：qa 用 Playwright 脚本 + Playwright MCP 做浏览器功能验收并出报告，通过态截图存入迭代 `evidence/` 并由 pr 嵌入 PR 正文当证据，不靠"我测完了"
 - 🧭 **统一上下文加载**：规范来源（全局 `~/.claude/` + 项目 `.claude/`，项目覆盖全局）只定义一次，单一入口收敛
+- 🧩 **自定义 skills 发现**：项目 `.claude/skills/<name>/SKILL.md` 会被统一上下文加载发现，pipeline 在相关阶段优先调用（先 skill、后自造），Claude Code / Codex 双运行时通用
 - 📦 **配置收敛**：项目配置统一放 `.claude/.sdlc-config`，无散落的根目录 `.env`
 - 🔧 **可恢复**：每轮需求生成结构化 iteration 目录，`status.json` 记录 phase，会话中断后下个 session 可续跑
 - 🛡️ **老项目安全**：existing project 先 intake 生成 baseline，防止 AI 重建你的目录结构

@@ -53,8 +53,24 @@ echo "📤 已推送: origin/$CURRENT_BRANCH"
 ### 2. 创建 PR
 
 ```bash
-# 从迭代产物 + 变更摘要生成 PR body
-PR_BODY=$(cat << 'EOF'
+# 验收证据：qa 通过时截的成功态图（docs/iterations/<迭代>/evidence/*.png）
+# 已由 accept 提交并随 push 上传，此处用 branch raw URL 嵌入 PR body。
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+EVIDENCE_DIR="$ITER_DIR/evidence"
+EVIDENCE_MD=""
+if compgen -G "$EVIDENCE_DIR/*.png" > /dev/null 2>&1; then
+  EVIDENCE_MD=$'## 验收证据（QA 截图）\n\n'
+  for img in "$EVIDENCE_DIR"/*.png; do
+    rel="${img#"$PROJECT_ROOT"/}"                 # docs/iterations/.../evidence/<id>.png
+    name=$(basename "$img" .png)
+    url="https://raw.githubusercontent.com/${REPO}/${CURRENT_BRANCH}/${rel}"
+    EVIDENCE_MD+="### ${name}"$'\n\n'"![${name}](${url})"$'\n\n'
+  done
+fi
+# 无 qa / 无证据图 → EVIDENCE_MD 为空，该节自动省略。
+
+# 从迭代产物 + 变更摘要生成 PR body（${EVIDENCE_MD} 需插值，故用非引号 heredoc）
+PR_BODY=$(cat << EOF
 ## 需求摘要
 
 <!-- 从 requirements.md 提取 -->
@@ -71,13 +87,14 @@ PR_BODY=$(cat << 'EOF'
 | Unit | ✅ |
 | QA（浏览器） | ✅ / 跳过 |
 
+${EVIDENCE_MD}
 ## 变更文件
 
 <!-- git diff --stat origin/main...HEAD -->
 
 ## 迭代信息
 
-- 迭代目录: `docs/iterations/<date>/<seq>-<slug>-<type>/`
+- 迭代目录: \`docs/iterations/<date>/<seq>-<slug>-<type>/\`
 
 ---
 
@@ -126,4 +143,5 @@ echo "✅ PR: <url> | 分支: $CURRENT_BRANCH"
 - 输出：远程分支 + PR URL
 - 参考：
   - references/11-git-committer.md（前一步：本地提交）
+  - references/flow-qa.md（验收证据图来源：evidence/<Scenario-ID>.png）
   - references/parallel-dev.md（worktree 模式分支管理）
