@@ -26,3 +26,6 @@ npm-debug.log*
 BEFORE-STATE-*.md
 REVIEW-*.md
 VALIDATION-*.md
+
+# ─── Superpowers 的 brainstorm/plan 中间产物（本地保留，不入库） ───
+docs/superpowers/
