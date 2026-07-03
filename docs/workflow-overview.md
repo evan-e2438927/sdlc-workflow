@@ -113,7 +113,7 @@ qa 命令（真实浏览器验收）：
   Playwright MCP   页面 / 控制台 / 网络 + 交互验收 ← 唯一最终通过依据
 ```
 
-> ⚠️ 最终通过必须有 Playwright MCP 的真实浏览器交互证据，而非模型自述。qa 通过截图存入迭代 `evidence/`，由 pr 嵌入 PR body。
+> ⚠️ 最终通过必须有 Playwright MCP 的真实浏览器交互证据，而非模型自述。qa 通过截图存入 `tests/reports/<slug>/screenshots/`（gitignore、不入主干），由 pr 推送到隔离的 `pr-assets` 分支后嵌入 PR 正文。
 
 ---
 
@@ -188,7 +188,7 @@ sdlc-workflow
 | 项 | 说明 |
 |-----|------|
 | **何时用** | `apply` 完成后，做真实浏览器功能验收 |
-| **做什么** | 生成 Playwright 脚本 → Playwright MCP 真实浏览器执行 → 通过态截图存入迭代 `evidence/` |
+| **做什么** | 生成 Playwright 脚本 → Playwright MCP 真实浏览器执行 → 通过态截图 move 到 `tests/reports/<slug>/screenshots/`（gitignore） |
 | **产物** | `tests/reports/<slug>-e2e-report.md` + 证据截图 |
 | **前置条件** | `phase` 为 `applied` |
 
@@ -214,7 +214,7 @@ sdlc-workflow
 | 项 | 说明 |
 |-----|------|
 | **何时用** | `accept` 完成本地提交后发布 |
-| **做什么** | `git push` → `gh pr create`（唯一与远程交互；证据截图随迭代 `evidence/` 嵌入 PR 正文） |
+| **做什么** | `git push` → `gh pr create`（唯一与远程交互；QA 截图经隔离 `pr-assets` 分支嵌入 PR 正文） |
 | **产物** | 远程分支 + PR URL |
 | **前置条件** | `phase` 为 `accepted` |
 

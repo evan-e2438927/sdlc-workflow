@@ -58,13 +58,18 @@ FOR EACH E2E 场景:
   navigate → snapshot（确认可见状态）
   → click / type（核心操作序列）
   → 断言结果 + 检查 console error
-  → 通过时：截「成功态验收证据图」到 docs/iterations/<迭代>/evidence/<Scenario-ID>.png
-  → 失败时：截诊断图到 tests/reports/<slug>/screenshots/（仅排障，不入 PR）
+  → 通过时：take_screenshot 截成功态 → **立即 move** 到
+      tests/reports/<slug>/screenshots/<Scenario-ID>.png
+  → 失败时：同样 move 诊断图到 tests/reports/<slug>/screenshots/（仅排障）
 ```
 
-> 证据图放在迭代目录 `evidence/`（在 `docs/` 下、**不在** `tests/reports/**` 忽略范围内），
-> 因此由 accept 的 `git add -A` 一并提交，并被 pr 阶段读取嵌入 PR body（见
-> references/12-pr-creator.md「验收证据」）。一个场景覆盖多 AC 时以场景为单位截一张。
+> ⚠️ **Playwright MCP 的 `take_screenshot` 默认落在工作目录根**（cwd），不听指定路径。
+> 因此每次截图后必须**显式 `mv`** 到 `tests/reports/<slug>/screenshots/<Scenario-ID>.png`，
+> 否则截图会散落在项目根。一个场景覆盖多 AC 时以场景为单位截一张。
+>
+> 截图**保存在项目内但不入库**：`tests/reports/**/screenshots/` 与 `tests/reports/**/*.png`
+> 已被 `.gitignore` 忽略。pr 阶段会把它们推送到**隔离的 `pr-assets` 分支**再嵌入 PR 正文
+> （见 references/12-pr-creator.md「验收截图」），主干与工作区始终不含二进制。
 
 dev server 启动：读 package.json scripts（dev > start > serve），后台启动并等待 ready，
 提取实际监听 URL。**收尾**：记录后台进程 PID，全部场景执行完（无论通过与否）后必须 teardown
@@ -76,7 +81,7 @@ dev server 启动：读 package.json scripts（dev > start > serve），后台�
 - 通过/失败场景列表
 - AC 覆盖率统计
 - 失败场景的错误信息和诊断截图路径
-- 通过场景的证据图相对路径（`docs/iterations/<迭代>/evidence/<Scenario-ID>.png`）
+- 通过场景的证据截图路径（`tests/reports/<slug>/screenshots/<Scenario-ID>.png`，gitignore、仅本地）
 
 ## 结果
 
@@ -115,7 +120,7 @@ C) 超过 REVIEW_MAX_ROUNDS 仍失败 → 中止，输出失败列表 + 截图�
 | 输入 | `docs/iterations/.../status.json` | 确认 phase == applied |
 | 输出 | `tests/e2e/<slug>/E2E-*.e2e.ts` | Playwright 脚本 |
 | 输出 | `tests/reports/<slug>-e2e-report.md` | 验收报告 |
-| 输出 | `docs/iterations/.../evidence/<Scenario-ID>.png` | 通过场景的证据图（入库，供 pr 嵌入）|
+| 输出 | `tests/reports/<slug>/screenshots/<Scenario-ID>.png` | 通过场景证据截图（gitignore、仅本地，供 pr 推送 pr-assets 分支）|
 | 输出 | `docs/iterations/.../status.json` | 更新 phase 为 qa_passed（全部 PASS 时）|
 
 ## 流程中的位置
