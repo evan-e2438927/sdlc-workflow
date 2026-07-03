@@ -31,6 +31,7 @@
 <level>/SECURITY.md                # 安全基线
 <level>/CODING_GUIDELINES.md       # 编码规范
 <level>/rules/*.md                 # 细分规则（workflow-rules 等）
+<level>/skills/*/SKILL.md          # 自定义 skill 索引（仅 name+description，正文调用时才加载）
 ```
 
 existing project 额外加载项目级基线（仅 `<project>/.claude/`）：
@@ -53,11 +54,18 @@ load_context():
   FOR level IN [ ~/.claude/ , <project>/.claude/ ]:        # 顺序即优先级
     FOR f IN [CLAUDE.md, ARCHITECTURE.md, SECURITY.md, CODING_GUIDELINES.md, rules/*.md]:
       IF exists(level + f): CTX.merge(read(level + f))     # 项目级覆盖全局级
+    FOR s IN glob(level + skills/*/SKILL.md):              # 仅索引，不读正文
+      CTX.skills.add(frontmatter(s).name, frontmatter(s).description)  # 项目级同名覆盖全局级
   IF project_mode == existing:
     load <project>/.claude/{PROJECT_BASELINE,EXISTING_STRUCTURE,TEST_BASELINE}.md
   load <project>/.claude/.sdlc-config  (fallback: ~/.claude/.sdlc-config → 内置默认)
   RETURN CTX
 ```
+
+> **skills 优先级规则**：若 `CTX.skills` 中某 skill 的 `description` 与当前阶段任务相关，
+> **优先调用它（先 skill、后自造）**；其正文在**调用时**才加载。此规则对齐 superpowers
+> 的 `using-superpowers`。用户想让某 skill 只用于特定阶段，在其 `description` 里点明阶段即可，
+> 无需额外配置。
 
 ## 何时调用
 
@@ -72,6 +80,7 @@ load_context():
 - 全局级 `~/.claude/` 不存在或为空 → 正常，仅使用项目级 + 内置默认
 - existing project 缺少 baseline 三件套 → 回退执行 existing-project-intake（见
   references/00-existing-project-intake.md）
+- `<level>/skills/` 不存在或为空 → 跳过，无自定义 skill，不报错
 
 ## 相关文件
 

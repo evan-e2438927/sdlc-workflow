@@ -21,6 +21,7 @@ echo "🔄 同步最新 SDLC 脚手架到项目: $PROJECT_ROOT"
 
 # ── 1. 目录结构（幂等）────────────────────────────────────────
 mkdir -p "$CLAUDE_DIR/rules"
+mkdir -p "$CLAUDE_DIR/skills"
 mkdir -p "$PROJECT_ROOT/docs/iterations"
 mkdir -p "$PROJECT_ROOT/tests/unit/web" "$PROJECT_ROOT/tests/unit/server" "$PROJECT_ROOT/tests/unit/packages"
 mkdir -p "$PROJECT_ROOT/tests/e2e"
@@ -114,7 +115,34 @@ ensure_user_doc "$SKILL_DIR/templates/ARCHITECTURE.md.tpl"      "$CLAUDE_DIR/ARC
 ensure_user_doc "$SKILL_DIR/templates/SECURITY.md.tpl"         "$CLAUDE_DIR/SECURITY.md"         ".claude/SECURITY.md"
 ensure_user_doc "$SKILL_DIR/templates/CODING_GUIDELINES.md.tpl" "$CLAUDE_DIR/CODING_GUIDELINES.md" ".claude/CODING_GUIDELINES.md"
 
-# ── 5. .gitignore 兜底 ───────────────────────────────────────
+# ── 5. 自定义 skills 脚手架（占位说明 + CLAUDE.md 小节，幂等）──
+if [ ! -f "$CLAUDE_DIR/skills/README.md" ]; then
+  cat > "$CLAUDE_DIR/skills/README.md" <<'EOF'
+# 自定义 Skills
+
+把项目专属 skill 放到本目录：`.claude/skills/<name>/SKILL.md`
+（frontmatter 需含 `name` 与 `description`）。
+
+SDLC pipeline 会自动发现并在与当前阶段相关时优先调用。
+详见项目根 `.claude/CLAUDE.md` 的「自定义 Skills」小节。
+EOF
+  echo "  ＋ 补齐 .claude/skills/README.md"
+fi
+# CLAUDE.md 若缺「自定义 Skills」小节则追加（不覆盖已有内容）
+if ! grep -q '^## 自定义 Skills' "$CLAUDE_DIR/CLAUDE.md"; then
+  cp "$CLAUDE_DIR/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md.bak"
+  cat >> "$CLAUDE_DIR/CLAUDE.md" <<'EOF'
+
+## 自定义 Skills
+把项目专属 skill 放到 `.claude/skills/<name>/SKILL.md`（frontmatter 需含 `name` 与 `description`）。SDLC pipeline 会自动发现它们，并在 `description` 与当前阶段相关时**优先调用**（先 skill、后自造）。
+- Claude Code：harness 原生自动发现。
+- Codex：由统一上下文加载入口扫描目录索引后可用。
+- 想让某 skill 只在特定阶段用，在其 `description` 里点明阶段即可，无需额外配置。
+EOF
+  echo "  ＋ CLAUDE.md 追加「自定义 Skills」小节（旧版备份: CLAUDE.md.bak）"
+fi
+
+# ── 6. .gitignore 兜底 ───────────────────────────────────────
 ensure_gitignore() {
   local pattern="$1"
   if [ -f "$PROJECT_ROOT/.gitignore" ]; then
@@ -125,6 +153,12 @@ ensure_gitignore() {
 }
 ensure_gitignore ".claude/.sdlc-config"
 ensure_gitignore ".claude/.sdlc-config.local"
+# qa 二进制产物不入库（保留 tests/reports/*.md 验收报告）
+ensure_gitignore "# SDLC qa 二进制产物（保留 tests/reports/*.md）"
+ensure_gitignore "tests/reports/**/screenshots/"
+ensure_gitignore "tests/reports/playwright/"
+ensure_gitignore "tests/reports/**/*.png"
 
-echo "✅ 同步完成。用户编辑的 CLAUDE.md / ARCHITECTURE.md / SECURITY.md / CODING_GUIDELINES.md 未被改动。"
+echo "✅ 同步完成。用户编辑的 ARCHITECTURE.md / SECURITY.md / CODING_GUIDELINES.md 未被改动；"
+echo "   CLAUDE.md 仅在缺少「自定义 Skills」小节时追加（不改动既有内容，旧版见 CLAUDE.md.bak）。"
 echo "   如 workflow-rules.md / .sdlc-config 有自定义内容，请对照 .bak 备份回并。"
