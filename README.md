@@ -12,6 +12,15 @@
 
 ---
 
+> **怎么读这份文档**
+> - 🏃 **想马上用** → [安装](#安装) → [第一次完整跑一遍](#第一次完整跑一遍)
+> - 🤔 **在评估要不要用** → [为什么需要它](#为什么需要它) → [与其他方案的对比](#与其他方案的对比)
+> - 🧠 **想懂设计原理** → [DESIGN-PROMO.md · 设计理念](./DESIGN-PROMO.md) ｜ [workflow-overview.md · 机制全景](./docs/workflow-overview.md)
+>
+> **文档地图（三份分工，别重复读）**：本 **README** = 门面 + 安装 + 命令速查；**[DESIGN-PROMO](./DESIGN-PROMO.md)** = 为什么这么设计（理念深挖，适合推广）；**[workflow-overview](./docs/workflow-overview.md)** = 2 模型 / 4 阶段 / 命令的机制全景（适合培训讲解）。
+
+---
+
 ## 这是什么？
 
 一套用在 [Claude Code](https://claude.ai/code) 与 [Codex](https://github.com/openai/codex) 中的 **Skill 插件**（两端共用同一套 skill，单一入口），把软件交付拆成五个可审、可恢复、有产物的阶段，让 AI 按工程 contract 而非 prompt 技巧来推进：
@@ -184,6 +193,29 @@ sdlc-mini 把按钮颜色改成蓝色          # 小任务轻量流程
 ```
 
 **推荐流程**：`proposal → 人工审核 → apply → qa → accept → pr`，确保设计经人工确认、变更经浏览器验收、发布前可在本地复核 commit。
+
+---
+
+## 第一次完整跑一遍
+
+> 培训场景推荐：第一次别用 `doit` 一把梭，手动分步走完，感受每步的**产物**和**确认点**。以「给订单页加导出按钮」为例。
+
+| 步 | 命令 | 你会看到 / 要做什么 | 产物落点 |
+|----|------|--------------------|---------|
+| 0 | `sdlc-init` | 检测 fresh / existing；existing 会先采集 baseline（**别跳过**——这步防止 AI 把你现有目录当新项目重建） | `.claude/`、`.claude/.sdlc-config` |
+| 1 | `sdlc-proposal 给订单页加导出按钮` | 生成 requirements / design / tasks，**跑完自动暂停**等你审 | `docs/iterations/<date>/<seq>-<slug>-feature/` |
+| ⏸ | 👀 **人工审核** | 打开 `design.md`、`tasks.md` 复核方案；不满意就让它改，满意再继续 | —（唯一强制停顿点之一） |
+| 2 | `sdlc-apply` | 按 tasks 实现代码 + 单元测试 + lint，**不提交** | 代码变更 + `tests/unit/` |
+| 3 | `sdlc-qa` | 生成 Playwright 脚本、真实浏览器跑一遍，通过态截图落本地 | `tests/reports/<slug>-e2e-report.md` + 截图（gitignore） |
+| 4 | `sdlc-accept` | 更新文档 + **本地 commit**（仍不 push）；建议先 `git diff` 复核 | 一个本地 commit |
+| 5 | `sdlc-pr` | `git push` + 建 PR；QA 截图经隔离 `pr-assets` 分支嵌入 PR 正文 | 远程分支 + PR URL |
+
+**只有两处需要你停下来**：第 1 步后的「人工审核」，和第 4 步后的「本地 diff 复核」；其余自动。熟悉后想全自动，一条命令：`sdlc-doit --qa 给订单页加导出按钮`。
+
+**三个新手常见坑**：
+- **existing 项目必须先让 init 采集 baseline**，否则 AI 可能按默认目录约定重建结构。
+- **`--review` 需要本机装了 Codex CLI**；没装就先别加，仅本地 lint / unit（Gate 会诚实中止而非静默跳过）。
+- **qa 需要 Playwright MCP 已挂载**；未挂载时 qa 会提示缺依赖，而不是假装通过。
 
 ---
 

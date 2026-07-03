@@ -4,6 +4,8 @@
 >
 > 一套面向 Claude Code / Codex 的全流程 SDLC 自动化技能——从需求拆解到 PR，中间有人工审核门、可选的设计/代码审查、浏览器功能验收，每一步都有产物、有证据、可恢复。
 
+> 📖 **本文定位**：三份文档里的「**为什么这么设计**」，适合推广与深度理解。想装 / 上手看 [README](./README.md)，想看机制全景看 [workflow-overview](./docs/workflow-overview.md)。
+
 ---
 
 ## 为什么需要它
