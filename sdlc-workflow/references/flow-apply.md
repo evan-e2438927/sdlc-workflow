@@ -88,6 +88,14 @@ if [ ! -f ".claude/CLAUDE.md" ] || [ ! -f ".claude/ARCHITECTURE.md" ]; then
 fi
 ```
 
+### 4. 统一上下文加载
+
+apply 通常在**独立会话**里跑（与 proposal 分开），必须重新经统一入口加载上下文：
+
+`LOAD_CONTEXT`（见 `references/context-loader.md`）——加载全局 + 项目 `.claude/` 规范
+**及自定义 skill 索引 `CTX.skills`**（来源 `~/.claude/skills/` 与 `<project>/.claude/skills/`）。
+不加载则 ⑥ 开发看不到用户扩展的 skills；Codex 无 harness 自动发现，尤其依赖此步。
+
 ## 执行步骤
 
 ```
@@ -95,6 +103,8 @@ fi
 读取 $ITER_DIR/tasks.md → 获取任务列表
 
 ⑥ Claude Code 开发
+   ⑥.0 开发前先查 CTX.skills：与任务相关的自定义 skill 优先调用（先 skill、后自造，
+        正文调用时才加载；见 context-loader.md「skills 优先级规则」）
    只实现 frontend / backend / unit-test 三类 track 的任务
    （track: qa 的任务不在此实现，留给 qa 命令）
    解析 tasks.md 依赖关系，构建拓扑分层

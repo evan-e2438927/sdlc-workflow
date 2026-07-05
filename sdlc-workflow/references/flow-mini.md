@@ -17,6 +17,9 @@
 1. 项目必须已完成 `/sdlc-workflow init`
 2. 若缺少 baseline 文档且项目为 existing project，先回退执行 `init`
 3. 判断是否满足 mini 条件；不满足立即升级到 `/sdlc-workflow doit`
+4. **统一上下文加载**（`LOAD_CONTEXT`，见 `references/context-loader.md`）：加载全局 + 项目 `.claude/` 规范
+   **以及自定义 skill 索引 `CTX.skills`**。此步不可跳过——尤其 Codex 无 harness 自动发现 skills，
+   不加载 = 后续开发看不到用户扩展的 skills。
 
 ### Step 1. Create Iteration
 
@@ -71,6 +74,8 @@ docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/
 
 Gate 1 通过（或跳过）后，开始修改业务代码。
 
+**先查可用 skills**：改代码前查 Step 0 加载的 `CTX.skills`，与本次改动相关的 skill **优先调用（先 skill、后自造）**，正文调用时才加载（见 `references/context-loader.md`「skills 优先级规则」）。
+
 ### Step 7. Validation Capability Detection
 
 在 Gate 2 前必须检测：
@@ -103,7 +108,10 @@ Gate 1 通过（或跳过）后，开始修改业务代码。
 
 ### Step 9.5. QA（仅 `--qa`）
 
-读取 qa track 场景，编写并通过 Playwright MCP 执行浏览器功能验收。
+**按 `references/flow-qa.md` 执行**（不要自行简化）：读取 qa track 场景 → 编写 Playwright 脚本 →
+通过 Playwright MCP 真实浏览器执行 → **每个场景通过时 `take_screenshot` 成功态并立即 `mv` 到
+`tests/reports/<slug>/screenshots/<Scenario-ID>.png`**（MCP 默认落 cwd 根，必须显式 mv；截图 gitignore、
+不入主干）→ 生成 `tests/reports/<slug>-e2e-report.md`。截图由后续 pr 步骤经隔离 `pr-assets` 分支嵌入 PR。
 
 ### Step 10. Final Report
 
