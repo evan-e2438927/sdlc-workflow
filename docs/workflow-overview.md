@@ -2,7 +2,7 @@
 
 > 一句话：Claude Code 生成，Codex CLI 审查，四阶段流水线驱动需求→设计→开发→交付；主线 5 命令 **proposal → apply → qa → accept → pr**，外加 init / doit / mini / review / update / worktree 覆盖从初始化到并行开发的全场景。
 
-> 📖 **本文定位**：三份文档里的「**机制全景**」，适合培训讲解逐阶段拆解。想装 / 上手看 [README](../README.md)，想懂设计理念看 [DESIGN-PROMO](../DESIGN-PROMO.md)。
+> 📖 **本文定位**：三份文档里的「**机制全景**」，适合培训讲解逐阶段拆解。想装 / 上手看 [README](../README.zh-CN.md)，想懂设计理念看 [DESIGN-PROMO](../DESIGN-PROMO.zh-CN.md)。
 
 ---
 
