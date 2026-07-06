@@ -520,6 +520,15 @@ IF 当前为 apply 模式:
 
 #### ⑥ Claude Code 开发
 
+##### ⑥.0 开发前置：优先复用可用 skills
+
+在写任何业务代码前，先查**统一上下文加载**（⓪ `LOAD_CONTEXT`）得到的自定义 skill 索引 `CTX.skills`
+（来源 `~/.claude/skills/` 与 `<project>/.claude/skills/`）：
+
+- 若某 skill 的 `description` 与当前任务相关，**优先调用它（先 skill、后自造）**，其正文在调用时才加载。
+- 此规则对 Claude Code / Codex 双运行时都适用；**Codex 无 harness 自动发现，只能靠 `CTX.skills` 索引**，故此步不可跳过。
+- 完整优先级规则见 `references/context-loader.md`「skills 优先级规则」。
+
 ##### ⑥.1 依赖分析与并行分组
 
 ```
@@ -577,8 +586,10 @@ FOR layer IN LAYERS:
             设计文档: {design.md 相关章节}
             架构约束: {ARCHITECTURE.md}
             编码规范: {CODING_GUIDELINES.md}
+            可用 skills 索引: {CTX.skills}   # 与任务相关的优先调用（先 skill、后自造）
             规则:
             - 只修改任务 Target Files 范围内的文件
+            - 与任务相关的 CTX.skills 优先调用，而非从零自造
             - 修改文件路径必须落在 Track 对应范围内（frontend→apps/web, backend→apps/server, shared→packages/{config,env,auth}, infra→db/migrations|root configs, test→tests/）
             - 不得修改其他任务的目标文件
             - 完成后报告: 修改的文件列表 + 验收标准完成情况
@@ -714,11 +725,15 @@ LOG "👉 浏览器验收: sdlc-qa   👉 提交: sdlc-accept"
 #### ⑩ qa（qa 命令 / doit --qa）
 ```
 # 前置：phase == applied
+# 完整过程见 references/flow-qa.md（本块是其摘要，细节以 flow-qa.md 为准）
 读取 tasks.md 中 track: qa 的任务
 # deferred 闭环：核对 coverage.md 中 "deferred to qa" 的 AC 都有对应 qa 场景，缺失报警
 FOR EACH qa 场景:
   编写 Playwright 脚本 → tests/e2e/<slug>/E2E-<nnn>-<scenario>.e2e.ts
-  通过 Playwright MCP 执行：navigate → snapshot → click/type → 断言 → 失败截图
+  通过 Playwright MCP 执行：navigate → snapshot → click/type → 断言 → 检查 console error
+  通过时：take_screenshot 截成功态 → **立即 mv** 到 tests/reports/<slug>/screenshots/<Scenario-ID>.png
+          （⚠️ MCP 默认落 cwd 根，必须显式 mv；截图 gitignore、不入主干，由 ⑬ pr 经隔离 pr-assets 分支嵌入 PR）
+  失败时：同样 mv 诊断图到 tests/reports/<slug>/screenshots/
 执行完毕 teardown 后台 dev server（释放端口）
 生成 tests/reports/<slug>-e2e-report.md
 IF 全部 PASS: UPDATE status.json: phase="qa_passed"

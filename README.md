@@ -1,134 +1,138 @@
-# 企业级 SDLC Workflow — AI 驱动的自动化软件交付流水线
+# Enterprise SDLC Workflow — an AI-driven, automated software delivery pipeline
+
+<p align="center"><b>English</b> · <a href="./README.zh-CN.md">简体中文</a></p>
 
 <p align="center">
-  <strong>🏭 用 Claude Code 做开发 · 用 Codex CLI 做审查 · 用浏览器自动化做验收 · 全程留痕可恢复</strong>
+  <strong>🏭 Claude Code writes · Codex CLI reviews · browser automation verifies · every step traceable and resumable</strong>
 </p>
 
 <p align="center">
-  <a href="./DESIGN-PROMO.md#设计哲学">💡 设计理念</a> ·
-  <a href="./examples/30-second-demo.md">⚡ 30 秒上手</a> ·
-  <a href="./sdlc-workflow/SKILL.md">🔧 核心规范</a>
+  <a href="./DESIGN-PROMO.md#design-philosophy">💡 Design philosophy</a> ·
+  <a href="./examples/30-second-demo.md">⚡ 30-second start</a> ·
+  <a href="./sdlc-workflow/SKILL.md">🔧 Core spec</a>
 </p>
 
 ---
 
-> **怎么读这份文档**
-> - 🏃 **想马上用** → [安装](#安装) → [第一次完整跑一遍](#第一次完整跑一遍)
-> - 🤔 **在评估要不要用** → [为什么需要它](#为什么需要它) → [与其他方案的对比](#与其他方案的对比)
-> - 🧠 **想懂设计原理** → [DESIGN-PROMO.md · 设计理念](./DESIGN-PROMO.md) ｜ [workflow-overview.md · 机制全景](./docs/workflow-overview.md)
+> **How to read these docs**
+> - 🏃 **Want to use it now** → [Install](#install) → [Your first full run](#your-first-full-run)
+> - 🤔 **Evaluating whether to adopt** → [Why you need it](#why-you-need-it) → [Compared with other approaches](#compared-with-other-approaches)
+> - 🧠 **Want the design rationale** → [DESIGN-PROMO.md · design philosophy](./DESIGN-PROMO.md) ｜ [workflow-overview.md · mechanics (Chinese)](./docs/workflow-overview.md)
 >
-> **文档地图（三份分工，别重复读）**：本 **README** = 门面 + 安装 + 命令速查；**[DESIGN-PROMO](./DESIGN-PROMO.md)** = 为什么这么设计（理念深挖，适合推广）；**[workflow-overview](./docs/workflow-overview.md)** = 2 模型 / 4 阶段 / 命令的机制全景（适合培训讲解）。
+> **Doc map (three docs, no overlap)**: this **README** = front door + install + command reference; **[DESIGN-PROMO](./DESIGN-PROMO.md)** = why it is designed this way (deep rationale, good for evangelism); **[workflow-overview](./docs/workflow-overview.md)** = the 2-model / 4-stage / command mechanics in full (good for training; currently Chinese only).
 
 ---
 
-## 这是什么？
+## What is this?
 
-一套用在 [Claude Code](https://claude.ai/code) 与 [Codex](https://github.com/openai/codex) 中的 **Skill 插件**（两端共用同一套 skill，单一入口），把软件交付拆成五个可审、可恢复、有产物的阶段，让 AI 按工程 contract 而非 prompt 技巧来推进：
+A **Skill plugin** for [Claude Code](https://claude.ai/code) and [Codex](https://github.com/openai/codex) (one shared skill set across both runtimes, single entry point) that splits software delivery into five reviewable, resumable, artifact-producing stages, so the AI advances by an engineering **contract** rather than prompt tricks:
 
 ```
-主线：proposal → apply → qa → accept → pr
-       拆解      开发     验收    定稿     发布
+Main line: proposal → apply → qa → accept → pr
+           break down  build  verify  finalize  ship
 ```
 
-| 阶段 | 命令 | 做什么 | 产出 phase |
-|------|------|--------|-----------|
-| 需求拆解 | `proposal` | 需求 → 澄清 → 设计 → 任务（按 track 拆分）→ [Gate1] → **暂停等人工审核** | pending_review |
-| 开发 | `apply` | 实现 frontend/backend/unit-test → 单元测试 → [Gate2] → lint+unit | applied |
-| 浏览器验收 | `qa` | 把 qa track 写成 Playwright 脚本并通过 Playwright MCP 执行 | qa_passed |
-| 定稿 | `accept` | 总结变更 → 更新文档 → **本地 commit**（不 push） | accepted |
-| 发布 | `pr` | `git push` → `gh pr create`（唯一与远程交互的动作） | pr_created |
+| Stage | Command | What it does | Output phase |
+|-------|---------|--------------|--------------|
+| Break down | `proposal` | requirement → clarify → design → tasks (split by track) → [Gate 1] → **pause for human review** | pending_review |
+| Build | `apply` | implement frontend/backend/unit-test → unit tests → [Gate 2] → lint+unit | applied |
+| Browser QA | `qa` | turn the qa track into Playwright scripts and run them via Playwright MCP | qa_passed |
+| Finalize | `accept` | summarize changes → update docs → **local commit** (no push) | accepted |
+| Ship | `pr` | `git push` → `gh pr create` (the only step that touches the remote) | pr_created |
 
-外加三条辅助线：
-- `init`：初始化 / 接入项目，生成 baseline 锁定结构
-- `doit`：把五个阶段全自动串起来（`--qa` 含浏览器验收），一路到 PR
-- `mini`：小任务轻量流程，但 Gate 与验收不跳过
-- `worktree`：基于 git worktree 隔离多条并行 pipeline
-- `review`：单独跑 Codex Gate1/Gate2
+Plus a few auxiliary lines:
+- `init`: initialize / onboard a project, generating a baseline that locks the structure
+- `doit`: chain all five stages fully automatically (`--qa` includes browser QA), straight to a PR
+- `mini`: lightweight flow for tiny changes, but Gates and QA are not skipped
+- `worktree`: isolate multiple parallel pipelines via git worktree
+- `review`: run Codex Gate 1 / Gate 2 standalone
 
-**核心特点**：
-- 🤖 **AI 驱动**：从需求到 PR 全流程自动化，每步都有产物、有证据、可恢复
-- 🎯 **阶段分离**：开发（apply）、浏览器验收（qa）、本地定稿（accept）、远程发布（pr）各自独立，边界清晰、可单独重跑
-- 🧍 **人工审核门**：proposal 后暂停，设计经人工确认再开发，避免 AI 全权拍板
-- 🔒 **双模型把关**：Claude Code 生成，Codex CLI 独立审查（`--review` 启用，不降级、不跳过）
-- 🧪 **证据链验收**：qa 用 Playwright 脚本 + Playwright MCP 做浏览器功能验收并出报告，通过态截图存 `tests/reports/`（gitignore、不入主干）并由 pr 经隔离 `pr-assets` 分支嵌入 PR 正文当证据，不靠"我测完了"
-- 🧭 **统一上下文加载**：规范来源（全局 `~/.claude/` + 项目 `.claude/`，项目覆盖全局）只定义一次，单一入口收敛
-- 🧩 **自定义 skills 发现**：项目 `.claude/skills/<name>/SKILL.md` 会被统一上下文加载发现，pipeline 在相关阶段优先调用（先 skill、后自造），Claude Code / Codex 双运行时通用
-- 📦 **配置收敛**：项目配置统一放 `.claude/.sdlc-config`，无散落的根目录 `.env`
-- 🔧 **可恢复**：每轮需求生成结构化 iteration 目录，`status.json` 记录 phase，会话中断后下个 session 可续跑
-- 🛡️ **老项目安全**：existing project 先 intake 生成 baseline，防止 AI 重建你的目录结构
-- 🌲 **Worktree 并行**：多需求 / 多 Agent 同时跑，自动分配端口、隔离分支与配置
-
----
-
-## 为什么需要它
-
-你已经在用 Claude Code / Cursor / Codex 写代码了，但大概率遇到过：
-
-| 痛点 | 现在怎么处理 | 用了这套系统 |
-|------|------------|-------------|
-| 老项目交给 AI 被当新项目重建 | 反复解释"别动现有架构" | 先 intake 再开发，baseline 锁定结构 |
-| 模型擅自改目录结构 | 事后人工修 | 目录约束作为规则注入，Gate 校验 |
-| 设计没人审就直接写代码 | 写完才发现方向错 | proposal 暂停等人工审核，apply 才动手 |
-| 说"已完成"实际没测 | 手动逐个验证 | qa 必须有浏览器交互证据与报告 |
-| 审查全靠自己看 diff | 看不过来就跳过 | Codex CLI 自动审查，Gate 失败就停 |
-| commit / PR 一把梭，难回退 | 出错只能 reset | accept 只本地 commit，确认后 pr 才推送发布 |
-| 配置散落、含密钥 | `.env` 到处放 | 统一 `.claude/.sdlc-config`，gitignored |
-| 多需求并行卡在串行 | 排队，hotfix 也得等 | worktree：独立工作树 + 分支 + 端口隔离 |
-
-**一句话**：用**工程 contract** 而非 prompt 技巧来约束 AI 行为的 SDLC 系统。
+**Highlights**:
+- 🤖 **AI-driven**: full automation from requirement to PR, every step producing artifacts, evidence, and recoverable state
+- 🎯 **Stage separation**: build (apply), browser QA (qa), local finalize (accept), and remote ship (pr) are independent — clear boundaries, each re-runnable on its own
+- 🧍 **Human review gate**: pause after proposal so the design is human-confirmed before coding, so the AI never decides everything alone
+- 🔒 **Dual-model gating**: Claude Code generates, Codex CLI reviews independently (enabled by `--review`; never downgraded, never silently skipped)
+- 🧪 **Evidence-chain acceptance**: qa runs real browser verification with Playwright scripts + Playwright MCP and produces a report; success screenshots are stored under `tests/reports/` (gitignored, kept out of the main branch) and embedded into the PR body by `pr` via an isolated `pr-assets` branch — not "trust me, I tested it"
+- 🧭 **Unified context loading**: the source of conventions (global `~/.claude/` + project `.claude/`, project overrides global) is defined exactly once, converged at a single entry
+- 🧩 **Custom skills discovery**: a project's `.claude/skills/<name>/SKILL.md` is discovered by unified context loading, and the pipeline prefers it at relevant stages (skill first, hand-rolled second); works across both Claude Code and Codex
+- 📦 **Config convergence**: project config lives in one place, `.claude/.sdlc-config`, with no scattered root-level `.env`
+- 🔧 **Resumable**: each requirement produces a structured iteration directory; `status.json` records the phase, so the next session can continue after an interruption
+- 🛡️ **Safe for existing projects**: existing projects run an intake to generate a baseline first, preventing the AI from rebuilding your directory structure
+- 🌲 **Worktree parallelism**: multiple requirements / agents run at once, with auto-allocated ports and isolated branches and config
 
 ---
 
-## 与其他方案的对比
+## Why you need it
 
-| | 裸用 Claude Code | Cursor Rules | SDLC Workflow |
-|--|-----------------|--------------|---------------|
-| 目录结构约束 | ❌ 靠 prompt | ⚠️ 可配规则，无强制 | ✅ 注入 workflow，运行时强制 |
-| 设计审查 | ❌ | ❌ | ✅ Codex CLI Gate 1 |
-| 人工审核门 | ❌ | ❌ | ✅ proposal 暂停 → 人工 → apply |
-| 代码审查 | ❌ | ❌ | ✅ Codex CLI Gate 2 |
-| 浏览器验收 | ⚠️ 口述 | ⚠️ 口述 | ✅ qa：Playwright + MCP 证据 |
-| 提交 / 发布分离 | ❌ 一把梭 | ❌ | ✅ accept 本地 commit / pr 远程发布 |
-| 迭代可恢复 | ❌ 靠聊天记录 | ❌ | ✅ iteration 目录 + status.json |
-| 老项目安全接入 | ❌ 经常被重建 | ⚠️ 看运气 | ✅ intake → baseline → 约束 |
-| 并行开发隔离 | ❌ 单仓串行 | ❌ | ✅ git worktree + 端口隔离 |
+You are already coding with Claude Code / Cursor / Codex, but you have probably hit:
+
+| Pain point | How you handle it today | With this system |
+|------------|-------------------------|------------------|
+| Existing project rebuilt as if new when handed to AI | Repeatedly explain "don't touch the current architecture" | Intake before building; baseline locks the structure |
+| Model changes the directory layout on its own | Fix it up afterward | Directory constraints injected as rules, checked by a Gate |
+| Code written before anyone reviews the design | Only discover the wrong direction after it's written | proposal pauses for human review; apply only starts after |
+| "It's done" when nothing was actually tested | Manually verify one by one | qa requires real browser-interaction evidence and a report |
+| Review depends on you reading the diff | Skip it when there's too much | Codex CLI reviews automatically; the Gate stops on failure |
+| commit / PR done in one shot, hard to roll back | Only option is reset | accept commits locally only; pr pushes and ships after you confirm |
+| Config scattered, secrets included | `.env` everywhere | Unified `.claude/.sdlc-config`, gitignored |
+| Parallel requirements stuck in serial | Queue up; even a hotfix waits | worktree: isolated work tree + branch + ports |
+
+**In one sentence**: an SDLC system that constrains AI behavior with an **engineering contract** instead of prompt tricks.
 
 ---
 
-## 安装
+## Compared with other approaches
 
-> 支持 **Claude Code** 与 **Codex** 两种运行时。
+| | Bare Claude Code | Cursor Rules | SDLC Workflow |
+|--|------------------|--------------|---------------|
+| Directory constraints | ❌ via prompt | ⚠️ configurable rules, not enforced | ✅ injected into the workflow, enforced at runtime |
+| Design review | ❌ | ❌ | ✅ Codex CLI Gate 1 |
+| Human review gate | ❌ | ❌ | ✅ proposal pauses → human → apply |
+| Code review | ❌ | ❌ | ✅ Codex CLI Gate 2 |
+| Browser QA | ⚠️ narrated | ⚠️ narrated | ✅ qa: Playwright + MCP evidence |
+| Commit / ship separation | ❌ one shot | ❌ | ✅ accept local commit / pr remote ship |
+| Resumable iterations | ❌ relies on chat history | ❌ | ✅ iteration dir + status.json |
+| Safe onboarding of existing projects | ❌ often rebuilt | ⚠️ hit or miss | ✅ intake → baseline → constraints |
+| Parallel-dev isolation | ❌ single-repo serial | ❌ | ✅ git worktree + port isolation |
 
-### Claude Code（plugin marketplace，推荐）
+---
 
-在 Claude Code 终端中执行：
+## Install
+
+> Supports both the **Claude Code** and **Codex** runtimes.
+
+### Claude Code (plugin marketplace, recommended)
+
+Run in the Claude Code terminal:
 
 ```bash
-# 1. 注册 marketplace
+# 1. Register the marketplace
 /plugin marketplace add evan-e2438927/sdlc-workflow
 
-# 2. 安装全套 skill
+# 2. Install the full skill set
 /plugin install sdlc-full@sdlc-workflow
 ```
 
-### Codex / 通用（skills CLI）
+### Codex / generic (skills CLI)
 
-跨运行时安装，Codex 与其他支持 skills 的环境通用：
+Cross-runtime install, usable from Codex and other skills-capable environments:
 
 ```bash
-npx skills add evan-e2438927/sdlc-workflow -g -y
+npx skills add evan-e2438927/sdlc-workflow -y
 ```
 
-安装后即可使用 `sdlc-*` 系列 skill：`sdlc-init` / `sdlc-update` / `sdlc-proposal` / `sdlc-apply` / `sdlc-qa` / `sdlc-accept` / `sdlc-pr` / `sdlc-doit` / `sdlc-mini` / `sdlc-review` / `sdlc-worktree`。
+> **Note**: the skills CLI's SKILL.md format does not support `-g` (global) install; if you need it globally, use "Manual install" below.
 
-> **统一入口**：Claude Code 与 Codex **共用同一套 skill**，不再维护单独的 slash 命令集。触发方式：说出意图（如「用 sdlc 跑 proposal：…」），或在 Claude Code 里 `/sdlc-proposal`。`sdlc-workflow` 是总览/编排 skill，各阶段 skill 是薄入口，指向同一批 `references/`，逻辑单源。
+After installing you can use the `sdlc-*` skills: `sdlc-init` / `sdlc-update` / `sdlc-proposal` / `sdlc-apply` / `sdlc-qa` / `sdlc-accept` / `sdlc-pr` / `sdlc-doit` / `sdlc-mini` / `sdlc-review` / `sdlc-worktree`.
 
-### 手动安装（备选）
+> **Single entry point**: Claude Code and Codex **share one skill set** — there is no separate slash-command set. Trigger by stating intent (e.g. "run sdlc proposal: …") or, in Claude Code, `/sdlc-proposal`. `sdlc-workflow` is the overview/orchestration skill; each stage skill is a thin entry pointing at the same `references/`, single source of truth.
+
+### Manual install (fallback)
 
 <details>
-<summary>点击展开</summary>
+<summary>Click to expand</summary>
 
-**全局安装（所有项目可用）**
+**Global install (available to all projects)**
 
 ```bash
 git clone https://github.com/evan-e2438927/sdlc-workflow.git ~/.claude/sdlc-workflow-repo
@@ -136,7 +140,7 @@ mkdir -p ~/.claude/skills
 ln -sf ~/.claude/sdlc-workflow-repo/sdlc-workflow ~/.claude/skills/sdlc-workflow
 ```
 
-**项目级安装（仅当前项目）**
+**Project-level install (current project only)**
 
 ```bash
 cd your-project
@@ -147,146 +151,146 @@ ln -sf .claude/sdlc-workflow-repo/sdlc-workflow .claude/skills/sdlc-workflow
 
 </details>
 
-### 更新
+### Updating
 
-- **Claude Code**：`/plugin update sdlc-full@sdlc-workflow`，再在各项目里跑 `sdlc-update` 同步脚手架
-- **Codex / 通用**：`npx skills update`，或在 clone 目录 `git pull`
+- **Claude Code**: `/plugin update sdlc-full@sdlc-workflow`, then run `sdlc-update` in each project to sync the scaffold
+- **Codex / generic**: `npx skills update`, or `git pull` in the clone directory
 
-### 依赖项
+### Dependencies
 
-| 工具 | 用途 | 安装 |
-|------|------|------|
-| [Claude Code](https://claude.ai/code) | AI 开发代理 | 官网安装 |
-| [Codex CLI](https://github.com/openai/codex) | Gate 1/2 独立审查（`--review`） | `npm i -g @openai/codex` |
-| [GitHub CLI](https://cli.github.com/) | `pr` 命令创建 PR | `brew install gh` |
-| [Playwright MCP](https://github.com/microsoft/playwright-mcp) | `qa` 浏览器功能验收 | Claude Code 挂载 MCP |
-| [GitHub MCP](https://github.com/github/github-mcp-server)（可选） | PR 增强 | Claude Code 挂载 MCP |
+| Tool | Purpose | Install |
+|------|---------|---------|
+| [Claude Code](https://claude.ai/code) | AI development agent | via official site |
+| [Codex CLI](https://github.com/openai/codex) | Independent Gate 1/2 review (`--review`) | `npm i -g @openai/codex` |
+| [GitHub CLI](https://cli.github.com/) | `pr` command creates the PR | `brew install gh` |
+| [Playwright MCP](https://github.com/microsoft/playwright-mcp) | `qa` browser QA | mount the MCP in Claude Code |
+| [GitHub MCP](https://github.com/github/github-mcp-server) (optional) | PR enhancements | mount the MCP in Claude Code |
 
-> Gate 是可选的（`--review` 时启用）；但一旦启用，Codex CLI 不可用必须中止，不会自动跳过。
+> Gates are optional (enabled with `--review`); but once enabled, an unavailable Codex CLI aborts the run rather than being silently skipped.
 
 ---
 
-## 快速开始
+## Quick start
 
 ```bash
-# 1. 初始化 / 接入项目（可选参数：review=1 branch=feat/ test-framework=jest）
+# 1. Initialize / onboard a project (optional args: review=1 branch=feat/ test-framework=jest)
 sdlc-init "review=1"
 
-# 2. 需求拆解（推荐流程，结束后暂停等人工审核）
-sdlc-proposal 增加用户登录模块，支持邮箱和手机号注册
+# 2. Break down the requirement (recommended flow; pauses for human review at the end)
+sdlc-proposal Add a user login module supporting email and phone registration
 
-# 3. 审阅 proposal 产物 → 确认后开发（开发 + 单元测试 + lint，不提交）
+# 3. Review the proposal artifacts → after confirming, build (build + unit tests + lint, no commit)
 sdlc-apply
 
-# 4. 浏览器功能验收（Playwright 脚本 + MCP 执行）
+# 4. Browser QA (Playwright scripts + MCP execution)
 sdlc-qa
 
-# 5. 验收通过 → 更新文档 + 本地 commit
+# 5. QA passed → update docs + local commit
 sdlc-accept
 
-# 6. 确认本地提交无误 → 推送并创建 PR
+# 6. Local commit looks good → push and create the PR
 sdlc-pr
 
-# —— 或者一把梭 ——
-sdlc-doit --qa 增加用户登录模块      # 全自动，含浏览器验收，一路到 PR
-sdlc-mini 把按钮颜色改成蓝色          # 小任务轻量流程
+# —— or all in one shot ——
+sdlc-doit --qa Add a user login module      # fully automatic, includes browser QA, straight to a PR
+sdlc-mini Change the button color to blue    # lightweight flow for tiny changes
 ```
 
-**推荐流程**：`proposal → 人工审核 → apply → qa → accept → pr`，确保设计经人工确认、变更经浏览器验收、发布前可在本地复核 commit。
+**Recommended flow**: `proposal → human review → apply → qa → accept → pr`, ensuring the design is human-confirmed, the change is browser-verified, and you can review the commit locally before shipping.
 
 ---
 
-## 第一次完整跑一遍
+## Your first full run
 
-> 培训场景推荐：第一次别用 `doit` 一把梭，手动分步走完，感受每步的**产物**和**确认点**。以「给订单页加导出按钮」为例。
+> Recommended for training: don't use `doit` one-shot the first time — step through it manually to feel each step's **artifacts** and **checkpoints**. Example: "add an export button to the orders page."
 
-| 步 | 命令 | 你会看到 / 要做什么 | 产物落点 |
-|----|------|--------------------|---------|
-| 0 | `sdlc-init` | 检测 fresh / existing；existing 会先采集 baseline（**别跳过**——这步防止 AI 把你现有目录当新项目重建） | `.claude/`、`.claude/.sdlc-config` |
-| 1 | `sdlc-proposal 给订单页加导出按钮` | 生成 requirements / design / tasks，**跑完自动暂停**等你审 | `docs/iterations/<date>/<seq>-<slug>-feature/` |
-| ⏸ | 👀 **人工审核** | 打开 `design.md`、`tasks.md` 复核方案；不满意就让它改，满意再继续 | —（唯一强制停顿点之一） |
-| 2 | `sdlc-apply` | 按 tasks 实现代码 + 单元测试 + lint，**不提交** | 代码变更 + `tests/unit/` |
-| 3 | `sdlc-qa` | 生成 Playwright 脚本、真实浏览器跑一遍，通过态截图落本地 | `tests/reports/<slug>-e2e-report.md` + 截图（gitignore） |
-| 4 | `sdlc-accept` | 更新文档 + **本地 commit**（仍不 push）；建议先 `git diff` 复核 | 一个本地 commit |
-| 5 | `sdlc-pr` | `git push` + 建 PR；QA 截图经隔离 `pr-assets` 分支嵌入 PR 正文 | 远程分支 + PR URL |
+| Step | Command | What you'll see / do | Where artifacts land |
+|------|---------|----------------------|----------------------|
+| 0 | `sdlc-init` | Detects fresh / existing; existing runs a baseline intake first (**don't skip** — this prevents the AI from treating your existing directory as a new project) | `.claude/`, `.claude/.sdlc-config` |
+| 1 | `sdlc-proposal add an export button to the orders page` | Generates requirements / design / tasks, then **auto-pauses** for your review | `docs/iterations/<date>/<seq>-<slug>-feature/` |
+| ⏸ | 👀 **Human review** | Open `design.md` and `tasks.md` to check the plan; ask it to revise if unhappy, continue when satisfied | — (one of the two mandatory stops) |
+| 2 | `sdlc-apply` | Implements code + unit tests + lint per tasks, **no commit** | code changes + `tests/unit/` |
+| 3 | `sdlc-qa` | Generates Playwright scripts, runs them in a real browser, saves success screenshots locally | `tests/reports/<slug>-e2e-report.md` + screenshots (gitignored) |
+| 4 | `sdlc-accept` | Updates docs + **local commit** (still no push); review with `git diff` first | one local commit |
+| 5 | `sdlc-pr` | `git push` + create the PR; QA screenshots are embedded into the PR body via the isolated `pr-assets` branch | remote branch + PR URL |
 
-**只有两处需要你停下来**：第 1 步后的「人工审核」，和第 4 步后的「本地 diff 复核」；其余自动。熟悉后想全自动，一条命令：`sdlc-doit --qa 给订单页加导出按钮`。
+**Only two places require you to stop**: the "human review" after step 1, and the "local diff review" after step 4; everything else is automatic. Once comfortable, one command does it all: `sdlc-doit --qa add an export button to the orders page`.
 
-**三个新手常见坑**：
-- **existing 项目必须先让 init 采集 baseline**，否则 AI 可能按默认目录约定重建结构。
-- **`--review` 需要本机装了 Codex CLI**；没装就先别加，仅本地 lint / unit（Gate 会诚实中止而非静默跳过）。
-- **qa 需要 Playwright MCP 已挂载**；未挂载时 qa 会提示缺依赖，而不是假装通过。
-
----
-
-## Skill 一览（统一入口）
-
-每个阶段是一个 skill，Claude Code 与 Codex 共用；说出意图或在 Claude Code 里 `/<skill>` 触发。
-
-| Skill | 参数 | 适用场景 | phase |
-|------|------|---------|-------|
-| `sdlc-init` | `[key=value …]` | 项目接入，生成配置与 baseline | — |
-| `sdlc-update` | `[项目目录]` | 两阶段升级同步：阶段一安全同步脚手架（幂等，不覆盖用户内容）；阶段二漂移感知增量刷新（基线自动刷新、用户文档逐项确认） | — |
-| `sdlc-proposal` | `<需求> [--review]` | 需求拆解（①-④）→ 等待人工审核 | pending_review |
-| `sdlc-apply` | `[--review] [迭代目录]` | 开发 + 单元测试 + lint（⑥-⑨，不提交） | applied |
-| `sdlc-qa` | `[迭代目录]` | Playwright 浏览器功能验收（⑩） | qa_passed |
-| `sdlc-accept` | `[迭代目录]` | 总结变更 → 更新文档 → 本地 commit（⑪⑫） | accepted |
-| `sdlc-pr` | `[迭代目录]` | push → 创建 PR（⑬，唯一远程动作） | pr_created |
-| `sdlc-doit` | `[--review] [--qa] <需求>` | 全自动，一路到 PR（①-⑬） | — |
-| `sdlc-mini` | `[--review] [--qa] <小任务>` | 微小任务轻量流程 | — |
-| `sdlc-review` | `<proposal\|code> <迭代目录>` | 单独跑 Codex Gate 1 / Gate 2 | — |
-| `sdlc-worktree` | `create <slug> <type> \| list \| status \| remove <seq\|slug> \| gc` | 多需求并行 / 多 Agent | — |
-
-### 参数说明
-
-- 记号：`< >` 必填，`[ ]` 可选，`|` 多选一。
-- `--review`：启用 Codex 审查门禁（proposal 的 Gate 1 设计审查 + apply 的 Gate 2 代码审查）；不加则跳过 Gate，仅本地 lint/unit。
-- `--qa`：在 doit / mini 流程中插入 Playwright 浏览器功能验收（步骤 ⑩）。
-- `迭代目录`：形如 `docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/`；**省略时自动定位**最近一个匹配 phase 的迭代。
-- `<需求>` / `<小任务>` 输入格式：纯文本、`file:///本地路径`、或 URL（自动经 Playwright MCP 提取正文）。
-- `sdlc-init` 的 `key=value` 配置（均可选）：`review=<n>`（REVIEW_MAX_ROUNDS）、`branch=<prefix>`（GIT_BRANCH_PREFIX）、`test-framework=<jest|vitest|mocha>`、`lint=<eslint|biome>`。
-- `sdlc-worktree` 的 `<type>`：`feature | fix | refactor | docs | test | chore`。
-
-**为什么 accept 和 pr 分开**：accept 把变更定稿到**本地**（更新文档 + commit），你可以先 review 本地 diff；确认无误后再用 `pr` 推送并发布。本地定稿与远程发布解耦，出错好回退。
-
-**mini 不是"跳过流程"**：浏览器验收不精简、Gate 不跳过；影响 > 3 文件或改 API/数据模型时自动升级到 doit。
-
-**worktree 不是"另开一个流程"**：它只负责隔离工作区与分支，pipeline 仍走 proposal/apply/qa/accept/pr。
+**Three common beginner pitfalls**:
+- **Existing projects must let init run the baseline intake first**, otherwise the AI may rebuild your structure per default directory conventions.
+- **`--review` needs Codex CLI installed locally**; if it isn't, leave it off and run local lint / unit only (the Gate aborts honestly rather than silently skipping).
+- **qa needs Playwright MCP mounted**; if it isn't, qa reports the missing dependency rather than pretending to pass.
 
 ---
 
-## Pipeline 流程图
+## Skills at a glance (single entry point)
+
+Each stage is a skill, shared by Claude Code and Codex; trigger by stating intent or, in Claude Code, `/<skill>`.
+
+| Skill | Args | Use case | phase |
+|-------|------|----------|-------|
+| `sdlc-init` | `[key=value …]` | onboard a project, generate config and baseline | — |
+| `sdlc-update` | `[project dir]` | two-phase upgrade sync: phase 1 safely syncs the scaffold (idempotent, never overwrites user content); phase 2 drift-aware incremental refresh (baselines auto-refresh, user docs confirmed item by item) | — |
+| `sdlc-proposal` | `<requirement> [--review]` | break down the requirement (①-④) → wait for human review | pending_review |
+| `sdlc-apply` | `[--review] [iter dir]` | build + unit tests + lint (⑥-⑨, no commit) | applied |
+| `sdlc-qa` | `[iter dir]` | Playwright browser QA (⑩) | qa_passed |
+| `sdlc-accept` | `[iter dir]` | summarize changes → update docs → local commit (⑪⑫) | accepted |
+| `sdlc-pr` | `[iter dir]` | push → create PR (⑬, the only remote action) | pr_created |
+| `sdlc-doit` | `[--review] [--qa] <requirement>` | fully automatic, straight to a PR (①-⑬) | — |
+| `sdlc-mini` | `[--review] [--qa] <tiny task>` | lightweight flow for tiny tasks | — |
+| `sdlc-review` | `<proposal\|code> <iter dir>` | run Codex Gate 1 / Gate 2 standalone | — |
+| `sdlc-worktree` | `create <slug> <type> \| list \| status \| remove <seq\|slug> \| gc` | parallel requirements / multiple agents | — |
+
+### Argument notes
+
+- Notation: `< >` required, `[ ]` optional, `|` one of.
+- `--review`: enable the Codex review gates (proposal's Gate 1 design review + apply's Gate 2 code review); without it, Gates are skipped and only local lint/unit run.
+- `--qa`: insert Playwright browser QA (step ⑩) into the doit / mini flow.
+- `iter dir`: of the form `docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/`; **auto-located when omitted**, picking the most recent iteration matching the phase.
+- `<requirement>` / `<tiny task>` input formats: plain text, `file:///local-path`, or a URL (body auto-extracted via Playwright MCP).
+- `sdlc-init` `key=value` config (all optional): `review=<n>` (REVIEW_MAX_ROUNDS), `branch=<prefix>` (GIT_BRANCH_PREFIX), `test-framework=<jest|vitest|mocha>`, `lint=<eslint|biome>`.
+- `sdlc-worktree` `<type>`: `feature | fix | refactor | docs | test | chore`.
+
+**Why accept and pr are separate**: accept finalizes the change **locally** (update docs + commit) so you can review the local diff; once confirmed, `pr` pushes and ships. Decoupling local finalize from remote ship makes rollback easy.
+
+**mini is not "skip the flow"**: browser QA is not trimmed and Gates are not skipped; it auto-upgrades to doit when it touches > 3 files or changes an API / data model.
+
+**worktree is not "a separate flow"**: it only isolates the work tree and branch; the pipeline still runs proposal/apply/qa/accept/pr.
+
+---
+
+## Pipeline diagram
 
 ```mermaid
 graph TD
-    START["/sdlc-workflow"] --> CMD{命令?}
-    CMD -->|proposal| P1["①-④ 需求拆解 [+Gate 1]"]
-    P1 --> P_STOP["⏸ 暂停 (pending_review)"]
-    P_STOP -->|人工审核| APPLY
+    START["/sdlc-workflow"] --> CMD{command?}
+    CMD -->|proposal| P1["①-④ break down [+Gate 1]"]
+    P1 --> P_STOP["⏸ pause (pending_review)"]
+    P_STOP -->|human review| APPLY
 
-    CMD -->|apply| APPLY["⑥-⑨ 开发 → 单测 → lint [+Gate 2]"]
+    CMD -->|apply| APPLY["⑥-⑨ build → unit → lint [+Gate 2]"]
     APPLY --> A_END["applied"]
     A_END --> QA
 
-    CMD -->|qa| QA["⑩ Playwright 浏览器功能验收"]
+    CMD -->|qa| QA["⑩ Playwright browser QA"]
     QA --> Q_END["qa_passed"]
     Q_END --> ACCEPT
 
-    CMD -->|accept| ACCEPT["⑪⑫ 总结变更 → 文档 → 本地 commit"]
+    CMD -->|accept| ACCEPT["⑪⑫ summarize → docs → local commit"]
     ACCEPT --> AC_END["accepted"]
     AC_END --> PR
 
     CMD -->|pr| PR["⑬ push → gh pr create"]
     PR --> END["✅ pr_created + PR"]
 
-    CMD -->|doit| DOIT["①-⑬ 全自动（不停顿）"]
+    CMD -->|doit| DOIT["①-⑬ fully automatic (no stops)"]
     DOIT --> END
 
-    CMD -->|mini| MINI["mini 轻量流程"]
+    CMD -->|mini| MINI["mini lightweight flow"]
     MINI --> END
 ```
 
-每轮迭代的状态记录在 `docs/iterations/.../status.json`，会话中断后下个 session 据此续跑：
+Each iteration's state is recorded in `docs/iterations/.../status.json`, so the next session can resume from it after an interruption:
 
 ```json
 {
@@ -302,112 +306,112 @@ graph TD
 
 ---
 
-## 统一上下文加载
+## Unified context loading
 
-所有命令在执行前经**单一入口**加载规范，规范清单只在 [`references/context-loader.md`](sdlc-workflow/references/context-loader.md) 定义一次：
+Before running, every command loads conventions through a **single entry**, and the convention list is defined exactly once in [`references/context-loader.md`](sdlc-workflow/references/context-loader.md):
 
 ```
-加载顺序（后者覆盖前者）：
-  1. 全局级  ~/.claude/            ← 用户跨项目通用规范
-  2. 项目级  <project>/.claude/    ← 项目专属规范，覆盖全局
+Load order (later overrides earlier):
+  1. Global   ~/.claude/            ← user's cross-project conventions
+  2. Project  <project>/.claude/    ← project-specific conventions, override global
 ```
 
-每层加载 `CLAUDE.md` / `ARCHITECTURE.md` / `SECURITY.md` / `CODING_GUIDELINES.md` / `rules/*.md`；existing project 额外加载 baseline 三件套；运行时配置读 `.claude/.sdlc-config`。命令与各 reference 不再各自罗列 `.claude/*` 清单。
+Each level loads `CLAUDE.md` / `ARCHITECTURE.md` / `SECURITY.md` / `CODING_GUIDELINES.md` / `rules/*.md`; existing projects additionally load the baseline trio; runtime config is read from `.claude/.sdlc-config`. Commands and references no longer list `.claude/*` on their own.
 
 ---
 
-## 并行开发（Worktree 模式）
+## Parallel development (Worktree mode)
 
-基于 `git worktree` 让一个仓库同时存在多个工作区，每个工作区跑独立 pipeline。
+Uses `git worktree` to keep multiple work trees for one repo at once, each running an independent pipeline.
 
 ```bash
-# 创建并行工作区（自动分配 seq、分支、端口、复制 .claude/.sdlc-config*）
+# Create a parallel work tree (auto-allocates seq, branch, ports, copies .claude/.sdlc-config*)
 sdlc-worktree create user-login feature
 sdlc-worktree create payment-bug fix
 
-# 进入工作区跑正常 pipeline
+# Enter the work tree and run the normal pipeline
 cd ../wt-001-user-login-feature
-sdlc-proposal "用户登录功能"
+sdlc-proposal "user login feature"
 
-# 全局总览 / 列表 / 清理
+# Global overview / list / cleanup
 sdlc-worktree status
 sdlc-worktree list
 sdlc-worktree remove 001
 sdlc-worktree gc
 ```
 
-| 资源 | 隔离方式 |
-|------|---------|
-| 工作目录 | `../wt-<seq>-<slug>-<type>/`，主仓的兄弟目录 |
-| 分支 | `{GIT_BRANCH_PREFIX}{slug}-{date}-wt{seq}`，git 强制独占 |
-| dev server 端口 | `PORT=3000+seq, API_PORT=4000+seq`，写入该 worktree 的 `.claude/.sdlc-config` |
-| 配置 | 从主仓复制 `.claude/.sdlc-config*`（gitignored，不随 git worktree 带过去） |
-| 注册表 | `.worktrees/worktree-registry.json`（提交到 main，作为多 Agent 协调总线） |
+| Resource | Isolation |
+|----------|-----------|
+| Work dir | `../wt-<seq>-<slug>-<type>/`, a sibling of the main repo |
+| Branch | `{GIT_BRANCH_PREFIX}{slug}-{date}-wt{seq}`, git-enforced exclusive |
+| Dev server ports | `PORT=3000+seq, API_PORT=4000+seq`, written to that worktree's `.claude/.sdlc-config` |
+| Config | copied from the main repo's `.claude/.sdlc-config*` (gitignored, not carried over by git worktree) |
+| Registry | `.worktrees/worktree-registry.json` (committed to main, serving as the multi-agent coordination bus) |
 
-详见 [parallel-dev.md](sdlc-workflow/references/parallel-dev.md)，脚本见 [sdlc-worktree.sh](sdlc-workflow/scripts/sdlc-worktree.sh)。
+See [parallel-dev.md](sdlc-workflow/references/parallel-dev.md); the script is [sdlc-worktree.sh](sdlc-workflow/scripts/sdlc-worktree.sh).
 
 ---
 
-## 目录结构
+## Directory structure
 
-仓库本身是一个**多运行时插件**：Claude Code 与 Codex 共用同一套 `skills/`，逻辑单源在 `sdlc-workflow/references/`。
+The repo itself is a **multi-runtime plugin**: Claude Code and Codex share one `skills/` set, with the single source of logic in `sdlc-workflow/references/`.
 
 ```
-sdlc-workflow/（repo 根）
-├── skills/                 # 统一入口：每个阶段一个 skill（两端共用）
-│   ├── sdlc-workflow/      # → 软链到 ../sdlc-workflow（总览/编排 skill）
+sdlc-workflow/ (repo root)
+├── skills/                 # single entry: one skill per stage (shared by both runtimes)
+│   ├── sdlc-workflow/      # → symlink to ../sdlc-workflow (overview/orchestration skill)
 │   ├── sdlc-init/  sdlc-proposal/  sdlc-apply/  sdlc-qa/  sdlc-accept/
 │   ├── sdlc-pr/  sdlc-doit/  sdlc-mini/  sdlc-review/  sdlc-update/  sdlc-worktree/
-│   └──   每个含 SKILL.md（薄入口，指向 references/）
-├── .claude-plugin/         # Claude Code 清单（marketplace.json + plugin.json，自动发现 skills/）
-├── .codex-plugin/          # Codex 清单（plugin.json，skills: ./skills/）
-└── sdlc-workflow/          # 核心 Skill 内容（被 skills/sdlc-workflow 引用）
+│   └──   each contains a SKILL.md (thin entry, pointing at references/)
+├── .claude-plugin/         # Claude Code manifest (marketplace.json + plugin.json, auto-discovers skills/)
+├── .codex-plugin/          # Codex manifest (plugin.json, skills: ./skills/)
+└── sdlc-workflow/          # core skill content (referenced by skills/sdlc-workflow)
 ```
 
 ```
-sdlc-workflow/              # 核心 Skill
-├── SKILL.md                # 主流程规范（Orchestrator）
-├── references/             # 步骤详细规范（Workers）
+sdlc-workflow/              # core skill
+├── SKILL.md                # main-flow spec (orchestrator)
+├── references/             # per-step detailed specs (workers)
 │   ├── pipeline-overview.md
-│   ├── context-loader.md     # 统一上下文加载入口
-│   ├── flow-proposal.md      # 需求拆解流程
-│   ├── flow-apply.md         # 开发流程
-│   ├── flow-qa.md            # 浏览器功能验收流程
-│   ├── flow-accept.md        # 验收提交流程（文档 + 本地 commit）
-│   ├── flow-mini.md          # 小任务轻量流程
-│   ├── parallel-dev.md       # worktree 并行开发
+│   ├── context-loader.md     # unified context-loading entry
+│   ├── flow-proposal.md      # requirement breakdown flow
+│   ├── flow-apply.md         # build flow
+│   ├── flow-qa.md            # browser QA flow
+│   ├── flow-accept.md        # acceptance flow (docs + local commit)
+│   ├── flow-mini.md          # lightweight tiny-task flow
+│   ├── parallel-dev.md       # worktree parallel development
 │   ├── 00-existing-project-intake.md
 │   ├── 01-requirements-ingestion.md
 │   ├── 02-requirements-clarifier.md
 │   ├── 03-design-generator.md
 │   ├── 04-task-generator.md
 │   ├── 05-design-reviewer.md   # Gate 1
-│   ├── 07-test-generator.md    # 单元测试生成
+│   ├── 07-test-generator.md    # unit test generation
 │   ├── 08-code-reviewer.md     # Gate 2
 │   ├── 09-test-pipeline.md     # lint + unit
 │   ├── 10-docs-updater.md
-│   ├── 11-git-committer.md     # 本地 commit + Conventional Commits 规范
+│   ├── 11-git-committer.md     # local commit + Conventional Commits spec
 │   ├── 12-pr-creator.md        # push + PR
 │   └── micro-change-mode.md
-├── scripts/                # 初始化与并行开发脚本
+├── scripts/                # init and parallel-dev scripts
 │   ├── init-project.sh
-│   ├── update-project.sh         # 同步最新脚手架到已初始化项目
+│   ├── update-project.sh         # sync latest scaffold into an initialized project
 │   ├── sdlc-worktree.sh
 │   └── update-workflow-config.sh
-└── templates/              # 项目模板
+└── templates/              # project templates
     ├── CLAUDE.md.tpl
     ├── workflow-rules.md.tpl
-    ├── sdlc-config.tpl        # → 生成 .claude/.sdlc-config
+    ├── sdlc-config.tpl        # → generates .claude/.sdlc-config
     ├── ARCHITECTURE.md.tpl
     ├── SECURITY.md.tpl
     └── CODING_GUIDELINES.md.tpl
 ```
 
-### 目标项目结构（init 后生成）
+### Target project structure (generated after init)
 
 ```
 your-project/
-├── .claude/                    # Claude 上下文（统一放置）
+├── .claude/                    # Claude context (kept together)
 │   ├── CLAUDE.md
 │   ├── ARCHITECTURE.md
 │   ├── SECURITY.md
@@ -415,7 +419,7 @@ your-project/
 │   ├── PROJECT_BASELINE.md     # existing project
 │   ├── EXISTING_STRUCTURE.md
 │   ├── TEST_BASELINE.md
-│   ├── .sdlc-config            # 配置（gitignored）
+│   ├── .sdlc-config            # config (gitignored)
 │   └── rules/workflow-rules.md
 ├── docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/
 │   ├── requirements.md
@@ -423,62 +427,62 @@ your-project/
 │   ├── tasks.md
 │   └── status.json             # phase: pending_review → applied → qa_passed → accepted → pr_created
 ├── tests/
-│   ├── unit/                   # 单元测试（apply 生成）
-│   ├── e2e/                    # Playwright 脚本（qa 生成）
-│   └── reports/                # 测试与验收报告
-└── .worktrees/                 # worktree 注册表（启用并行后生成）
+│   ├── unit/                   # unit tests (generated by apply)
+│   ├── e2e/                    # Playwright scripts (generated by qa)
+│   └── reports/                # test and acceptance reports
+└── .worktrees/                 # worktree registry (created once parallelism is enabled)
 ```
 
 ---
 
-## 配置项
+## Configuration
 
-统一放在 `.claude/.sdlc-config`（`KEY=VALUE` 格式，`sdlc-init` 自动生成并加入 `.gitignore`）。全局默认可放 `~/.claude/.sdlc-config`，项目级覆盖全局：
+All in `.claude/.sdlc-config` (`KEY=VALUE` format, generated by `sdlc-init` and added to `.gitignore`). Global defaults can go in `~/.claude/.sdlc-config`, with project-level overriding global:
 
-| 配置项 | 默认值 | 说明 |
-|--------|--------|------|
-| `TEST_FRAMEWORK` | `jest` | 单元测试框架（jest/vitest/mocha） |
-| `LINT_TOOL` | `eslint` | Lint 工具（eslint/biome） |
-| `E2E_FRAMEWORK` | `playwright` | 浏览器验收框架（qa 命令） |
-| `TEST_BOOTSTRAP_POLICY` | `report` | 测试基础设施缺口处理（report/auto/never） |
-| `REVIEW_MAX_ROUNDS` | `1` | Gate/Test 最大循环轮数 |
-| `GIT_BRANCH_PREFIX` | `feat/` | Git 分支前缀 |
-| `COMMIT_TYPE` | （空） | Conventional Commits type，留空按迭代 type 推断 |
-| `COMMIT_SCOPE` | （空） | Conventional Commits scope，留空自动推断 |
-| `PR_TEMPLATE` | （空） | 自定义 PR body 模板路径 |
+| Key | Default | Description |
+|-----|---------|-------------|
+| `TEST_FRAMEWORK` | `jest` | unit test framework (jest/vitest/mocha) |
+| `LINT_TOOL` | `eslint` | lint tool (eslint/biome) |
+| `E2E_FRAMEWORK` | `playwright` | browser QA framework (qa command) |
+| `TEST_BOOTSTRAP_POLICY` | `report` | how to handle missing test infra (report/auto/never) |
+| `REVIEW_MAX_ROUNDS` | `1` | max Gate/Test loop rounds |
+| `GIT_BRANCH_PREFIX` | `feat/` | git branch prefix |
+| `COMMIT_TYPE` | (empty) | Conventional Commits type; empty infers from iteration type |
+| `COMMIT_SCOPE` | (empty) | Conventional Commits scope; empty auto-infers |
+| `PR_TEMPLATE` | (empty) | path to a custom PR body template |
 
-提交统一遵循 [Conventional Commits 1.0.0](https://www.conventionalcommits.org/zh-hans/v1.0.0/)，权威定义见 [11-git-committer.md](sdlc-workflow/references/11-git-committer.md)。
+Commits follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/); the authoritative definition is in [11-git-committer.md](sdlc-workflow/references/11-git-committer.md).
 
 ---
 
 ## FAQ
 
-**Q: 没有 Codex CLI 能用吗？**
-> 能。Gate 是可选的（`--review` 时才启用）。但一旦启用，Codex 不可用会中止而不是跳过。
+**Q: Can I use it without Codex CLI?**
+> Yes. Gates are optional (enabled only with `--review`). But once enabled, an unavailable Codex aborts rather than skips.
 
-**Q: 为什么 accept 和 pr 要分开？**
-> accept 只在本地定稿（更新文档 + commit），方便你先 review 本地 diff；确认无误后再用 pr 推送发布。本地与远程解耦，出错好回退。
+**Q: Why are accept and pr separate?**
+> accept finalizes locally only (update docs + commit) so you can review the local diff; after confirming, use pr to push and ship. Decoupling local from remote makes rollback easy.
 
-**Q: 支持 TypeScript 以外的项目吗？**
-> 支持。配 `TEST_FRAMEWORK` 和 `LINT_TOOL` 即可，流程本身不依赖特定语言。
+**Q: Does it support projects other than TypeScript?**
+> Yes. Set `TEST_FRAMEWORK` and `LINT_TOOL`; the flow itself is language-agnostic.
 
-**Q: proposal / doit / mini 怎么选？**
-> 要审设计 → proposal + apply（+ qa + accept + pr）。完全信任 AI → doit。改 CSS / 文案 / 小 UI → mini。
+**Q: How do I choose between proposal / doit / mini?**
+> Need to review the design → proposal + apply (+ qa + accept + pr). Fully trust the AI → doit. CSS / copy / small UI tweak → mini.
 
-**Q: 会话中断了怎么办？**
-> 下个 session 读 `docs/iterations/` 和 `status.json` 的 phase 即可续跑，所有中间产物已持久化。
+**Q: What if the session is interrupted?**
+> The next session reads `docs/iterations/` and the `status.json` phase to resume; all intermediate artifacts are persisted.
 
-**Q: 全局规范和项目规范冲突怎么办？**
-> 项目级 `.claude/` 覆盖全局 `~/.claude/`，命令运行时参数（`--review`/`--qa`）优先级最高。
+**Q: What if global and project conventions conflict?**
+> Project-level `.claude/` overrides global `~/.claude/`; runtime command flags (`--review`/`--qa`) have the highest priority.
 
-**Q: 多个需求要并行开发怎么办？**
-> 用 `worktree create` 给每个需求开独立工作区，分支、端口、`.claude/.sdlc-config` 自动隔离，多个会话互不干扰，合并后 `worktree gc` 清理。
+**Q: What if I need to develop multiple requirements in parallel?**
+> Use `worktree create` to open an isolated work tree per requirement; branches, ports, and `.claude/.sdlc-config` are isolated automatically, sessions don't interfere, and `worktree gc` cleans up after merge.
 
 ---
 
-## 实践工程案例
+## Real-world engineering cases
 - https://github.com/evan-e2438927/btc-trade/pulls
-- [梦幻电影院-ERC20](https://movie.coinbasis.org/) ｜ 工程代码: https://github.com/evan-e2438927/dream-castle-cinema
+- [Dream Cinema — ERC20](https://movie.coinbasis.org/) ｜ source: https://github.com/evan-e2438927/dream-castle-cinema
 
 ---
 

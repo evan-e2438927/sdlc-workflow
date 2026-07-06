@@ -12,14 +12,15 @@ description: >-
 
 ## 步骤
 
+0. **统一上下文加载**（`LOAD_CONTEXT`，见 `references/context-loader.md`）：加载 `.claude/` 规范 + 自定义 skill 索引 `CTX.skills`。**不可跳过**——Codex 无 harness 自动发现，不加载则开发看不到用户扩展的 skills。
 1. 初始化迭代目录 `docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/`。
 2. 精简需求拆解（精简版 ①②③④，提取核心 AC）。
 3. [mini Gate 1] 仅 `--review`：Codex 轻量设计审查。
-4. 实现代码（单任务或小规模并行）。
+4. 实现代码（单任务或小规模并行）；**改代码前先查 `CTX.skills`，相关的优先调用（先 skill、后自造）**。
 5. 生成单元测试（聚焦核心 AC）。
 6. [mini Gate 2] 仅 `--review`：Codex 轻量代码审查。
 7. test-pipeline（lint + unit）。
-8. [qa] 仅 `--qa`：Playwright 浏览器功能验收。
+8. [qa] 仅 `--qa`：**按 `references/flow-qa.md` 执行**浏览器功能验收，含**通过态截图** → `tests/reports/<slug>/screenshots/`（gitignore，由 pr 经 `pr-assets` 分支嵌入 PR）。
 9. docs-updater（仅更新受影响章节）→ git-committer（本地 commit）→ pr-creator（push + PR）。
 
 **自动升级**：过程中发现影响 > 3 文件 / 改 API / 改数据模型 → 自动切换到 doit。**浏览器验收不精简**（最终通过标准）。
