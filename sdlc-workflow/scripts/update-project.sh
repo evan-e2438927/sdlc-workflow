@@ -12,6 +12,30 @@ PROJECT_ROOT="${1:-.}"
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CLAUDE_DIR="$PROJECT_ROOT/.claude"
 
+# 安装 PostToolUse 检查 hook + 合并 settings.json（幂等）
+install_sdlc_hook() {
+  local root="$1"
+  mkdir -p "$root/.claude/hooks"
+  cp "$SKILL_DIR/templates/hooks/sdlc-post-edit-check.sh" "$root/.claude/hooks/sdlc-post-edit-check.sh"
+  chmod +x "$root/.claude/hooks/sdlc-post-edit-check.sh"
+  local settings="$root/.claude/settings.json"
+  local tpl="$SKILL_DIR/templates/settings.json.tpl"
+  if [ ! -f "$settings" ]; then
+    cp "$tpl" "$settings"
+  elif command -v jq >/dev/null 2>&1; then
+    # 若尚无我们的 hook，则合并追加一个 PostToolUse 条目
+    if ! jq -e '.hooks.PostToolUse[]?.hooks[]? | select(.command|test("sdlc-post-edit-check"))' "$settings" >/dev/null 2>&1; then
+      local tmp; tmp="$(mktemp)"
+      jq --slurpfile add "$tpl" '
+        .hooks = (.hooks // {})
+        | .hooks.PostToolUse = ((.hooks.PostToolUse // []) + $add[0].hooks.PostToolUse)
+      ' "$settings" > "$tmp" && mv "$tmp" "$settings"
+    fi
+  else
+    echo "  ⚠ 已安装 hook 脚本，但缺少 jq 无法自动合并 settings.json；请手动把 templates/settings.json.tpl 的 PostToolUse 合并进 $settings" >&2
+  fi
+}
+
 if [ ! -f "$CLAUDE_DIR/CLAUDE.md" ]; then
   echo "❌ 项目尚未初始化（缺少 .claude/CLAUDE.md），请先运行 /sdlc-workflow:init"
   exit 1
@@ -150,6 +174,10 @@ if grep -q '务必先阅读 `docs/iterations/` 下的历史迭代' "$CLAUDEMD"; 
   perl -i -pe 's/\*\*在处理新需求时，务必先阅读 `docs\/iterations\/` 下的历史迭代\*\*/**在处理新需求时，先阅读 `docs\/iterations\/` 下最近 `HISTORY_ITER_DEPTH` 个迭代**（默认 2，`0`=全部；见 `.claude\/.sdlc-config`）的 requirements.md 与 design.md/g' "$CLAUDEMD"
   echo "  ✅ CLAUDE.md 历史迭代指令已迁移为 HISTORY_ITER_DEPTH（旧版备份: CLAUDE.md.bak）"
 fi
+
+# ── 5.2 安装/同步 PostToolUse 检查 hook（幂等）──
+install_sdlc_hook "$PROJECT_ROOT"
+echo "  ✅ PostToolUse 检查 hook 已安装/同步"
 
 # ── 6. .gitignore 兜底 ───────────────────────────────────────
 ensure_gitignore() {

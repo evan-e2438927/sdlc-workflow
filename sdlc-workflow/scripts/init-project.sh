@@ -36,6 +36,31 @@ copy_if_not_exists "$SKILL_DIR/templates/CODING_GUIDELINES.md.tpl"   "$PROJECT_R
 # SDLC 配置统一放到 .claude/.sdlc-config（替代旧的项目根 .env）
 copy_if_not_exists "$SKILL_DIR/templates/sdlc-config.tpl"            "$PROJECT_ROOT/.claude/.sdlc-config"
 
+# 安装 PostToolUse 检查 hook + 合并 settings.json（幂等）
+install_sdlc_hook() {
+  local root="$1"
+  mkdir -p "$root/.claude/hooks"
+  cp "$SKILL_DIR/templates/hooks/sdlc-post-edit-check.sh" "$root/.claude/hooks/sdlc-post-edit-check.sh"
+  chmod +x "$root/.claude/hooks/sdlc-post-edit-check.sh"
+  local settings="$root/.claude/settings.json"
+  local tpl="$SKILL_DIR/templates/settings.json.tpl"
+  if [ ! -f "$settings" ]; then
+    cp "$tpl" "$settings"
+  elif command -v jq >/dev/null 2>&1; then
+    # 若尚无我们的 hook，则合并追加一个 PostToolUse 条目
+    if ! jq -e '.hooks.PostToolUse[]?.hooks[]? | select(.command|test("sdlc-post-edit-check"))' "$settings" >/dev/null 2>&1; then
+      local tmp; tmp="$(mktemp)"
+      jq --slurpfile add "$tpl" '
+        .hooks = (.hooks // {})
+        | .hooks.PostToolUse = ((.hooks.PostToolUse // []) + $add[0].hooks.PostToolUse)
+      ' "$settings" > "$tmp" && mv "$tmp" "$settings"
+    fi
+  else
+    echo "  ⚠ 已安装 hook 脚本，但缺少 jq 无法自动合并 settings.json；请手动把 templates/settings.json.tpl 的 PostToolUse 合并进 $settings" >&2
+  fi
+}
+install_sdlc_hook "$PROJECT_ROOT"
+
 sync_config_var() {
   local file="$1"
   local key="$2"
