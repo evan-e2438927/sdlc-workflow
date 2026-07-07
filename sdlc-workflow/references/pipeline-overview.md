@@ -339,3 +339,4 @@ git diff (代码变更)   ──────→  🔍 Gate 2: code-reviewer
 | COMMIT_SCOPE | (空) | Conventional Commits scope（留空自动推断） |
 | PR_TEMPLATE | (空) | 自定义 PR body 模板路径 |
 | HISTORY_ITER_DEPTH | 2 | 读取历史迭代上下文的深度（最近 N 个迭代，0=全部） |
+| EDIT_CHECK | on | 每次 Edit/Write 后跑 LINT_TOOL 检查改动文件，失败时把错误反馈给模型（缺 linter 自动降级） |

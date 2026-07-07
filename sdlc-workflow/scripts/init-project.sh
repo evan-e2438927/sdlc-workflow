@@ -106,6 +106,7 @@ ensure_gitignore() {
 }
 ensure_gitignore ".claude/.sdlc-config"
 ensure_gitignore ".claude/.sdlc-config.local"
+ensure_gitignore ".claude/*.bak"
 # qa 二进制产物不入库（保留 tests/reports/*.md 验收报告）
 ensure_gitignore "# SDLC qa 二进制产物（保留 tests/reports/*.md）"
 ensure_gitignore "tests/reports/**/screenshots/"
