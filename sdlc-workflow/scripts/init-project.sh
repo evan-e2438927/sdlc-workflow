@@ -53,7 +53,7 @@ install_sdlc_hook() {
       jq --slurpfile add "$tpl" '
         .hooks = (.hooks // {})
         | .hooks.PostToolUse = ((.hooks.PostToolUse // []) + $add[0].hooks.PostToolUse)
-      ' "$settings" > "$tmp" && mv "$tmp" "$settings"
+      ' "$settings" > "$tmp" && mv "$tmp" "$settings" || rm -f "$tmp"
     fi
   else
     echo "  ⚠ 已安装 hook 脚本，但缺少 jq 无法自动合并 settings.json；请手动把 templates/settings.json.tpl 的 PostToolUse 合并进 $settings" >&2

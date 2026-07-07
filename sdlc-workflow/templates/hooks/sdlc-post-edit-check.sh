@@ -34,7 +34,10 @@ esac
 # Resolve linter; absent -> graceful no-op (do not spam a project without it)
 command -v "$LINT_TOOL" >/dev/null 2>&1 || exit 0
 
-OUT="$("$LINT_TOOL" "$FILE" 2>&1)"; RC=$?
+case "$LINT_TOOL" in
+  biome) OUT="$(biome lint "$FILE" 2>&1)"; RC=$? ;;
+  *)     OUT="$("$LINT_TOOL" "$FILE" 2>&1)"; RC=$? ;;
+esac
 if [ "$RC" -ne 0 ]; then
   {
     echo "[sdlc hook] ${LINT_TOOL} 检查未通过：$FILE"
