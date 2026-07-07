@@ -36,7 +36,7 @@ docs/iterations/
         └── status.json        # proposal/apply 状态
 ```
 
-**在处理新需求时，务必先阅读 `docs/iterations/` 下的历史迭代**，了解已有的设计决策、架构变更和业务上下文，避免：
+**在处理新需求时，先阅读 `docs/iterations/` 下最近 `HISTORY_ITER_DEPTH` 个迭代**（默认 2，`0`=全部；见 `.claude/.sdlc-config`）的 requirements.md 与 design.md，了解已有的设计决策、架构变更和业务上下文，避免：
 - 与已有设计冲突
 - 重复实现已存在的功能
 - 引入与历史决策矛盾的方案

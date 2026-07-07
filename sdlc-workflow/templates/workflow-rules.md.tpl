@@ -19,7 +19,7 @@
 - Codex Gate 默认使用 `codex exec --full-auto`
 - Codex CLI 不可用时必须中止，不能自动跳过 Gate
 - 测试文件统一存放 tests/ 目录（unit/ + e2e/ + reports/）
-- 新需求处理前必须参考 docs/iterations/ 历史上下文
+- 新需求处理前必须参考 docs/iterations/ 最近 HISTORY_ITER_DEPTH 个迭代的历史上下文（默认 2，0=全部；见 .claude/.sdlc-config）
 - 若项目已存在业务代码或工程结构，则进入 existing project mode，必须先生成：
   - `.claude/PROJECT_BASELINE.md`
   - `.claude/EXISTING_STRUCTURE.md`
