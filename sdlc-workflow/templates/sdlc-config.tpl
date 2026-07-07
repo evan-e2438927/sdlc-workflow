@@ -20,6 +20,11 @@ TEST_FRAMEWORK=jest
 # 测试执行前的静态检查（快速失败）
 LINT_TOOL=eslint
 
+# [可选] 编辑即检查   枚举: on | off   默认: on
+# PostToolUse hook 在每次 Edit/Write 后对改动的代码文件跑 LINT_TOOL；失败时把错误反馈给模型让其修复
+# （PostToolUse 不能硬阻断，编辑已发生）。缺少 linter 时自动降级为不反馈。
+EDIT_CHECK=on
+
 # [固定] E2E 框架   固定: playwright
 # qa 命令（步骤 ⑩）编写并通过 Playwright MCP 执行浏览器功能验收
 E2E_FRAMEWORK=playwright
