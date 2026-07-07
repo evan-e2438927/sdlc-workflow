@@ -142,6 +142,15 @@ EOF
   echo "  ＋ CLAUDE.md 追加「自定义 Skills」小节（旧版备份: CLAUDE.md.bak）"
 fi
 
+# ── 5.1 迁移历史迭代深度指令（用户 CLAUDE.md 不被整体覆盖，做定向替换）──
+CLAUDEMD="$CLAUDE_DIR/CLAUDE.md"
+if grep -q '务必先阅读 `docs/iterations/` 下的历史迭代' "$CLAUDEMD"; then
+  cp "$CLAUDEMD" "$CLAUDEMD.bak"
+  # 用 perl 做整行替换，避免 sed 在不同平台对中文/反引号的转义差异
+  perl -i -pe 's/\*\*在处理新需求时，务必先阅读 `docs\/iterations\/` 下的历史迭代\*\*/**在处理新需求时，先阅读 `docs\/iterations\/` 下最近 `HISTORY_ITER_DEPTH` 个迭代**（默认 2，`0`=全部；见 `.claude\/.sdlc-config`）的 requirements.md 与 design.md/g' "$CLAUDEMD"
+  echo "  ✅ CLAUDE.md 历史迭代指令已迁移为 HISTORY_ITER_DEPTH（旧版备份: CLAUDE.md.bak）"
+fi
+
 # ── 6. .gitignore 兜底 ───────────────────────────────────────
 ensure_gitignore() {
   local pattern="$1"
