@@ -42,13 +42,19 @@ IF INTERACTIVE AND any(x.provenance == "never-asked" for x in MUST_ASK):
 
 ### 1. 读取历史上下文
 
-在生成新设计前，读取最近 N 个迭代的 design.md，了解已有设计：
+在生成新设计前，读取**最近 `HISTORY_ITER_DEPTH` 个迭代**（默认 2，`0`=全部；取自 `.claude/.sdlc-config`）
+的 requirements.md + design.md，了解已有需求与设计：
 
 ```bash
-# 读取最近 3 个迭代的设计文档
+# 读取最近 N 个迭代（N = HISTORY_ITER_DEPTH，0 表示全部）
+DEPTH="${HISTORY_ITER_DEPTH:-2}"
 HISTORY_DIR="docs/iterations/"
-LATEST_DESIGNS=$(find "$HISTORY_DIR" -name "design.md" -type f \
-  | sort -r | head -3 | xargs -I{} cat {})
+ITER_DIRS=$(find "$HISTORY_DIR" -mindepth 2 -maxdepth 2 -type d | sort -r)
+if [ "$DEPTH" -gt 0 ]; then ITER_DIRS=$(printf '%s\n' "$ITER_DIRS" | head -n "$DEPTH"); fi
+HISTORY=$(printf '%s\n' "$ITER_DIRS" | while read -r d; do
+  [ -z "$d" ] && continue
+  cat "$d/requirements.md" "$d/design.md" 2>/dev/null
+done)
 
 # 分析历史设计要点
 # - 已有模块和组件
@@ -250,9 +256,11 @@ REQ_FILE="docs/iterations/$DATE/$SEQ-$SLUG-$TYPE/requirements.md"
 ARCH_FILE=".claude/ARCHITECTURE.md"
 SEC_FILE=".claude/SECURITY.md"
 
-# 2. 读取历史上下文（最近 3 个迭代）
-HISTORY=$(find docs/iterations/ -name "design.md" -type f \
-  | sort -r | head -3 | xargs -I{} cat {})
+# 2. 读取历史上下文（最近 HISTORY_ITER_DEPTH 个迭代，0=全部；读 requirements.md + design.md）
+DEPTH="${HISTORY_ITER_DEPTH:-2}"
+ITER_DIRS=$(find docs/iterations/ -mindepth 2 -maxdepth 2 -type d | sort -r)
+[ "$DEPTH" -gt 0 ] && ITER_DIRS=$(printf '%s\n' "$ITER_DIRS" | head -n "$DEPTH")
+HISTORY=$(printf '%s\n' "$ITER_DIRS" | while read -r d; do [ -n "$d" ] && cat "$d/requirements.md" "$d/design.md" 2>/dev/null; done)
 
 # 3. 生成设计文档
 cat > "docs/iterations/$DATE/$SEQ-$SLUG-$TYPE/design.md" << 'TEMPLATE'
