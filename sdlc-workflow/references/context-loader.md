@@ -42,7 +42,7 @@ existing project 额外加载项目级基线（仅 `<project>/.claude/`）：
 <project>/.claude/TEST_BASELINE.md
 ```
 
-运行时配置：`<project>/.claude/.sdlc-config`（TEST_FRAMEWORK / LINT_TOOL / GIT_BRANCH_PREFIX 等，
+运行时配置：`<project>/.claude/.sdlc-config`（TEST_FRAMEWORK / LINT_TOOL / GIT_BRANCH_PREFIX / HISTORY_ITER_DEPTH 等，
 KEY=VALUE 格式），缺省回退到全局 `~/.claude/.sdlc-config`，再回退到内置默认。
 （旧的项目根 `.env` 已废弃，配置统一收敛到 `.claude/.sdlc-config`。）
 

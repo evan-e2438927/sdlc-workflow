@@ -338,3 +338,4 @@ git diff (代码变更)   ──────→  🔍 Gate 2: code-reviewer
 | COMMIT_TYPE | (空) | Conventional Commits type（留空按迭代 type 推断） |
 | COMMIT_SCOPE | (空) | Conventional Commits scope（留空自动推断） |
 | PR_TEMPLATE | (空) | 自定义 PR body 模板路径 |
+| HISTORY_ITER_DEPTH | 2 | 读取历史迭代上下文的深度（最近 N 个迭代，0=全部） |
