@@ -62,6 +62,17 @@ done)
 # - 已有的技术决策
 ```
 
+### 1.5 复核项目 skill 规范（CTX.skills）
+
+在生成设计前，复核统一上下文加载得到的 `CTX.skills`（来源 `~/.claude/skills/` 与
+`<project>/.claude/skills/`）：识别 `description` 与本设计相关的项目规范 skill。
+
+- 设计必须与命中的项目规范一致；`design.md` 新增一节「## 遵循的项目规范」，逐条列出
+  命中的 skill 名 + 依据要点。
+- 若设计与某项目规范冲突，**不得静默假设**：按 §0 澄清门禁登记为设计假设/澄清项，
+  交互模式下先发起澄清。
+- 命中的规范会在 ④ task-generator 阶段被下沉到每个任务的「适用规范」字段。
+
 ### 2. 设计文档结构
 
 生成的 design.md 包含以下章节：
@@ -242,10 +253,11 @@ Claude Code 在生成设计时应参考：
 3. 可扩展性
 4. 简单性（避免过度设计）
 5. 已有历史迭代中的设计模式
-6. 默认遵循 Better-T-Stack 风格目录：`apps/web`、`apps/server`、`packages/*`
-7. `packages/config` 为基础包；`packages/env`、`packages/api`、`packages/auth`、`packages/db`、`packages/infra`、`packages/ui` 按所选能力启用
-8. 共享逻辑优先下沉到 `packages/*`，不要在前后端复制
-9. 不要无理由新增根目录级 `web/`、`server/`、`api/`
+6. 项目自定义 skill（CTX.skills）中与本设计相关的规范约定，设计必须与之一致
+7. 默认遵循 Better-T-Stack 风格目录：`apps/web`、`apps/server`、`packages/*`
+8. `packages/config` 为基础包；`packages/env`、`packages/api`、`packages/auth`、`packages/db`、`packages/infra`、`packages/ui` 按所选能力启用
+9. 共享逻辑优先下沉到 `packages/*`，不要在前后端复制
+10. 不要无理由新增根目录级 `web/`、`server/`、`api/`
 ```
 
 ## 命令模板
