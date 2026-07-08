@@ -69,6 +69,7 @@ $(cat .claude/SECURITY.md)"
 | 目录结构 | workspace 落位正确 | Web 在 `apps/web`，Server 在 `apps/server`，共享逻辑在 `packages/*` |
 | **AC 覆盖度** | **需求级 AC 到任务级 AC 的映射完整性** | **见下方 AC 覆盖度检查规则** |
 | **Track 一致性** | **每个任务声明 Track 且与目标文件路径自洽** | **见下方 Track 一致性检查规则** |
+| **项目规范一致性** | **design.md「遵循的项目规范」与 CTX.skills 命中项是否一致、tasks.md 每任务是否有适用规范字段** | **命中的项目规范全部被遵循，无静默冲突** |
 | **澄清完备性** | **被假设驱动的设计决策是否已显式登记并澄清** | **交互模式下无 never-asked 的设计影响项；假设决策均登记在「设计假设」小节** |
 
 ### 2.1 AC 覆盖度检查规则（Gate 1 必做）
@@ -110,6 +111,8 @@ AC_COVERAGE_CHECK:
    - tasks.md 中的 AC 是否保留了 Given-When-Then 格式
    - 是否存在模糊的、不可验证的 AC 描述
    - 每个 Requirement 是否至少覆盖了 happy-path 和 error 两个场景维度
+8) 项目规范一致性:
+   - design.md 是否声明了「遵循的项目规范」，且与 CTX.skills 中相关 skill 一致；tasks.md 每个任务是否都带「适用规范」字段（无相关规范应显式写 "无"）
 ```
 
 ### 2.2 Track 一致性检查规则（Gate 1 必做）

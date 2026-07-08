@@ -20,6 +20,12 @@ TEST_FRAMEWORK=jest
 # 测试执行前的静态检查（快速失败）
 LINT_TOOL=eslint
 
+# [可选] 编辑即检查   枚举: on | off   默认: on
+# PostToolUse hook 在每次 Edit/Write 后对改动的代码文件跑 LINT_TOOL；失败时把错误反馈给模型让其修复
+# （PostToolUse 不能硬阻断，编辑已发生）。缺少 linter 时自动降级为不反馈。
+# 注：仅当 LINT_TOOL 可在 PATH 解析到时才运行；仅装在 node_modules/.bin 的项目本地 linter 会被跳过。
+EDIT_CHECK=on
+
 # [固定] E2E 框架   固定: playwright
 # qa 命令（步骤 ⑩）编写并通过 Playwright MCP 执行浏览器功能验收
 E2E_FRAMEWORK=playwright
@@ -38,6 +44,15 @@ TEST_BOOTSTRAP_POLICY=report
 # Gate1(设计审查)、Gate2(代码审查)、测试修复 各环节的最大重试次数
 # 超过仍未通过 → 中止 Pipeline → 等待人工介入（仅 --review 时生效 Gate）
 REVIEW_MAX_ROUNDS=1
+
+# ──────────────────────────────────────────────────────────────
+# 上下文 / 历史
+# ──────────────────────────────────────────────────────────────
+
+# [可选] 读取历史迭代上下文的深度   类型: 非负整数   默认: 2
+# proposal / doit / mini 在生成设计时，只参考最近 N 个迭代目录（按 日期/序号 逆序）。
+# 0 = 读取全部历史（旧行为，适合大重构）。每个迭代读 requirements.md + design.md。
+HISTORY_ITER_DEPTH=2
 
 # ──────────────────────────────────────────────────────────────
 # Git / PR 配置（Conventional Commits）

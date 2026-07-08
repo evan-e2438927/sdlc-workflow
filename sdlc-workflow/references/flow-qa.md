@@ -22,6 +22,7 @@ Playwright 脚本，并通过 Playwright MCP 在真实浏览器中执行功能�
 
 - `status.json` 中 `phase == "applied"`
 - Playwright MCP 可用
+- 执行前经统一上下文加载（见 `references/context-loader.md`），使编写测试脚本时也消费 `CTX.skills` 与编码规范
 
 ## 步骤一：编写自动化测试脚本
 

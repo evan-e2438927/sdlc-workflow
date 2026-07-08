@@ -42,19 +42,36 @@ IF INTERACTIVE AND any(x.provenance == "never-asked" for x in MUST_ASK):
 
 ### 1. 读取历史上下文
 
-在生成新设计前，读取最近 N 个迭代的 design.md，了解已有设计：
+在生成新设计前，读取**最近 `HISTORY_ITER_DEPTH` 个迭代**（默认 2，`0`=全部；取自 `.claude/.sdlc-config`）
+的 requirements.md + design.md，了解已有需求与设计：
 
 ```bash
-# 读取最近 3 个迭代的设计文档
+# 读取最近 N 个迭代（N = HISTORY_ITER_DEPTH，0 表示全部）
+DEPTH="${HISTORY_ITER_DEPTH:-2}"
 HISTORY_DIR="docs/iterations/"
-LATEST_DESIGNS=$(find "$HISTORY_DIR" -name "design.md" -type f \
-  | sort -r | head -3 | xargs -I{} cat {})
+ITER_DIRS=$(find "$HISTORY_DIR" -mindepth 2 -maxdepth 2 -type d | sort -r)
+if [ "$DEPTH" -gt 0 ]; then ITER_DIRS=$(printf '%s\n' "$ITER_DIRS" | head -n "$DEPTH"); fi
+HISTORY=$(printf '%s\n' "$ITER_DIRS" | while read -r d; do
+  [ -z "$d" ] && continue
+  cat "$d/requirements.md" "$d/design.md" 2>/dev/null
+done)
 
 # 分析历史设计要点
 # - 已有模块和组件
 # - 设计模式和约定
 # - 已有的技术决策
 ```
+
+### 1.5 复核项目 skill 规范（CTX.skills）
+
+在生成设计前，复核统一上下文加载得到的 `CTX.skills`（来源 `~/.claude/skills/` 与
+`<project>/.claude/skills/`）：识别 `description` 与本设计相关的项目规范 skill。
+
+- 设计必须与命中的项目规范一致；`design.md` 新增一节「## 遵循的项目规范」，逐条列出
+  命中的 skill 名 + 依据要点。
+- 若设计与某项目规范冲突，**不得静默假设**：按 §0 澄清门禁登记为设计假设/澄清项，
+  交互模式下先发起澄清。
+- 命中的规范会在 ④ task-generator 阶段被下沉到每个任务的「适用规范」字段。
 
 ### 2. 设计文档结构
 
@@ -236,10 +253,11 @@ Claude Code 在生成设计时应参考：
 3. 可扩展性
 4. 简单性（避免过度设计）
 5. 已有历史迭代中的设计模式
-6. 默认遵循 Better-T-Stack 风格目录：`apps/web`、`apps/server`、`packages/*`
-7. `packages/config` 为基础包；`packages/env`、`packages/api`、`packages/auth`、`packages/db`、`packages/infra`、`packages/ui` 按所选能力启用
-8. 共享逻辑优先下沉到 `packages/*`，不要在前后端复制
-9. 不要无理由新增根目录级 `web/`、`server/`、`api/`
+6. 项目自定义 skill（CTX.skills）中与本设计相关的规范约定，设计必须与之一致
+7. 默认遵循 Better-T-Stack 风格目录：`apps/web`、`apps/server`、`packages/*`
+8. `packages/config` 为基础包；`packages/env`、`packages/api`、`packages/auth`、`packages/db`、`packages/infra`、`packages/ui` 按所选能力启用
+9. 共享逻辑优先下沉到 `packages/*`，不要在前后端复制
+10. 不要无理由新增根目录级 `web/`、`server/`、`api/`
 ```
 
 ## 命令模板
@@ -250,9 +268,11 @@ REQ_FILE="docs/iterations/$DATE/$SEQ-$SLUG-$TYPE/requirements.md"
 ARCH_FILE=".claude/ARCHITECTURE.md"
 SEC_FILE=".claude/SECURITY.md"
 
-# 2. 读取历史上下文（最近 3 个迭代）
-HISTORY=$(find docs/iterations/ -name "design.md" -type f \
-  | sort -r | head -3 | xargs -I{} cat {})
+# 2. 读取历史上下文（最近 HISTORY_ITER_DEPTH 个迭代，0=全部；读 requirements.md + design.md）
+DEPTH="${HISTORY_ITER_DEPTH:-2}"
+ITER_DIRS=$(find docs/iterations/ -mindepth 2 -maxdepth 2 -type d | sort -r)
+[ "$DEPTH" -gt 0 ] && ITER_DIRS=$(printf '%s\n' "$ITER_DIRS" | head -n "$DEPTH")
+HISTORY=$(printf '%s\n' "$ITER_DIRS" | while read -r d; do [ -n "$d" ] && cat "$d/requirements.md" "$d/design.md" 2>/dev/null; done)
 
 # 3. 生成设计文档
 cat > "docs/iterations/$DATE/$SEQ-$SLUG-$TYPE/design.md" << 'TEMPLATE'

@@ -27,6 +27,7 @@
 9. 禁止验收标准退化为模糊 checkbox（如 "功能正常"、"数据正确"），必须含可验证的具体值或条件
 10. 每个任务必须显式声明 Track（frontend / backend / shared / infra / unit-test / qa），且与目标文件路径自洽；跨端任务必须拆为多个任务，禁止一个任务跨 Track
 11. `unit-test` / `qa` Track 仅出现在 Phase 3；Phase 1/2 实现任务自带的单元测试不算独立 Track。`qa` Track 只写浏览器验收规格（Given-When-Then + 选择器约束），不写实现代码——脚本由 `qa` 命令生成执行
+12. 每个任务必须声明「适用规范」字段：从 design.md 的「遵循的项目规范」中挑出与本任务目标文件相关的规范，列出 skill 名 + 一句要点；无相关规范写 "无"，不得省略字段
 ```
 
 ### 2. 任务结构
@@ -43,6 +44,8 @@
 - packages/auth/src/index.ts
 
 **Track**: backend
+
+**适用规范**: <该任务涉及的项目 skill 名 + 一句要点；若无相关项目规范则写 "无">
 
 **Requirement IDs**:
 - R-001

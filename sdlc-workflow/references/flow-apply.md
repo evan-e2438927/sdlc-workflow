@@ -103,8 +103,9 @@ apply 通常在**独立会话**里跑（与 proposal 分开），必须重新经
 读取 $ITER_DIR/tasks.md → 获取任务列表
 
 ⑥ Claude Code 开发
-   ⑥.0 开发前先查 CTX.skills：与任务相关的自定义 skill 优先调用（先 skill、后自造，
-        正文调用时才加载；见 context-loader.md「skills 优先级规则」）
+   ⑥.0 每个任务**执行前**，先读该任务的「适用规范」字段，对照命中的项目 skill
+        （必要时才加载其正文；先 skill、后自造，见 context-loader.md「skills 优先级规则」）。
+        规范检查是逐任务的，不是开发前一次性的——避免长会话注意力漂移。
    只实现 frontend / backend / unit-test 三类 track 的任务
    （track: qa 的任务不在此实现，留给 qa 命令）
    解析 tasks.md 依赖关系，构建拓扑分层
