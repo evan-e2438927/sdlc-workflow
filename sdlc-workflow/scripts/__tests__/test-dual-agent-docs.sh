@@ -32,6 +32,7 @@ has   "$R/04-task-generator.md"   '**角色并行提示**'
 lacks "$R/04-task-generator.md"   'Agent Team 并行提示'
 has   "$R/05-design-reviewer.md"  '### 2.3 接口契约检查规则（Gate 1 必做）'
 has   "$R/05-design-reviewer.md"  '10) 接口契约:'
+n=$(grep -c '10) 接口契约' "$R/05-design-reviewer.md"); [ "$n" = "3" ] || { echo "FAIL: 05 item 10 出现 $n 次，应为 3"; fail=1; }
 
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1

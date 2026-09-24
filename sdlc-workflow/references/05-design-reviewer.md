@@ -41,6 +41,10 @@ codex exec --full-auto "审查以下设计文档和任务分解。
    - design.md 中凡解决了 requirements.md 里 [❓待确认] / [⚠️ 假设] 项的技术决策，是否都在「设计假设」小节显式登记（含关联 ASM-ID + 理由 + 假设错误的影响）
    - 是否存在把假设当既定事实、未经标注就写进设计正文的决策
    - 交互模式（proposal/mini）下，是否存在 provenance=never-asked（从未提问）却影响设计的低置信度项——若有则 FAIL，要求先澄清
+10) 接口契约:
+   - 同时有 frontend 与 backend 任务时，design.md 是否有「接口契约」接口表，契约形态是否与项目实际一致
+   - tasks.md 引用的接口是否都在契约中；ts-types 形态是否有 Phase 1 契约落地任务
+   - frontend 任务是否存在"仅为获知接口形状"而依赖 backend 任务的情况
 
 给出 PASS/FAIL 及具体问题列表。
 
@@ -314,6 +318,10 @@ while [ $round -le $max_rounds ]; do
    - design.md 中凡解决了 requirements.md 里 [❓待确认] / [⚠️ 假设] 项的技术决策，是否都在「设计假设」小节显式登记（含关联 ASM-ID + 理由 + 假设错误的影响）
    - 是否存在把假设当既定事实、未经标注就写进设计正文的决策
    - 交互模式（proposal/mini）下，是否存在 provenance=never-asked（从未提问）却影响设计的低置信度项——若有则 FAIL，要求先澄清
+10) 接口契约:
+   - 同时有 frontend 与 backend 任务时，design.md 是否有「接口契约」接口表，契约形态是否与项目实际一致
+   - tasks.md 引用的接口是否都在契约中；ts-types 形态是否有 Phase 1 契约落地任务
+   - frontend 任务是否存在"仅为获知接口形状"而依赖 backend 任务的情况
 
 给出 PASS/FAIL 及具体问题列表。
 
