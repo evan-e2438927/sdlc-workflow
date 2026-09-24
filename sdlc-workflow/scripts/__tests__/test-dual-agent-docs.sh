@@ -71,5 +71,14 @@ lacks "$S" '1. **单 Agent 模式**'
 lacks "$S" '步骤⑥ Claude Code 开发'
 lacks "$F" 'Claude Code 开发'
 
+# ── Task 6: 测试角色 + skill 入口 + mini ──
+has   "$R/07-test-generator.md" '# 步骤 ⑦: Test Generator — 查漏补缺（test 角色）'
+has   "$R/07-test-generator.md" '执行者：test 角色'
+has   "$R/07-test-generator.md" '$ITER_DIR/tracks/test.md'
+has   "$REPO_DIR/skills/sdlc-apply/SKILL.md" '--agents single|multi'
+has   "$REPO_DIR/skills/sdlc-apply/SKILL.md" '⑥.1 打地基'
+lacks "$REPO_DIR/skills/sdlc-apply/SKILL.md" 'Agent Team'
+has   "$REPO_DIR/skills/sdlc-doit/SKILL.md"  '--agents single|multi'
+has   "$R/flow-mini.md" '执行模式固定 single'
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1

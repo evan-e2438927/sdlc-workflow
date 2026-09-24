@@ -16,10 +16,11 @@ description: >-
 - 不写 `pending_review` 暂停点，不等人工审核，直接需求到 PR。
 - 低置信度需求**自动 assume**（无人值守），不发起询问，标注 `[⚠️ 假设: ...]`，provenance=never-asked。
 - `--review` 启用 Gate 1 + Gate 2；`--qa` 在提交前插入步骤 ⑩ 浏览器功能验收。
+- `--agents single|multi` 同 apply，决定开发阶段（⑥ ⑦）的执行模式；未指定时读 `AGENT_MODE`（默认 auto）。
 
 ## 步骤
 
-⓪ 初始化 + 统一上下文加载 → ①②③④ 需求拆解（clarifier auto-assume）→ [⑤ Gate 1] → ⑥⑦ 开发 + 单测 → [⑧ Gate 2] → ⑨ lint+unit → [⑩ qa] → ⑪⑫ 文档 + 本地 commit → ⑬ push + PR。
+⓪ 初始化 + 统一上下文加载 → ①②③④ 需求拆解（clarifier auto-assume）→ [⑤ Gate 1] → ⑥ 开发（打地基 → 前后端角色 → 汇总）→ ⑦ 查漏 → [⑧ Gate 2] → ⑨ lint+unit → [⑩ qa] → ⑪⑫ 文档 + 本地 commit → ⑬ push + PR。
 
 完成输出 `✅ PR: <url> | 变更: N files | 测试: 全部通过`。
 
