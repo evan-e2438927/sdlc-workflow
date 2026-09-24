@@ -277,6 +277,7 @@ worktree 内 `<project>` 指向该 worktree 根目录，全局级仍为 `~/.clau
 | LINT_TOOL | eslint | Lint 工具（eslint/biome） |
 | TEST_BOOTSTRAP_POLICY | report | 测试基础设施缺口处理（report/auto/never） |
 | REVIEW_MAX_ROUNDS | 1 | Codex 审查最大轮数（--review 时生效） |
+| AGENT_MODE | auto | apply 执行模式（auto / single / multi），运行时 `--agents` 覆盖；见 references/flow-apply.md |
 | GIT_BRANCH_PREFIX | feat/ | Git 分支前缀 |
 | COMMIT_TYPE | (空) | Conventional Commits type，留空则按迭代 type 推断 |
 | COMMIT_SCOPE | (空) | Conventional Commits scope，留空则自动推断 |
