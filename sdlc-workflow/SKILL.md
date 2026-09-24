@@ -528,6 +528,7 @@ IF 当前为 apply 模式:
 ```
 MODE = resolve_agent_mode()            # flow-apply.md「执行模式选择」→ status.json.agent_mode
 WPS  = pack_work_packages(tasks.md)    # ⑥.0 按 Track 打包：角色说明 + 任务 + 接口契约 + 规范
+IF MODE == "multi": write_allow_lists(WPS)   # ⑥.0 允许清单 + 标记文件，越界守卫据此在写入前拦截
 foundation(WPS.infra, WPS.shared)      # ⑥.1 主 agent：infra/shared 任务 + 契约落地 + 安装新增依赖
 IF MODE == "multi":
   parallel(dispatch("sdlc-backend-dev", WPS.backend),

@@ -333,6 +333,7 @@ apply（及 doit）的开发阶段支持两种执行模式，流程相同、产�
 - 临时覆盖：`sdlc-apply --agents single|multi <迭代目录>`。
 - 前后端并行的依据是 proposal 阶段产出的「接口契约」（design.md 结构化表格；TS monorepo 额外生成 `packages/contracts` 共享类型；已有 OpenAPI 则沿用）。
 - 公共文件（`package.json`、lockfile、根配置、契约文件）只由主 agent 修改；各角色只改自己的路径，完成后写 `tracks/<track>.md` 汇报，主 agent 汇总时做越界检测。
+- multi 模式另有**越界守卫**（PreToolUse hook，`EDIT_GUARD=on`）：主 agent 在 ⑥.0 为每个角色生成允许清单，角色子 agent 写清单外的文件会在写入前被拒绝，转为 blocked 交主 agent 处理。
 
 详见 [flow-apply.md](sdlc-workflow/references/flow-apply.md) 与 [roles/](sdlc-workflow/references/roles/)。
 

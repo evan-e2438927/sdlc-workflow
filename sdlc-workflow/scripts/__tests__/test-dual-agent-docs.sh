@@ -120,9 +120,8 @@ n=$(grep -c '=== tracks 汇报 ===' "$R/08-code-reviewer.md"); [ "$n" = "3" ] ||
 # F3: 测试文件归属路径在 04/05/roles/tpl 间同步
 has "$R/04-task-generator.md" 'references/track-paths.md'
 has "$R/05-design-reviewer.md" 'TRACK_PATH_RULES = references/track-paths.md 的 tracks 字段'
-has "$R/roles/backend.md" 'tests/unit/packages/api/**'
-has "$R/roles/backend.md" 'tests/unit/packages/db/**'
-has "$R/roles/frontend.md" 'tests/unit/packages/ui/**'
+has "$R/track-paths.md" '"tests/unit/packages/api/"'
+has "$R/track-paths.md" '"tests/unit/packages/ui/"'
 has "$SKILL_DIR/templates/workflow-rules.md.tpl" 'packages/contracts/*'
 
 # F4: 历史迭代兼容（旧标题 fallback）
@@ -182,6 +181,22 @@ has   "$R/03-design-generator.md" '沿用既有惯例'
 has   "$R/05-design-reviewer.md"  '登记了沿用既有惯例的理由'
 lacks "$SKILL_DIR/templates/sdlc-config.tpl" '仅装在 node_modules/.bin 的项目本地 linter 会被跳过'
 has   "$SKILL_DIR/templates/sdlc-config.tpl" '优先使用离被改文件最近的 node_modules/.bin'
+
+# ── 越界守卫：flow / SKILL / roles / README ──
+has   "$F" '## 越界守卫'
+has   "$F" 'tracks/.allow-<role>'
+has   "$F" '.claude/.sdlc-active-iteration'
+has   "$F" '允许清单: <'
+has   "$F" '被越界守卫拒绝写入'
+has   "$F" '只有 `*` 是通配符'
+has   "$S" 'write_allow_lists(WPS)'
+for role in backend frontend test; do
+  has "$R/roles/$role.md" 'references/track-paths.md'
+  has "$R/roles/$role.md" "tracks/.allow-$role"
+  has "$R/roles/$role.md" '[sdlc guard]'
+done
+has   "$REPO_DIR/README.zh-CN.md" '越界守卫'
+has   "$REPO_DIR/README.md"       'out-of-bounds guard'
 
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1

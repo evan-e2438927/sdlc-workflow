@@ -333,6 +333,7 @@ The build phase of apply (and doit) runs in one of two modes. The flow and the o
 - One-off override: `sdlc-apply --agents single|multi <iter dir>`.
 - Frontend and backend work in parallel against the interface contract produced during proposal (a structured table in design.md; shared types in `packages/contracts` for TS monorepos; an existing OpenAPI file is reused).
 - Only the main agent edits shared files (`package.json`, lockfiles, root config, the contract file). Each role edits only its own paths and writes a `tracks/<track>.md` report; the main agent checks for out-of-bounds edits when merging.
+- Multi mode also has an **out-of-bounds guard** (a PreToolUse hook, `EDIT_GUARD=on`): at ⑥.0 the main agent writes an allow list per role, and a role sub-agent's write to any file outside it is refused before it happens and turned into a blocked report for the main agent.
 
 See [flow-apply.md](sdlc-workflow/references/flow-apply.md) and [roles/](sdlc-workflow/references/roles/) (Chinese).
 

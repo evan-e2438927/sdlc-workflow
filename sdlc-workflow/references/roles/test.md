@@ -11,9 +11,8 @@
 - 完成后按 `references/roles/track-report.md` 写汇报到 `$ITER_DIR/tracks/test.md`
 
 ## 可改路径白名单
-- `tests/unit/**`（路径镜像 workspace：`tests/unit/web|server|packages`）
-- `tests/reports/<slug>-coverage.md`
-- `$ITER_DIR/tracks/test.md`
+- **multi 模式**：以工作包附带的允许清单 `$ITER_DIR/tracks/.allow-test` 为准（所有开发任务目标文件对应的测试文件、unit-test 任务目标文件、`tests/unit/**`、覆盖率报告、本汇报文件 `$ITER_DIR/tracks/test.md`）；清单外的写入会被越界守卫拒绝
+- **single 模式 / 清单缺失**：`references/track-paths.md` 的 `tracks.unit-test`（`tests/unit/**`，路径镜像 workspace）、与源码同目录的 `*.test.*` / `*.spec.*`、`tests/reports/<slug>-coverage.md`、`$ITER_DIR/tracks/test.md`
 
 ## 必读
 1. 工作包附带的规范上下文（CODING_GUIDELINES 摘录 + 自定义 skill 索引）与 `TEST_FRAMEWORK`
@@ -29,3 +28,4 @@
 ## 遇到阻塞
 新增用例因源码缺陷而失败时：不改源码，保留失败用例，在汇报「与设计的偏差」写明缺陷与复现方式，状态记 `partial`。
 需要新增测试依赖（修改 `package.json`）时：状态标 `blocked`，在「公共文件修改请求」写明。
+被越界守卫拒绝写入（stderr 以 `[sdlc guard]` 开头）时，同样按上述 blocked 处理，不要改用 Bash 等方式绕过。

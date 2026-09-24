@@ -115,6 +115,8 @@ apply 通常在**独立会话**里跑（与 proposal 分开），必须重新经
         按 Track 生成工作包（WP）：
           WP = 角色说明全文（references/roles/<track>.md）+ 该 Track 任务（依赖顺序、目标文件、
                适用规范、AC）+ design.md「## 3. 接口契约」+ 规范上下文（LOAD_CONTEXT 摘录）
+        生成允许清单（仅 multi，规则见「越界守卫」）：为 backend / frontend / test 各写
+          $ITER_DIR/tracks/.allow-<role>，并写标记文件 .claude/.sdlc-active-iteration（内容为 $ITER_DIR）
         所有角色在每个任务**执行前**，先读该任务的「适用规范」字段，对照命中的项目 skill
         （必要时才加载其正文；先 skill、后自造，见 context-loader.md「skills 优先级规则」）。
         规范检查是逐任务的，不是开发前一次性的——避免长会话注意力漂移。
@@ -141,6 +143,7 @@ apply 通常在**独立会话**里跑（与 proposal 分开），必须重新经
    status.json: pipeline_stage=test-audit，tracks.test 随进度更新
 ⑦.1 汇总（主 agent）：读 tracks/test.md → 越界检测 → 回写 unit-test 任务
      → 对 unit-test 任务重跑一次 ⑥.5 式勾选属实自检 → status.json: pipeline_stage=merge（显式再写一次，标记本轮汇总完成）
+     → 删除 .claude/.sdlc-active-iteration（multi；中止 / 转人工介入前也要删除）
 
 [⑧ code-reviewer (Gate 2)   ← 仅 --review 模式]
    Codex CLI 审查代码（含契约一致性与越界检查）
@@ -208,6 +211,7 @@ LOG "🤖 执行模式: $MODE（$REASON）"
 接口契约: <design.md「## 3. 接口契约」整节 + 契约文件路径>
 规范上下文: <ARCHITECTURE / SECURITY / CODING_GUIDELINES 相关摘录 + CTX.skills 索引>
 测试命令: TEST_FRAMEWORK=<值>，LINT_TOOL=<值>
+允许清单: <$ITER_DIR/tracks/.allow-<track> 全文>（清单外的 Edit/Write 会在写入前被越界守卫拒绝）
 
 完成后：写 <ITER_DIR>/tracks/<track>.md，并在最终回复中给出与其相同的内容。
 ```
@@ -247,10 +251,46 @@ FOR 每条「公共文件修改请求」: 主 agent 评估后执行（如安装�
 子 agent 的 Edit/Write 同样触发 PostToolUse 编辑检查 hook（已在真实项目实测：hook 输入带 `agent_id` / `agent_type`，
 报错会反馈给该子 agent 自行修复），因此汇总阶段不再重复跑 `LINT_TOOL`；最终的全量 lint 由 ⑨ test-pipeline 负责。
 
+## 越界守卫
+
+multi 模式下，⑥.0 由主 agent 为每个角色生成允许清单，PreToolUse hook（`.claude/hooks/sdlc-pre-edit-guard.sh`，
+`EDIT_GUARD=on` 时生效）在角色子 agent 写文件**之前**对照清单，清单外的写入直接拒绝。single 模式由主 agent 执行，
+hook 输入没有 `agent_type`，守卫不生效，照旧靠角色自觉 + 汇总越界检测。
+
+**允许清单生成**（路径规则来源：`references/track-paths.md`）：
+
+```
+PUBLIC = track-paths.public_files ∪ { design.md「契约文件」 }
+TEST_SIBLINGS(f) = { dirname(f)/stem(f).{test,spec}.ext(f) }
+                   ∪ { <p>** : p ∈ track-paths.tracks[该 Track] 且 p 以 tests/unit/ 开头 }
+
+FOR role IN [backend, frontend]:
+  A = ⋃ task.目标文件 (task ∈ WP[role])
+  A = A − match(PUBLIC)
+  A = A ∪ ⋃ TEST_SIBLINGS(f) (f ∈ A)
+  A = A ∪ { $ITER_DIR/tracks/<role>.md }
+  WRITE $ITER_DIR/tracks/.allow-<role>
+
+test:
+  A = ⋃ TEST_SIBLINGS(f) (f ∈ 所有 backend / frontend 任务目标文件)
+      ∪ { unit-test 任务的目标文件本身 }
+      ∪ { tests/unit/**, tests/reports/<slug>-coverage.md, $ITER_DIR/tracks/test.md }
+  WRITE $ITER_DIR/tracks/.allow-test
+
+WRITE .claude/.sdlc-active-iteration = $ITER_DIR     # ⑦.1 结束时删除
+```
+
+- 清单格式：每行一个相对项目根的路径或 glob（只有 `*` 是通配符且可跨 `/`，`[`、`]`、`?` 按字面匹配，便于 `[slug]` 这类动态路由文件名），`#` 开头为注释；清单随迭代目录保留，accept 时一并提交。
+- **hook 判定**（命中即返回）：`EDIT_GUARD` 非 on / 无 `agent_type`（主 agent）/ 不是 sdlc 角色（含 general-purpose 回退）/
+  无标记文件 / `pipeline_stage` 不是 dev 或 test-audit / 清单文件不存在 / 目标在项目根之外 / 目标匹配清单 → 放行；
+  否则拒绝（exit 2），stderr 以 `[sdlc guard]` 开头，提示按 blocked 处理。
+- **局限**：用 Bash 写文件（`sed -i`、`echo >` 等）拦不到；回退为 general-purpose 时认不出角色；Codex 无 hook。
+  这些情况由角色禁止项与「汇总：越界检测与公共文件请求」兜底。
+
 ## blocked 处理
 
-1. 子 agent 遇计划外必须改公共文件 → 停止该任务，汇报标 `blocked` 并写明请求；status.json `tracks.<track>=blocked`。
-2. 主 agent 处理请求（改公共文件）后，重派该 Track **一次**（只含未完成的任务）。
+1. 子 agent 遇计划外必须改公共文件，或**被越界守卫拒绝写入** → 停止该任务，汇报标 `blocked` 并写明所需文件与原因；status.json `tracks.<track>=blocked`。
+2. 主 agent 处理请求后重派该 Track **一次**（只含未完成的任务）：公共文件由主 agent 自己改；清单外但属于该角色职责的文件（如漏列的新建工具文件），追加进 `$ITER_DIR/tracks/.allow-<track>` 后再重派。
 3. 仍 `blocked` → 主 agent 以 single 方式接手完成该 Track，汇报「执行者」记为 `main`，`agent_mode_reason` 追加 "；<track> 由主 agent 接手"。
 
 ## 断点续跑

@@ -10,13 +10,9 @@
 - 完成后按 `references/roles/track-report.md` 写汇报到 `$ITER_DIR/tracks/frontend.md`
 
 ## 可改路径白名单
-- `apps/web/**`
-- `apps/native/**`
-- `packages/ui/**`
-- `tests/unit/web/**`
-- `tests/unit/packages/ui/**`
-- `$ITER_DIR/tracks/frontend.md`
-- existing project：以 `.claude/EXISTING_STRUCTURE.md` 中前端对应的实际目录替换上述源码与测试路径
+- **multi 模式**：以工作包附带的允许清单 `$ITER_DIR/tracks/.allow-frontend` 为准（主 agent 从任务目标文件生成，已含对应测试文件与本汇报文件 `$ITER_DIR/tracks/frontend.md`）；清单外的 Edit/Write 会被越界守卫在写入前拒绝
+- **single 模式 / 清单缺失**：Track 范围见 `references/track-paths.md` 的 `tracks.frontend`，外加 `$ITER_DIR/tracks/frontend.md`
+- existing project：以 `.claude/EXISTING_STRUCTURE.md` 中前端对应的实际目录替换 Track 默认前缀
 
 ## 必读
 1. 工作包附带的规范上下文（ARCHITECTURE / SECURITY / CODING_GUIDELINES 摘录 + 自定义 skill 索引）
@@ -33,3 +29,4 @@
 ## 遇到阻塞
 必须修改公共文件或白名单外文件才能继续时：**停止该任务**，汇报状态标 `blocked`，
 在「公共文件修改请求」写明文件、改动内容与原因；其余不受影响的任务继续完成。
+被越界守卫拒绝写入（stderr 以 `[sdlc guard]` 开头）时，同样按上述 blocked 处理，不要改用 Bash 等方式绕过。
