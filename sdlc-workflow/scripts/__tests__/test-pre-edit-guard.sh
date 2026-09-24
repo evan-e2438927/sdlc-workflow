@@ -65,4 +65,22 @@ for t in bash cat grep sed head tr cut dirname basename env; do ln -sf "$(comman
 [ "$(run $BE "$P/apps/server/src/api/system.ts" "$NOJQ")" = "0" ] || { echo "FAIL 16 无 jq 清单内应放行"; fail=1; }
 [ "$(run $BE "$P/apps/web/src/x.ts" "$NOJQ")" = "2" ] || { echo "FAIL 17 无 jq 清单外应拒绝"; fail=1; }
 
+# 18/18b：清单里的 [ ] 只按字面匹配，不当作字符类（Next.js/Expo Router 动态路由段，如 [slug]）
+setup
+mkdir -p "$P/apps/web/app/blog/[slug]" "$P/apps/web/app/blog/s"
+printf 'apps/web/app/blog/[slug]/page.tsx\n' > "$P/$ITER/tracks/.allow-frontend"
+[ "$(run sdlc-workflow:sdlc-frontend-dev "$P/apps/web/app/blog/[slug]/page.tsx")" = "0" ] || { echo "FAIL 18 [ ] 应按字面匹配，清单内确切路径应放行"; fail=1; }
+[ "$(run sdlc-workflow:sdlc-frontend-dev "$P/apps/web/app/blog/s/page.tsx")" = "2" ] || { echo "FAIL 18b [ ] 不应被当作字符类，不应放行其他目录"; fail=1; }
+
+# 19/19b：[slug] 段仍字面匹配，末尾 * 通配符照常生效
+printf 'apps/web/app/blog/[slug]/*\n' > "$P/$ITER/tracks/.allow-frontend"
+[ "$(run sdlc-workflow:sdlc-frontend-dev "$P/apps/web/app/blog/[slug]/page.tsx")" = "0" ] || { echo "FAIL 19 [slug]/* 应匹配清单内文件"; fail=1; }
+[ "$(run sdlc-workflow:sdlc-frontend-dev "$P/apps/web/app/blog/s/page.tsx")" = "2" ] || { echo "FAIL 19b [slug]/* 不应匹配其他目录（[slug] 非字符类）"; fail=1; }
+
+# 20：相对路径应按项目根（而非 hook 运行时的 cwd）解析
+setup
+json='{"agent_type":"sdlc-backend-dev","tool_name":"Write","tool_input":{"file_path":"apps/server/src/api/system.ts"}}'
+rc=$(cd "$P/apps" && printf '%s' "$json" | CLAUDE_PROJECT_DIR="$P" /bin/bash "$HOOK" 2>"$TMP/err"; echo $?)
+[ "$rc" = "0" ] || { echo "FAIL 20 相对路径应按项目根（而非 cwd）解析"; fail=1; }
+
 [ "$fail" = "0" ] && echo PASS || exit 1

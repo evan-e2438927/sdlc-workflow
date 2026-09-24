@@ -53,7 +53,7 @@ ALLOW="$ITER_ABS/tracks/.allow-$ROLE"
 
 # Path relative to the project root, resolved through the nearest existing ancestor
 # (the target of a Write may not exist yet, nor its parent directories).
-case "$FILE" in /*) ABS="$FILE" ;; *) ABS="$PWD/$FILE" ;; esac
+case "$FILE" in /*) ABS="$FILE" ;; *) ABS="$ROOT/$FILE" ;; esac
 d="$(dirname "$ABS")"; rest="$(basename "$ABS")"
 while [ ! -d "$d" ] && [ "$d" != "/" ]; do rest="$(basename "$d")/$rest"; d="$(dirname "$d")"; done
 d="$(cd "$d" 2>/dev/null && pwd -P)" || exit 0
@@ -66,7 +66,11 @@ esac
 while IFS= read -r pat || [ -n "$pat" ]; do
   pat="${pat%$'\r'}"; pat="${pat#./}"
   case "$pat" in ''|'#'*) continue ;; esac
-  # shellcheck disable=SC2254  # unquoted on purpose: allow-list lines are glob patterns
+  # Only * is a wildcard (and it still crosses /); escape [ ] ? so they match literally
+  # instead of being read as bash glob character-class/single-char syntax (Next.js/Expo
+  # Router dynamic route segments like [slug] or [...slug] must match literally).
+  pat="${pat//\[/\\[}"; pat="${pat//\]/\\]}"; pat="${pat//\?/\\?}"
+  # shellcheck disable=SC2254  # unquoted on purpose: allow-list lines are glob patterns; only * is special (see escaping above)
   case "$REL" in $pat) exit 0 ;; esac
 done < "$ALLOW"
 
