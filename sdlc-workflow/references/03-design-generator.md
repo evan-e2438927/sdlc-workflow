@@ -73,6 +73,20 @@ done)
   交互模式下先发起澄清。
 - 命中的规范会在 ④ task-generator 阶段被下沉到每个任务的「适用规范」字段。
 
+### 1.6 判定契约形态
+
+写「接口契约」前，按以下优先级（从上到下，命中即停）判定本项目的契约形态，写入 design.md：
+
+| 优先级 | 条件 | 契约形态 | design.md 需写明 |
+|--------|------|----------|------------------|
+| 1 | 项目已有 `openapi.{yaml,yml,json}`，或 `.claude/PROJECT_BASELINE.md` 登记了 OpenAPI 文件 | `openapi` | OpenAPI 文件路径；本次新增/修改的接口同步写入该文件 |
+| 2 | TS monorepo：存在 `packages/` + `tsconfig*.json` + workspace 配置（`pnpm-workspace.yaml` / `package.json` 的 `workspaces` / `turbo.json`） | `ts-types` | 共享类型路径，默认 `packages/contracts/src/<slug>.ts`；existing project 已有共享类型包则沿用其位置 |
+| 3 | 其他 | `table` | 仅结构化接口表 |
+| — | 本次需求不涉及任何接口 | `none` | 「接口契约」写 "无" |
+
+除 `none` 外，结构化接口表**必须写**：表格是所有形态的共同底线，`ts-types` / `openapi`
+是在表格之上追加的机器可校验形式。契约是 apply ⑥.2 前后端并行开发的唯一依据。
+
 ### 2. 设计文档结构
 
 生成的 design.md 包含以下章节：
@@ -138,43 +152,21 @@ done)
 | token | VARCHAR(255) | 会话 token |
 | expires_at | TIMESTAMP | 过期时间 |
 
-## 3. API 接口设计
+## 3. 接口契约
 
-### 3.1 接口列表
+- **契约形态**: table | ts-types | openapi | none
+- **契约文件**: <ts-types 时为共享类型路径；openapi 时为 OpenAPI 文件路径；否则写 "无">
 
-| 方法 | 路径 | 说明 | 认证 |
-|------|------|------|------|
-| POST | /api/auth/login | 用户登录 | 否 |
-| POST | /api/auth/logout | 用户登出 | 是 |
-| GET | /api/user/profile | 获取用户信息 | 是 |
+### 3.1 接口表
 
-### 3.2 详细接口规范
+| 方法 | 路径 | 请求体 | 成功响应 | 错误响应（状态码 + 错误码） | 认证 | 关联 AC |
+|------|------|--------|----------|------------------------------|------|---------|
+| POST | /api/auth/login | `{username, password}` | 200 `{token, expires_at}` | 401 `INVALID_CREDENTIALS`；400 `VALIDATION_ERROR` | 否 | AC-001, AC-002, AC-004 |
+| POST | /api/auth/logout | 无 | 204 | 401 `UNAUTHENTICATED` | 是 | AC-007 |
+| GET | /api/user/profile | 无 | 200 `{id, username, email}` | 401 `UNAUTHENTICATED` | 是 | AC-008 |
 
-#### POST /api/auth/login
-
-**请求**:
-```json
-{
-  "username": "string",
-  "password": "string"
-}
-```
-
-**响应 (200)**:
-```json
-{
-  "token": "string",
-  "expires_at": "ISO8601"
-}
-```
-
-**错误响应**:
-```json
-{
-  "error": "INVALID_CREDENTIALS",
-  "message": "用户名或密码错误"
-}
-```
+> 前端按本表的请求/响应开发与构造 mock，后端按本表实现路由与错误码。
+> 实现中若必须偏离契约，先回写 design.md 本表（及契约文件），再改代码。
 
 ## 4. 安全考量
 
@@ -203,12 +195,14 @@ done)
 - Redis 6+
 - External SMS Gateway
 
-### 5.3 依赖管理
-```bash
-# 所需 npm 包
-npm install bcryptjs jsonwebtoken pg redis
-npm install -D @types/bcryptjs @types/jsonwebtoken
-```
+### 5.3 新增依赖
+
+| 包名 | 版本约束 | 用途 | 归属 Track |
+|------|----------|------|------------|
+| bcryptjs | ^2.4 | 密码哈希 | backend |
+| @types/bcryptjs | ^2.4（dev） | 类型定义 | backend |
+
+> apply ⑥.1 由主 agent 统一安装本表依赖；开发角色不直接修改 `package.json` / lockfile。无新增依赖写 "无"。
 
 ## 6. 风险评估
 

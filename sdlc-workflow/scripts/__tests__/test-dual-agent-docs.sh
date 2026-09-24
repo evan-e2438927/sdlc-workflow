@@ -20,5 +20,18 @@ lacks "$R/05-design-reviewer.md" '（frontend / backend / shared / infra / test�
 has   "$R/04-task-generator.md"  '`packages/auth/**`, `packages/contracts/**`'
 has   "$SKILL_DIR/SKILL.md"      'track: frontend|backend|shared|infra|unit-test|qa'
 
+# ── Task 3: 接口契约 ──
+has   "$R/03-design-generator.md" '### 1.6 判定契约形态'
+has   "$R/03-design-generator.md" '## 3. 接口契约'
+has   "$R/03-design-generator.md" '- **契约形态**: table | ts-types | openapi | none'
+lacks "$R/03-design-generator.md" '## 3. API 接口设计'
+has   "$R/03-design-generator.md" '### 5.3 新增依赖'
+lacks "$R/03-design-generator.md" '### 5.3 依赖管理'
+has   "$R/04-task-generator.md"   '不得仅为获知接口形状而依赖 backend 任务'
+has   "$R/04-task-generator.md"   '**角色并行提示**'
+lacks "$R/04-task-generator.md"   'Agent Team 并行提示'
+has   "$R/05-design-reviewer.md"  '### 2.3 接口契约检查规则（Gate 1 必做）'
+has   "$R/05-design-reviewer.md"  '10) 接口契约:'
+
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1
