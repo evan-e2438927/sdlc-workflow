@@ -68,6 +68,8 @@ has   "$S" '##### ⑥.5 勾选属实自检'
 lacks "$S" 'spawn_sub_agent'
 lacks "$S" 'Agent Team'
 lacks "$S" '1. **单 Agent 模式**'
+lacks "$S" '步骤⑥ Claude Code 开发'
+lacks "$F" 'Claude Code 开发'
 
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1
