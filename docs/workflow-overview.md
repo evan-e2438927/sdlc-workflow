@@ -84,12 +84,12 @@ graph LR
 
 | 步骤 | 名称 | 执行者 | 产出 |
 |------|------|--------|------|
-| ⑥ | Claude Code 开发 | Claude Code | 代码变更（支持 Agent Team 按拓扑层并行开发） |
-| ⑦ | test-generator | Claude Code | `tests/unit/` + `tests/e2e/` 测试文件 |
+| ⑥ | 开发 | 主 agent + backend / frontend 角色 | 代码变更 + `tracks/*.md` 汇报（单 / 多 agent 双模式） |
+| ⑦ | 查漏 | test 角色 | 补充的 `tests/unit/` 用例 + 覆盖率报告 |
 | ⑧ | code-reviewer | **Codex CLI** | **Gate 2**: PASS / FAIL（质量 / OWASP / 规范 / 任务状态） |
 
 **关键规则**：
-- 步骤⑥ 先做依赖分析 + 拓扑分层，若并行层 > 1 且任务 ≥ 3，启用 Agent Team 并行开发
+- 步骤⑥ 先由主 agent 打地基（infra / shared / 接口契约 / 新增依赖），再由 backend、frontend 角色开发；`AGENT_MODE=auto` 时前后端都有任务且运行时支持子 agent 即走多 agent 并行，否则主 agent 依次扮演各角色；步骤⑦ test 角色按 AC 查漏
 - Gate 2 审查维度：代码质量、安全漏洞（OWASP Top 10）、架构合规、编码规范、错误处理、目录结构、任务回写
 - Gate 2 FAIL 时回退到步骤⑥修复，最多循环 N 轮
 

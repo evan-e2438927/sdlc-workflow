@@ -87,5 +87,23 @@ has "$R/08-code-reviewer.md" '9) 越界：'
 has "$R/08-code-reviewer.md" '10) 越界：'
 has "$R/08-code-reviewer.md" '| 接口契约 |'
 has "$R/08-code-reviewer.md" '=== design.md 接口契约 ==='
+
+# ── Task 8: 概览与 README ──
+P="$R/pipeline-overview.md"
+has   "$P" 'A_S6_FOUND["⑥.1 主 agent 打地基'
+has   "$P" '| **Parallelization** | 步骤⑥.2 backend / frontend 角色并行开发（多 agent 模式）|'
+lacks "$P" 'Agent Team'
+W="$REPO_DIR/docs/workflow-overview.md"
+has   "$W" 'AGENT_MODE'
+lacks "$W" 'Agent Team'
+has   "$REPO_DIR/README.zh-CN.md" '## 单 / 多 agent 模式'
+has   "$REPO_DIR/README.zh-CN.md" '`[--review] [--agents single\|multi] [迭代目录]`'
+has   "$REPO_DIR/README.md"       '## Single- / multi-agent mode'
+has   "$REPO_DIR/README.md"       '`[--review] [--agents single\|multi] [iter dir]`'
+# 全仓不再出现旧的 Agent Team 说法（spec/plan 目录除外）
+for f in "$SKILL_DIR/SKILL.md" "$R"/*.md "$REPO_DIR"/skills/sdlc-*/SKILL.md "$W" "$REPO_DIR/README.md" "$REPO_DIR/README.zh-CN.md"; do
+  [ -L "$f" ] && continue
+  lacks "$f" 'Agent Team'
+done
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1

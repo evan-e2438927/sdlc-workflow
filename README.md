@@ -232,11 +232,11 @@ Each stage is a skill, shared by Claude Code and Codex; trigger by stating inten
 | `sdlc-init` | `[key=value …]` | onboard a project, generate config and baseline | — |
 | `sdlc-update` | `[project dir]` | two-phase upgrade sync: phase 1 safely syncs the scaffold (idempotent, never overwrites user content); phase 2 drift-aware incremental refresh (baselines auto-refresh, user docs confirmed item by item) | — |
 | `sdlc-proposal` | `<requirement> [--review]` | break down the requirement (①-④) → wait for human review | pending_review |
-| `sdlc-apply` | `[--review] [iter dir]` | build + unit tests + lint (⑥-⑨, no commit) | applied |
+| `sdlc-apply` | `[--review] [--agents single\|multi] [iter dir]` | build + unit tests + lint (⑥-⑨, no commit) | applied |
 | `sdlc-qa` | `[iter dir]` | Playwright browser QA (⑩) | qa_passed |
 | `sdlc-accept` | `[iter dir]` | summarize changes → update docs → local commit (⑪⑫) | accepted |
 | `sdlc-pr` | `[iter dir]` | push → create PR (⑬, the only remote action) | pr_created |
-| `sdlc-doit` | `[--review] [--qa] <requirement>` | fully automatic, straight to a PR (①-⑬) | — |
+| `sdlc-doit` | `[--review] [--qa] [--agents single\|multi] <requirement>` | fully automatic, straight to a PR (①-⑬) | — |
 | `sdlc-mini` | `[--review] [--qa] <tiny task>` | lightweight flow for tiny tasks | — |
 | `sdlc-review` | `<proposal\|code> <iter dir>` | run Codex Gate 1 / Gate 2 standalone | — |
 | `sdlc-worktree` | `create <slug> <type> \| list \| status \| remove <seq\|slug> \| gc` | parallel requirements / multiple agents | — |
@@ -317,6 +317,24 @@ Load order (later overrides earlier):
 ```
 
 Each level loads `CLAUDE.md` / `ARCHITECTURE.md` / `SECURITY.md` / `CODING_GUIDELINES.md` / `rules/*.md`; existing projects additionally load the baseline trio; runtime config is read from `.claude/.sdlc-config`. Commands and references no longer list `.claude/*` on their own.
+
+---
+
+## Single- / multi-agent mode
+
+The build phase of apply (and doit) runs in one of two modes. The flow and the output are the same; only who does the work differs:
+
+| Mode | How it runs | Good for |
+|------|-------------|----------|
+| `single` | the main agent plays backend → frontend → test in turn | Codex, one-sided changes, small requirements |
+| `multi` | backend / frontend sub-agents build in parallel, then a test sub-agent audits coverage | requirements with both frontend and backend work (Claude Code) |
+
+- Default `AGENT_MODE=auto`: `multi` when both frontend and backend have tasks and the runtime can spawn sub-agents, otherwise `single`; `mini` is always `single`.
+- One-off override: `sdlc-apply --agents single|multi <iter dir>`.
+- Frontend and backend work in parallel against the interface contract produced during proposal (a structured table in design.md; shared types in `packages/contracts` for TS monorepos; an existing OpenAPI file is reused).
+- Only the main agent edits shared files (`package.json`, lockfiles, root config, the contract file). Each role edits only its own paths and writes a `tracks/<track>.md` report; the main agent checks for out-of-bounds edits when merging.
+
+See [flow-apply.md](sdlc-workflow/references/flow-apply.md) and [roles/](sdlc-workflow/references/roles/) (Chinese).
 
 ---
 

@@ -232,11 +232,11 @@ sdlc-mini 把按钮颜色改成蓝色          # 小任务轻量流程
 | `sdlc-init` | `[key=value …]` | 项目接入，生成配置与 baseline | — |
 | `sdlc-update` | `[项目目录]` | 两阶段升级同步：阶段一安全同步脚手架（幂等，不覆盖用户内容）；阶段二漂移感知增量刷新（基线自动刷新、用户文档逐项确认） | — |
 | `sdlc-proposal` | `<需求> [--review]` | 需求拆解（①-④）→ 等待人工审核 | pending_review |
-| `sdlc-apply` | `[--review] [迭代目录]` | 开发 + 单元测试 + lint（⑥-⑨，不提交） | applied |
+| `sdlc-apply` | `[--review] [--agents single\|multi] [迭代目录]` | 开发 + 单元测试 + lint（⑥-⑨，不提交） | applied |
 | `sdlc-qa` | `[迭代目录]` | Playwright 浏览器功能验收（⑩） | qa_passed |
 | `sdlc-accept` | `[迭代目录]` | 总结变更 → 更新文档 → 本地 commit（⑪⑫） | accepted |
 | `sdlc-pr` | `[迭代目录]` | push → 创建 PR（⑬，唯一远程动作） | pr_created |
-| `sdlc-doit` | `[--review] [--qa] <需求>` | 全自动，一路到 PR（①-⑬） | — |
+| `sdlc-doit` | `[--review] [--qa] [--agents single\|multi] <需求>` | 全自动，一路到 PR（①-⑬） | — |
 | `sdlc-mini` | `[--review] [--qa] <小任务>` | 微小任务轻量流程 | — |
 | `sdlc-review` | `<proposal\|code> <迭代目录>` | 单独跑 Codex Gate 1 / Gate 2 | — |
 | `sdlc-worktree` | `create <slug> <type> \| list \| status \| remove <seq\|slug> \| gc` | 多需求并行 / 多 Agent | — |
@@ -317,6 +317,24 @@ graph TD
 ```
 
 每层加载 `CLAUDE.md` / `ARCHITECTURE.md` / `SECURITY.md` / `CODING_GUIDELINES.md` / `rules/*.md`；existing project 额外加载 baseline 三件套；运行时配置读 `.claude/.sdlc-config`。命令与各 reference 不再各自罗列 `.claude/*` 清单。
+
+---
+
+## 单 / 多 agent 模式
+
+apply（及 doit）的开发阶段支持两种执行模式，流程相同、产出等价，只是执行者不同：
+
+| 模式 | 执行方式 | 适用 |
+|------|----------|------|
+| `single` | 主 agent 依次扮演 backend → frontend → test 角色 | Codex、只改一端、小需求 |
+| `multi` | backend / frontend 子 agent 并行开发，test 子 agent 在其后查漏 | 前后端都有任务的需求（Claude Code） |
+
+- 默认 `AGENT_MODE=auto`：前后端都有任务、且运行时支持子 agent 时走 `multi`，否则 `single`；`mini` 固定 `single`。
+- 临时覆盖：`sdlc-apply --agents single|multi <迭代目录>`。
+- 前后端并行的依据是 proposal 阶段产出的「接口契约」（design.md 结构化表格；TS monorepo 额外生成 `packages/contracts` 共享类型；已有 OpenAPI 则沿用）。
+- 公共文件（`package.json`、lockfile、根配置、契约文件）只由主 agent 修改；各角色只改自己的路径，完成后写 `tracks/<track>.md` 汇报，主 agent 汇总时做越界检测。
+
+详见 [flow-apply.md](sdlc-workflow/references/flow-apply.md) 与 [roles/](sdlc-workflow/references/roles/)。
 
 ---
 
