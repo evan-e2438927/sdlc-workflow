@@ -7,7 +7,7 @@ description: >-
   running automated development workflow.
   Triggers: start workflow, new feature, process requirement, run pipeline,
   SDLC, digital worker, development automation, requirements to PR.
-argument-hint: "init [配置] | update [项目目录] | proposal <需求> | apply [--review] <迭代目录> | qa [<迭代目录>] | accept [<迭代目录>] | pr [<迭代目录>] | review [proposal|code] <迭代目录> | doit [--review] [--qa] <需求> | mini [--review] [--qa] <小任务> | worktree <create|list|status|remove|gc>"
+argument-hint: "init [配置] | update [项目目录] | proposal <需求> | apply [--review] [--agents single|multi] <迭代目录> | qa [<迭代目录>] | accept [<迭代目录>] | pr [<迭代目录>] | review [proposal|code] <迭代目录> | doit [--review] [--qa] [--agents single|multi] <需求> | mini [--review] [--qa] <小任务> | worktree <create|list|status|remove|gc>"
 homepage: https://github.com/evan-e2438927/sdlc-workflow
 metadata:
   openclaw:
@@ -37,12 +37,12 @@ metadata:
 - `sdlc-init`：初始化或接入项目
 - `sdlc-update`：两阶段升级同步——阶段一安全同步最新脚手架（结构/配置/规则模板，不覆盖用户内容）；阶段二读真实代码做漂移感知增量刷新（基线自动刷新、用户文档逐项确认）
 - `sdlc-proposal`：需求拆解（①-④，按 track 拆分），产出 proposal 产物后暂停，等待人工审核
-- `sdlc-apply` `[--review]`：人工审核通过后，开发 + 单元测试 + lint（⑥-⑨）；**不提交、不推 PR**；`--review` 触发 Codex 审查（Gate 1 + Gate 2）
+- `sdlc-apply` `[--review] [--agents single|multi]`：人工审核通过后，开发 + 单元测试 + lint（⑥-⑨）；**不提交、不推 PR**；`--review` 触发 Codex 审查（Gate 1 + Gate 2）
 - `sdlc-qa`：编写并执行 qa track 的 Playwright 浏览器功能验收（⑩）
 - `sdlc-accept`：总结变更 → 更新文档 → 本地 commit（⑪⑫）；**不 push、不建 PR**
 - `sdlc-pr`：push 当前分支 → gh pr create（⑬）；唯一与远程交互的阶段
 - `sdlc-review` `[proposal|code]`：单独运行 Codex 审查，不触发其他流程
-- `sdlc-doit` `[--review] [--qa]`：全自动模式（proposal + apply + [qa] + accept + pr 不停顿）；`--qa` 含浏览器验收
+- `sdlc-doit` `[--review] [--qa] [--agents single|multi]`：全自动模式（proposal + apply + [qa] + accept + pr 不停顿）；`--qa` 含浏览器验收
 - `sdlc-mini` `[--review] [--qa]`：小任务轻量流程；`--qa` 含浏览器验收
 - `sdlc-worktree`：并行工作区管理（create / list / status / remove / gc，worktree 隔离）
 
@@ -77,7 +77,7 @@ sdlc-proposal <需求>
 ### apply — 需求开发命令
 
 ```bash
-sdlc-apply [--review] <迭代目录>
+sdlc-apply [--review] [--agents single|multi] <迭代目录>
 # 示例
 sdlc-apply docs/iterations/2026-04-16/001-user-login-feature/
 sdlc-apply --review docs/iterations/2026-04-16/001-user-login-feature/
@@ -92,8 +92,8 @@ sdlc-apply --review docs/iterations/2026-04-16/001-user-login-feature/
 
 执行步骤 ⑥-⑨（默认跳过 Gate 2，加 `--review` 则执行 ⑧）：
 ```
-⑥ Claude Code 开发（frontend/backend/unit-test track，支持 Agent Team 并行）
-⑦ test-generator（仅单元测试 tests/unit/）
+⑥ 开发（⑥.1 主 agent 打地基 → ⑥.2 前后端角色开发 → ⑥.3 汇总；单 / 多 agent 由 AGENT_MODE 决定）
+⑦ 查漏（test 角色按 AC 补单测 + 覆盖率报告）
 [⑧ code-reviewer (Gate 2)   ← 仅 --review 模式]
 ⑨ test-pipeline（lint → unit 两阶段）
 ```
@@ -146,7 +146,7 @@ create --base main`。完成后 status.json 更新为 `phase: "pr_created"`（�
 ### doit — 全自动模式
 
 ```bash
-sdlc-doit [--review] [--qa] <需求>
+sdlc-doit [--review] [--qa] [--agents single|multi] <需求>
 ```
 
 内部等价于 `proposal + apply + [qa] + accept + pr` 不停顿，适用于完全信任 AI 处理的场景。
@@ -316,8 +316,8 @@ worktree 内 `<project>` 指向该 worktree 根目录，全局级仍为 `~/.clau
 | ④ | task-generator | design.md → tasks.md（任务级 AC 必须引用需求级 AC-ID，保留 Given-When-Then + 场景维度） | proposal/doit |
 | [⑤] | design-reviewer | **Gate 1（可选）**: Codex CLI 审查设计 + AC 覆盖度检查；仅 `--review` 时执行 | proposal --review |
 | — | **proposal 暂停点** | 写入 status.json → 控制台输出 → 等待人工审核 | **仅 proposal** |
-| ⑥ | Claude Code 开发 | 按 tasks.md 逐任务实现代码（frontend/backend/unit-test track） | apply/doit |
-| ⑦ | test-generator | 仅生成单元测试 tests/unit/（unit-test track） | apply/doit |
+| ⑥ | 开发 | 打包 → 主 agent 打地基（infra/shared/契约/依赖）→ backend / frontend 角色开发 → 汇总；单 / 多 agent 双模式 | apply/doit |
+| ⑦ | 查漏 | test 角色按 AC 清单补单测（unit-test track）+ 覆盖率报告 | apply/doit |
 | [⑧] | code-reviewer | **Gate 2（可选）**: Codex CLI 审查代码；仅 `--review` 时执行 | apply --review |
 | ⑨ | test-pipeline | lint → unit（两阶段，不含浏览器 E2E） | apply/doit |
 | — | **apply 完成点** | 更新 status.json → phase: applied（不提交、不推 PR） | **仅 apply** |
@@ -519,108 +519,27 @@ IF 当前为 apply 模式:
     ABORT
 ```
 
-#### ⑥ Claude Code 开发
+#### ⑥ 开发（单 / 多 agent 双模式）
 
-##### ⑥.0 开发前置：优先复用可用 skills
-
-在写任何业务代码前，先查**统一上下文加载**（⓪ `LOAD_CONTEXT`）得到的自定义 skill 索引 `CTX.skills`
-（来源 `~/.claude/skills/` 与 `<project>/.claude/skills/`）：
-
-- 若某 skill 的 `description` 与当前任务相关，**优先调用它（先 skill、后自造）**，其正文在调用时才加载。
-- 此规则对 Claude Code / Codex 双运行时都适用；**Codex 无 harness 自动发现，只能靠 `CTX.skills` 索引**，故此步不可跳过。
-- 完整优先级规则见 `references/context-loader.md`「skills 优先级规则」。
-
-##### ⑥.1 依赖分析与并行分组
+完整规范见 `references/flow-apply.md`（执行模式选择、工作包与派活、汇总、blocked 处理、断点续跑），
+角色说明见 `references/roles/`。两种模式流程相同、产出等价，模式只决定"谁来执行"。
 
 ```
-TASKS = parse_tasks("$ITER_DIR/tasks.md")
-DEP_GRAPH = build_dependency_graph(TASKS)  # 从"依赖关系"和 Phase 分组推导
-
-# 拓扑排序，识别可并行层
-LAYERS = topological_layers(DEP_GRAPH)
-# 示例：
-#   Layer 0: [T-001, T-002]    ← 无前置依赖，可并行
-#   Layer 1: [T-003, T-004]    ← 依赖 Layer 0，组内可并行
-#   Layer 2: [T-005]           ← 依赖 Layer 1
-
-PARALLEL_ELIGIBLE = any(len(layer) > 1 for layer in LAYERS) AND total_tasks >= 3
-```
-
-##### ⑥.2 执行模式选择
-
-```
-IF PARALLEL_ELIGIBLE:
-  MODE = "agent-team"
-  LOG "🔨 Agent Team 并行模式: <层数> 层 / <总任务数> 任务"
+MODE = resolve_agent_mode()            # flow-apply.md「执行模式选择」→ status.json.agent_mode
+WPS  = pack_work_packages(tasks.md)    # ⑥.0 按 Track 打包：角色说明 + 任务 + 接口契约 + 规范
+foundation(WPS.infra, WPS.shared)      # ⑥.1 主 agent：infra/shared 任务 + 契约落地 + 安装新增依赖
+IF MODE == "multi":
+  parallel(dispatch("sdlc-backend-dev", WPS.backend),
+           dispatch("sdlc-frontend-dev", WPS.frontend))   # ⑥.2 两个子 agent 同时执行
 ELSE:
-  MODE = "sequential"
-  LOG "🔨 顺序模式: <总任务数> 任务"
+  play_role("backend", WPS.backend)                       # ⑥.2 主 agent 依次扮演
+  play_role("frontend", WPS.frontend)
+merge(["backend", "frontend"])         # ⑥.3 越界检测 → 公共文件请求 / blocked → 回写 tasks.md → ⑥.5
 ```
 
-##### ⑥.3a 顺序模式（默认）
-
-按 tasks.md 逐任务实现代码，并在实现偏离 design.md 时同步修订 design/tasks，避免 Gate 2 审查对象与真实代码脱节。每完成一个任务后，必须同步回写 `tasks.md`。
-
-##### ⑥.3b Agent Team 并行模式
-
-```
-FOR layer IN LAYERS:
-  IF len(layer) == 1:
-    # 单任务层，主 Agent 直接执行
-    execute_task(layer[0])
-  ELSE:
-    # 多任务层，分发给子 Agent
-    # ⚠️ 并行前置条件（任一不满足 → 降级顺序执行该层）：
-    #   - 同层任务都**显式且完整声明**了 Target Files（声明不全/缺失的任务不得进并行层）
-    #   - 同层任务的目标文件（Target Files）两两无交集
-    IF has_file_overlap(layer) OR any(task.target_files is missing/incomplete for task in layer):
-      LOG "⚠️ Layer 存在文件交集或 Target Files 声明不全，降级顺序执行"
-      FOR task IN layer: execute_task(task)
-    ELSE:
-      sub_agents = []
-      FOR task IN layer:
-        agent = spawn_sub_agent(
-          prompt = """
-            你是 SDLC 开发子 Agent，负责实现单个任务。
-            任务: {task}
-            角色定位（Track）: {task.track}（请遵循该端的代码风格、依赖偏好、测试惯例）
-            设计文档: {design.md 相关章节}
-            架构约束: {ARCHITECTURE.md}
-            编码规范: {CODING_GUIDELINES.md}
-            可用 skills 索引: {CTX.skills}   # 与任务相关的优先调用（先 skill、后自造）
-            规则:
-            - 只修改任务 Target Files 范围内的文件
-            - 与任务相关的 CTX.skills 优先调用，而非从零自造
-            - 修改文件路径必须落在 Track 对应范围内（frontend→apps/web, backend→apps/server, shared→packages/{config,env,auth}, infra→db/migrations|root configs, test→tests/）
-            - 不得修改其他任务的目标文件
-            - 完成后报告: 修改的文件列表 + 验收标准完成情况
-          """
-        )
-        sub_agents.append(agent)
-
-      # 等待所有子 Agent 完成
-      results = await_all(sub_agents)
-
-      # 冲突检测与合并
-      modified_files = collect_all_modified_files(results)
-      IF has_conflict(modified_files):
-        LOG "⚠️ 子 Agent 产出文件冲突，主 Agent 手动合并"
-        resolve_conflicts(results)
-
-  # 每层完成后同步回写 tasks.md
-  FOR task IN layer:
-    更新 tasks.md: ### [ ] T-xxx → ### [x] T-xxx
-    勾选已满足的验收标准
-```
-
-##### ⑥.4 任务完成回写（两种模式通用）
-
-- 将任务标题从 `### [ ] T-xxx` 改为 `### [x] T-xxx`
-- 将该任务下已实际满足的验收标准勾选为 `[x]`
-- 未完成或部分完成的任务不得提前勾选
-- 实现偏离 design.md 时同步修订 design/tasks，避免 Gate 2 审查对象与真实代码脱节
-
-- LOG: 实现完成: <已完成任务数>/<总任务数>
+- 所有角色在每个任务**执行前**对照该任务的「适用规范」（先 skill、后自造）。
+- 只有主 agent 修改公共文件（`package.json`、lockfile、根配置、契约文件）与 `tasks.md`。
+- 每完成一个任务：`### [ ] T-xxx` → `### [x] T-xxx`，并勾选已实际满足的验收标准；未完成或部分完成的任务不得提前勾选；实现偏离 design.md 时同步修订 design / tasks。
 
 ##### ⑥.5 勾选属实自检（默认执行，不依赖 `--review`）
 
@@ -632,14 +551,15 @@ Gate 2 的"状态漂移"检查只在 `--review` 时跑，但"勾选是否属实"
 - 仍无法满足的 AC：取消勾选并在 tasks.md 标注原因，不得带病进入 ⑨ / phase=applied
 - LOG: 🔎 勾选属实自检: <核对任务数>，纠正漂移 <N> 处
 
-#### ⑦ test-generator
-- 输入：tasks.md + git diff
+#### ⑦ 查漏（test 角色）
+- ⑥.3 汇总完成后执行，不与开发并行；multi → `sdlc-test-dev` 子 agent，single → 主 agent 扮演
+- 处理 Track=unit-test 任务；对照 requirements.md 的 AC 清单补 error / boundary / security 缺口，**只新增测试**
 - **测试用例必须引用 AC-ID 和场景维度**（如 `it('AC-002 (error): 密码错误返回 401')`）
-- **仅生成单元测试**；`track: qa` / 验证方式为 qa·playwright-mcp 的 AC 不在此生成，coverage.md 标记 `deferred to qa`（E2E 脚本由 ⑩ qa 命令编写）
-- 输出：
-  - tests/unit/web|server|packages/...
-  - tests/reports/<slug>-coverage.md（含 AC 覆盖率汇总和场景维度覆盖统计，E2E/MCP 项标 deferred to qa）
-- LOG: 🧪 单元测试用例已生成
+- `track: qa` / 验证方式为 qa·playwright-mcp 的 AC 不在此生成，coverage.md 标记 `deferred to qa`
+- 输出：`tests/unit/web|server|packages/...`、`tests/reports/<slug>-coverage.md`、`tracks/test.md`
+- ⑦.1 主 agent 汇总：越界检测 → 回写 unit-test 任务
+- 规范见 `references/07-test-generator.md`、`references/roles/test.md`
+- LOG: 🧪 查漏完成: 补充用例 <N> 个
 
 #### ⑧ code-reviewer (Gate 2) — 仅 `--review` 模式
 
@@ -804,7 +724,7 @@ LOG "✅ PR: <url> | 分支: $CURRENT_BRANCH"
 
 ## 全局规则
 
-1. **单 Agent 模式**：所有步骤由一个 Claude Code Agent 执行
+1. **执行模式**：apply 开发阶段（⑥ ⑦）支持单 agent / 多 agent 两种模式（`AGENT_MODE`，见 `references/flow-apply.md`），两种模式产出等价；其余步骤由主 agent 执行
 2. **双模型把关（可选）**：Claude Code 生成，Codex CLI 审查；`--review` 时启用 Gate 1 + Gate 2
 3. **循环上限**：每个 Gate/Test ≤ REVIEW_MAX_ROUNDS（默认 1，--review 时生效）
 4. **Conventional Commits**：统一遵循 [Conventional Commits 1.0.0](https://www.conventionalcommits.org/zh-hans/v1.0.0/)，格式 `<type>[scope][!]: description`（type: feat/fix/docs/style/refactor/perf/test/build/ci/chore/revert；破坏性变更加 `!` 或 footer `BREAKING CHANGE:`）。权威定义见 `references/11-git-committer.md`
@@ -822,7 +742,7 @@ LOG "✅ PR: <url> | 分支: $CURRENT_BRANCH"
 16. **proposal 状态管理**：proposal 完成后必须写入 status.json；apply 启动前必须校验 status.json
 17. **上下文管理**：Pipeline 步骤间检测上下文占用，超过 80% 时执行 `/compact`。关键检查点：开发前（④→⑥）、测试前（⑦→⑨）、测试修复 retry 前（⑨ 内）。compact 前必须确保当前步骤产物已写入文件，compact 后须经统一上下文加载入口重新加载迭代目录产物 + 全局/项目 `.claude/` 规范
 17.1 **统一上下文加载**：所有命令在步骤 ① 前经唯一入口加载规范——先全局 `~/.claude/` 再项目 `<project>/.claude/`（项目覆盖全局）；加载清单与优先级只在 `references/context-loader.md` 定义一次，命令与 reference 不得各自罗列 `.claude/*` 清单
-18. **Agent Team 并行**：在步骤 ⑦ test-generator、⑪ docs-updater 使用 Agent Team 并行；⑨ test-pipeline 串行（lint → unit）
+18. **角色分工**：⑥.1 主 agent 打地基（infra / shared / 契约 / 依赖）；⑥.2 backend 与 frontend 角色开发（多 agent 模式下并行）；⑦ test 角色查漏；⑨ test-pipeline 串行（lint → unit）
 19. **Worktree 并行开发**：通过 `worktree create` 创建隔离工作区，每个 worktree 独立运行 pipeline；详见 `references/parallel-dev.md`
 20. **Worktree 端口隔离**：并行工作区的 dev server 端口按 `PORT=3000+seq, API_PORT=4000+seq` 分配，避免冲突
 21. **Worktree 注册表**：`.worktrees/worktree-registry.json` 记录所有并行工作区元数据，`pr-creator` 完成后更新 `pr_url`

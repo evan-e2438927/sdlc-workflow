@@ -49,5 +49,25 @@ for role in backend frontend test; do
 done
 has "$R/roles/test.md" '只新增测试'
 
+# ── Task 5: apply 编排 ──
+F="$R/flow-apply.md"
+for s in '## 执行模式选择' '## 工作包与派活' '## 汇总：越界检测与公共文件请求' '## blocked 处理' '## 断点续跑'; do has "$F" "$s"; done
+has   "$F" '⑥.1 打地基'
+has   "$F" '⑦ 查漏'
+has   "$F" '"agent_mode": "multi"'
+has   "$F" '--agents single'
+lacks "$F" '只实现 frontend / backend / unit-test 三类 track'
+lacks "$F" 'Agent Team'
+S="$SKILL_DIR/SKILL.md"
+has   "$S" '#### ⑥ 开发（单 / 多 agent 双模式）'
+has   "$S" '#### ⑦ 查漏（test 角色）'
+has   "$S" '[--agents single|multi]'
+has   "$S" '1. **执行模式**'
+has   "$S" '18. **角色分工**'
+has   "$S" '##### ⑥.5 勾选属实自检'
+lacks "$S" 'spawn_sub_agent'
+lacks "$S" 'Agent Team'
+lacks "$S" '1. **单 Agent 模式**'
+
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1
