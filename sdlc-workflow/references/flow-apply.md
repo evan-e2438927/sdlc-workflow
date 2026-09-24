@@ -244,8 +244,8 @@ FOR f IN CHANGED:
 FOR 每条「公共文件修改请求」: 主 agent 评估后执行（如安装依赖、注册路由），执行结果记入 tracks/foundation.md
 ```
 
-multi 模式下主 agent 在此对 owner 为子 agent 的代码文件统一跑一次 `LINT_TOOL`
-（PostToolUse hook 已触发时属冗余但无害），失败项退回对应角色修复。
+子 agent 的 Edit/Write 同样触发 PostToolUse 编辑检查 hook（已在真实项目实测：hook 输入带 `agent_id` / `agent_type`，
+报错会反馈给该子 agent 自行修复），因此汇总阶段不再重复跑 `LINT_TOOL`；最终的全量 lint 由 ⑨ test-pipeline 负责。
 
 ## blocked 处理
 

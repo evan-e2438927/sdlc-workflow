@@ -31,16 +31,34 @@ case "$FILE" in
   *) exit 0 ;;                              # not applicable
 esac
 
-# Resolve linter; absent -> graceful no-op (do not spam a project without it)
-command -v "$LINT_TOOL" >/dev/null 2>&1 || exit 0
+case "$FILE" in /*) ;; *) FILE="$PWD/$FILE" ;; esac
+
+# Resolve linter: the nearest project-local node_modules/.bin (walking up from the
+# edited file to the project root) wins, and runs from that package dir so it uses the
+# package's own version and config; otherwise fall back to PATH. Absent -> no-op.
+resolve_linter() {
+  local dir root
+  dir="$(cd "$(dirname "$FILE")" 2>/dev/null && pwd -P)" || return 1
+  root="$(cd "$PROJECT_DIR" 2>/dev/null && pwd -P)" || root="/"
+  while :; do
+    if [ -x "$dir/node_modules/.bin/$LINT_TOOL" ]; then
+      LINT_BIN="$dir/node_modules/.bin/$LINT_TOOL"; LINT_CWD="$dir"; return 0
+    fi
+    if [ "$dir" = "$root" ] || [ "$dir" = "/" ]; then break; fi
+    dir="$(dirname "$dir")"
+  done
+  LINT_BIN="$(command -v "$LINT_TOOL" 2>/dev/null)" || return 1
+  LINT_CWD="$root"
+}
+resolve_linter || exit 0
 
 case "$LINT_TOOL" in
-  biome) OUT="$(biome lint "$FILE" 2>&1)"; RC=$? ;;
-  *)     OUT="$("$LINT_TOOL" "$FILE" 2>&1)"; RC=$? ;;
+  biome) OUT="$(cd "$LINT_CWD" && "$LINT_BIN" lint "$FILE" 2>&1)"; RC=$? ;;
+  *)     OUT="$(cd "$LINT_CWD" && "$LINT_BIN" "$FILE" 2>&1)"; RC=$? ;;
 esac
 if [ "$RC" -ne 0 ]; then
   {
-    echo "[sdlc hook] ${LINT_TOOL} 检查未通过：$FILE"
+    echo "[sdlc hook] ${LINT_TOOL} 检查未通过：$FILE（linter: $LINT_BIN）"
     echo "$OUT"
     echo "请修复上述问题后再继续（项目规范由 .claude/skills / 编码规范定义）。"
   } >&2

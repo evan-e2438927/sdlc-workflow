@@ -195,6 +195,8 @@ CONTRACT_CHECK:
        FAIL "同时存在 frontend 与 backend 任务，但缺少接口契约"
   2. 形态一致:
      IF 契约形态 NOT IN [table, ts-types, openapi, none] OR 与 03-design-generator.md §1.6 判定不符:
+       # 例外：TS monorepo 判为 ts-types，但 design.md 登记了沿用既有惯例的理由（「契约形态判定说明」，
+       #       含现有惯例证据）而记为 table → 视为一致，不 FAIL；已有 OpenAPI 文件却记为 table 不适用此例外
        FAIL "契约形态非法或与项目实际不符（如已有 OpenAPI 文件却记为 table）"
   3. 引用完整:
      FOR EACH 任务描述 / AC 中出现的接口（方法 + 路径）:

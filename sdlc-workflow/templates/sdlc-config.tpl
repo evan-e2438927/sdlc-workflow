@@ -23,7 +23,8 @@ LINT_TOOL=eslint
 # [可选] 编辑即检查   枚举: on | off   默认: on
 # PostToolUse hook 在每次 Edit/Write 后对改动的代码文件跑 LINT_TOOL；失败时把错误反馈给模型让其修复
 # （PostToolUse 不能硬阻断，编辑已发生）。缺少 linter 时自动降级为不反馈。
-# 注：仅当 LINT_TOOL 可在 PATH 解析到时才运行；仅装在 node_modules/.bin 的项目本地 linter 会被跳过。
+# linter 解析：优先使用离被改文件最近的 node_modules/.bin/<LINT_TOOL>（向上找到项目根为止，并在该包目录下执行，
+# 用的是该包自己的版本与配置）；找不到再用 PATH 上的；都没有则不检查。子 agent 的编辑同样会触发本 hook。
 EDIT_CHECK=on
 
 # [固定] E2E 框架   固定: playwright

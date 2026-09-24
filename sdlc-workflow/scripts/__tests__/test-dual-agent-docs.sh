@@ -148,9 +148,10 @@ lacks "$R/07-test-generator.md" '生成 TODO 标记，待 Claude Code 实现后�
 # M1: 插件命名空间派发类型
 has "$F" 'sdlc-workflow:sdlc-backend-dev'
 
-# M2: LINT_TOOL 兜底跑法（去掉条件句）
-has   "$F" 'multi 模式下主 agent 在此对 owner 为子 agent 的代码文件统一跑一次'
+# M2 → 实测修订：hook 对子 agent 编辑同样触发，汇总阶段不再重复跑 LINT_TOOL
+lacks "$F" 'multi 模式下主 agent 在此对 owner 为子 agent 的代码文件统一跑一次'
 lacks "$F" '若 PostToolUse 编辑检查 hook 对子 agent 的编辑不生效'
+has   "$F" '子 agent 的 Edit/Write 同样触发 PostToolUse 编辑检查 hook'
 
 # M3: mini 检查置于执行模式解析器最前
 has   "$F" 'mini: 固定 single'
@@ -177,5 +178,11 @@ has "$W" '⑥ 开发（打地基 → 前后端角色 → 汇总）'
 has "$REPO_DIR/skills/sdlc-review/SKILL.md" 'Track 一致性'
 has "$REPO_DIR/skills/sdlc-review/SKILL.md" '契约一致性'
 has "$REPO_DIR/skills/sdlc-review/SKILL.md" '越界'
+# ── 实测修订：契约形态沿用既有惯例 + hook 本地 linter ──
+has   "$R/03-design-generator.md" '沿用既有惯例'
+has   "$R/05-design-reviewer.md"  '登记了沿用既有惯例的理由'
+lacks "$SKILL_DIR/templates/sdlc-config.tpl" '仅装在 node_modules/.bin 的项目本地 linter 会被跳过'
+has   "$SKILL_DIR/templates/sdlc-config.tpl" '优先使用离被改文件最近的 node_modules/.bin'
+
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1
