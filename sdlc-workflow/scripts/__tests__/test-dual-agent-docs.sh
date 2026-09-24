@@ -80,5 +80,12 @@ has   "$REPO_DIR/skills/sdlc-apply/SKILL.md" '⑥.1 打地基'
 lacks "$REPO_DIR/skills/sdlc-apply/SKILL.md" 'Agent Team'
 has   "$REPO_DIR/skills/sdlc-doit/SKILL.md"  '--agents single|multi'
 has   "$R/flow-mini.md" '执行模式固定 single'
+
+# ── Task 7: Gate 2 ──
+has "$R/08-code-reviewer.md" '8) 接口契约一致性'
+has "$R/08-code-reviewer.md" '9) 越界：'
+has "$R/08-code-reviewer.md" '10) 越界：'
+has "$R/08-code-reviewer.md" '| 接口契约 |'
+has "$R/08-code-reviewer.md" '=== design.md 接口契约 ==='
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1
