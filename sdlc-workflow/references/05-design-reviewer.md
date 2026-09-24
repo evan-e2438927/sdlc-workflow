@@ -127,9 +127,9 @@ Gate 1 必须验证每个任务都声明了 Track 字段、Track 与目标文件
 ```
 TRACK_CONSISTENCY_CHECK:
   TRACK_PATH_RULES = {
-    "frontend":  ["apps/web/", "apps/native/", "packages/ui/"],
-    "backend":   ["apps/server/", "packages/api/", "packages/db/"],
-    "shared":    ["packages/config/", "packages/env/", "packages/auth/", "packages/contracts/"],
+    "frontend":  ["apps/web/", "apps/native/", "packages/ui/", "tests/unit/web/", "tests/unit/packages/ui/"],
+    "backend":   ["apps/server/", "packages/api/", "packages/db/", "tests/unit/server/", "tests/unit/packages/api/", "tests/unit/packages/db/"],
+    "shared":    ["packages/config/", "packages/env/", "packages/auth/", "packages/contracts/", "tests/unit/packages/config/", "tests/unit/packages/env/", "tests/unit/packages/auth/", "tests/unit/packages/contracts/"],
     "infra":     ["db/migrations/", ".github/workflows/", "<root-config-files>"],
     "unit-test": ["tests/unit/"],
     "qa":        ["tests/e2e/"]
@@ -206,6 +206,9 @@ CONTRACT_CHECK:
      FOR EACH frontend 任务依赖了 backend 任务:
        IF 「依赖关系」未写明运行时原因: FAIL "$task.id 仅为接口形状依赖 backend，应改为依赖契约"
 ```
+
+> ⚠️ **历史迭代兼容**：本次改动之前生成的迭代可能没有「接口契约」小节（旧版 design.md 用的是「## 3. API 接口设计」，不满足上面「存在性」检查的标题匹配）。
+> 对这类迭代跑 Gate 1 前，先重新生成 proposal（含新版契约小节）或手工把该小节标题改名为「## 3. 接口契约」，否则检查 1 会因标题不匹配而 FAIL。
 
 ### 3. 循环逻辑
 

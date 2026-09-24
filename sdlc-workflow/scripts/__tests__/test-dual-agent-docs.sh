@@ -105,5 +105,77 @@ for f in "$SKILL_DIR/SKILL.md" "$R"/*.md "$REPO_DIR"/skills/sdlc-*/SKILL.md "$W"
   [ -L "$f" ] && continue
   lacks "$f" 'Agent Team'
 done
+
+# ── Final fix wave ──
+# F1: 命令模板与 §4 loop 对齐 —— 越界/契约块出现次数
+n=$(grep -c '越界：' "$R/08-code-reviewer.md"); [ "$n" = "3" ] || { echo "FAIL: 08 越界： 出现 $n 次，应为 3"; fail=1; }
+n=$(grep -c '=== design.md 接口契约 ===' "$R/08-code-reviewer.md"); [ "$n" = "2" ] || { echo "FAIL: 08 === design.md 接口契约 === 出现 $n 次，应为 2"; fail=1; }
+
+# F2: Gate 2 prompt 不再依赖 references/roles/*.md，改内联白名单 + tracks 汇报 + 未跟踪新文件
+lacks "$R/08-code-reviewer.md" '越界：各 Track 的改动是否落在对应角色白名单内（references/roles/*.md）'
+has   "$R/08-code-reviewer.md" '$ITER_DIR/tracks/*.md 是否如实列出修改文件'
+has   "$R/08-code-reviewer.md" 'tests/unit/packages/{api,db}/**'
+n=$(grep -c '=== 未跟踪的新文件 ===' "$R/08-code-reviewer.md"); [ "$n" = "3" ] || { echo "FAIL: 08 === 未跟踪的新文件 === 出现 $n 次，应为 3"; fail=1; }
+n=$(grep -c '=== tracks 汇报 ===' "$R/08-code-reviewer.md"); [ "$n" = "3" ] || { echo "FAIL: 08 === tracks 汇报 === 出现 $n 次，应为 3"; fail=1; }
+
+# F3: 测试文件归属路径在 04/05/roles/tpl 间同步
+has "$R/04-task-generator.md" 'tests/unit/packages/api/'
+has "$R/05-design-reviewer.md" 'tests/unit/packages/api/'
+has "$R/roles/backend.md" 'tests/unit/packages/api/**'
+has "$R/roles/backend.md" 'tests/unit/packages/db/**'
+has "$R/roles/frontend.md" 'tests/unit/packages/ui/**'
+has "$SKILL_DIR/templates/workflow-rules.md.tpl" 'packages/contracts/*'
+
+# F4: 历史迭代兼容（旧标题 fallback）
+has "$F" 'API 接口设计'
+has "$R/08-code-reviewer.md" "API 接口设计/,/^## 4"
+has "$R/05-design-reviewer.md" '历史迭代兼容'
+
+# F5: PRE_CHANGED / CHANGED 同口径，排除迭代目录自身，无提交仓库兜底
+has "$F" '.pre-changed'
+has "$F" 'CHANGED = SNAPSHOT() − PRE_CHANGED − "$ITER_DIR/**"'
+has "$F" 'SNAPSHOT() = (git ls-files) ∪ (git ls-files --others --exclude-standard)'
+
+# F6: 修复回合
+has "$F" '## 修复回合'
+has "$S" '修复回合，见 flow-apply.md'
+
+# F7: test-generator 只新增 + 失败用例处理
+has   "$R/07-test-generator.md" '保留失败用例，在 tracks/test.md「与设计的偏差」写明，状态记 partial'
+has   "$R/07-test-generator.md" '[ -e "$TEST_FILE" ] || cat > "$TEST_FILE"'
+lacks "$R/07-test-generator.md" '生成 TODO 标记，待 Claude Code 实现后补充'
+
+# M1: 插件命名空间派发类型
+has "$F" 'sdlc-workflow:sdlc-backend-dev'
+
+# M2: LINT_TOOL 兜底跑法（去掉条件句）
+has   "$F" 'multi 模式下主 agent 在此对 owner 为子 agent 的代码文件统一跑一次'
+lacks "$F" '若 PostToolUse 编辑检查 hook 对子 agent 的编辑不生效'
+
+# M3: mini 检查置于执行模式解析器最前
+has   "$F" 'mini: 固定 single'
+lacks "$F" 'auto: mini'
+
+# M4: foundation 的 skipped 判定
+has "$F" '`foundation` 例外'
+
+# M5: ⑦.1 重跑勾选自检 + 显式 pipeline_stage
+has "$F" '对 unit-test 任务重跑一次 ⑥.5 式勾选属实自检'
+
+# M6: 角色禁止项补充
+has "$R/roles/backend.md"  '不在全仓运行带 `--fix`'
+has "$R/roles/frontend.md" '不在全仓运行带 `--fix`'
+has "$R/roles/test.md"     '不在全仓运行带 `--fix`'
+
+# M7: 派活 prompt 的 CTX.skills 索引须含 SKILL.md 路径
+has "$F" 'CTX.skills 索引格式要求'
+
+# M8: workflow-overview.md 对齐新版 ⑥/⑦ 流程
+has "$W" '⑥ 开发（打地基 → 前后端角色 → 汇总）'
+
+# M9: sdlc-review SKILL.md 摘要补充 Gate 1/2 检查项
+has "$REPO_DIR/skills/sdlc-review/SKILL.md" 'Track 一致性'
+has "$REPO_DIR/skills/sdlc-review/SKILL.md" '契约一致性'
+has "$REPO_DIR/skills/sdlc-review/SKILL.md" '越界'
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1

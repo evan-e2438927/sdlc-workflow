@@ -719,8 +719,8 @@ LOG "✅ PR: <url> | 分支: $CURRENT_BRANCH"
 | 循环点 | 触发条件 | 回退到 | 最大轮数 | 超限行为 |
 |--------|----------|--------|----------|----------|
 | Gate 1 (⑤) | Codex 返回 FAIL（--review 时） | 步骤③ design-generator | REVIEW_MAX_ROUNDS | 控制台报错，中止 |
-| Gate 2 (⑧) | Codex 返回 FAIL（--review 时） | 步骤⑥ 开发 | REVIEW_MAX_ROUNDS | 控制台报错，中止 |
-| Test (⑨) | 测试失败 | 步骤⑥ 开发 | REVIEW_MAX_ROUNDS | 控制台报错，中止 |
+| Gate 2 (⑧) | Codex 返回 FAIL（--review 时） | 步骤⑥ 开发（修复回合，见 flow-apply.md「修复回合」） | REVIEW_MAX_ROUNDS | 控制台报错，中止 |
+| Test (⑨) | 测试失败 | 步骤⑥ 开发（修复回合，见 flow-apply.md「修复回合」） | REVIEW_MAX_ROUNDS | 控制台报错，中止 |
 
 ## 全局规则
 

@@ -106,8 +106,12 @@ apply 通常在**独立会话**里跑（与 proposal 分开），必须重新经
 
 ⑥ 开发（两种执行模式共用本流程，模式只决定"谁来执行"，见「执行模式选择」）
    ⑥.0 打包
-        记录开工前已改动的文件 PRE_CHANGED（git status --porcelain），越界检测时排除
+        计算/复用 PRE_CHANGED 基线（首次进入本次 apply 的 ⑥.0 时计算并写入
+          $ITER_DIR/tracks/.pre-changed；断点续跑复用同一份，见「汇总：越界检测与公共文件请求」）
         解析执行模式（见「执行模式选择」），写入 status.json
+        历史迭代兼容：早于本次改动生成的 design.md 可能仍是旧标题「## 3. API 接口设计」/
+          「### 5.3 依赖管理」——分别按新版「## 3. 接口契约」（契约形态 = table）/
+          「### 5.3 新增依赖」等效处理，不因标题不同而跳过
         按 Track 生成工作包（WP）：
           WP = 角色说明全文（references/roles/<track>.md）+ 该 Track 任务（依赖顺序、目标文件、
                适用规范、AC）+ design.md「## 3. 接口契约」+ 规范上下文（LOAD_CONTEXT 摘录）
@@ -136,6 +140,7 @@ apply 通常在**独立会话**里跑（与 proposal 分开），必须重新经
    生成 tests/reports/<slug>-coverage.md（规范见 07-test-generator.md）；写 tracks/test.md
    status.json: pipeline_stage=test-audit，tracks.test 随进度更新
 ⑦.1 汇总（主 agent）：读 tracks/test.md → 越界检测 → 回写 unit-test 任务
+     → 对 unit-test 任务重跑一次 ⑥.5 式勾选属实自检 → status.json: pipeline_stage=merge（显式再写一次，标记本轮汇总完成）
 
 [⑧ code-reviewer (Gate 2)   ← 仅 --review 模式]
    Codex CLI 审查代码（含契约一致性与越界检查）
@@ -158,18 +163,19 @@ CAN_SPAWN = 当前会话提供子 agent 派发工具（Claude Code 有；Codex �
 HAS_BE    = backend WP 非空；HAS_FE = frontend WP 非空
 OVERLAP   = backend WP 与 frontend WP 的目标文件有交集（按 Track 路径规则本不应出现）
 
-IF MODE_REQ == "single":
+IF 当前为 mini:  # mini 固定 single，优先于 --agents / AGENT_MODE 的任何取值
+  MODE="single"; REASON="mini: 固定 single"
+ELIF MODE_REQ == "single":
   MODE="single"; REASON="指定 single"
 ELIF MODE_REQ == "multi":
   IF NOT CAN_SPAWN:  MODE="single"; REASON="降级: 运行时不支持子 agent"
   ELIF OVERLAP:      MODE="single"; REASON="降级: 前后端目标文件有交集"
   ELSE:              MODE="multi";  REASON="指定 multi"
 ELSE:  # auto
-  IF 当前为 mini:               MODE="single"; REASON="auto: mini"
-  ELIF NOT CAN_SPAWN:           MODE="single"; REASON="auto: 运行时不支持子 agent"
-  ELIF NOT (HAS_BE AND HAS_FE): MODE="single"; REASON="auto: 无可并行的开发角色"
-  ELIF OVERLAP:                 MODE="single"; REASON="auto: 前后端目标文件有交集"
-  ELSE:                         MODE="multi";  REASON="auto: backend+frontend 均有任务"
+  IF NOT CAN_SPAWN:              MODE="single"; REASON="auto: 运行时不支持子 agent"
+  ELIF NOT (HAS_BE AND HAS_FE):  MODE="single"; REASON="auto: 无可并行的开发角色"
+  ELIF OVERLAP:                  MODE="single"; REASON="auto: 前后端目标文件有交集"
+  ELSE:                          MODE="multi";  REASON="auto: backend+frontend 均有任务"
 
 UPDATE status.json: agent_mode=MODE, agent_mode_reason=REASON
 LOG "🤖 执行模式: $MODE（$REASON）"
@@ -181,7 +187,8 @@ LOG "🤖 执行模式: $MODE（$REASON）"
 ## 工作包与派活
 
 - **派发方式**（multi）：用当前运行时的子 agent 派发工具，类型取 `sdlc-backend-dev` / `sdlc-frontend-dev` / `sdlc-test-dev`；
-  该类型不可用时改用通用子 agent（general-purpose），派活 prompt 不变。
+  以插件形式安装时该类型可能带命名空间前缀，如 `sdlc-workflow:sdlc-backend-dev` / `sdlc-workflow:sdlc-frontend-dev` / `sdlc-workflow:sdlc-test-dev`，两种命名都需尝试；
+  都不可用时改用通用子 agent（general-purpose），派活 prompt 不变。
 - **并行**：backend 与 frontend 两个子 agent 在**同一轮**同时派发，全部返回后进入 ⑥.3；test 子 agent 在 ⑥.3 之后单独派发。
 - **单 agent 模式**：主 agent 按同一份角色说明与工作包依次执行，同样写 `tracks/<track>.md`。
 - **派活 prompt 模板**：
@@ -205,12 +212,29 @@ LOG "🤖 执行模式: $MODE（$REASON）"
 完成后：写 <ITER_DIR>/tracks/<track>.md，并在最终回复中给出与其相同的内容。
 ```
 
+> **CTX.skills 索引格式要求**：传给子 agent 的 `CTX.skills` 索引必须包含每个命中 skill 的
+> **SKILL.md 文件路径**，不能只给 skill 名。子 agent 没有 Skill 工具，只能靠 `Read` 读取该路径
+> 才能拿到 skill 正文；只给名字会导致子 agent 无法加载规范内容。
+
 ## 汇总：越界检测与公共文件请求
+
+**SNAPSHOT()**（文件级、CHANGED 与 PRE_CHANGED 统一用这一口径，避免两者基线不一致）：
+
+```
+IF 仓库存在至少一次提交（git rev-parse HEAD 成功）:
+  SNAPSHOT() = (git diff --name-only HEAD) ∪ (git ls-files --others --exclude-standard)
+ELSE:  # 全新仓库，尚无 HEAD，git diff HEAD 会报错
+  SNAPSHOT() = (git ls-files) ∪ (git ls-files --others --exclude-standard)
+```
+
+**PRE_CHANGED 基线**：⑥.0 打包阶段用 SNAPSHOT() 计算，只在**本次 apply 首次进入 ⑥.0** 时计算一次，
+写入 `$ITER_DIR/tracks/.pre-changed`；断点续跑重新进入 ⑥.0 时该文件已存在则直接复用，不重新计算
+（否则续跑前主 agent 自己写的文件会被误当作"开工前已存在"而漏检）。
 
 在 ⑥.3（读 backend / frontend 汇报）与 ⑦.1（读 test 汇报）各执行一次：
 
 ```
-CHANGED = (git diff --name-only HEAD) ∪ (git ls-files --others --exclude-standard) − PRE_CHANGED
+CHANGED = SNAPSHOT() − PRE_CHANGED − "$ITER_DIR/**"   # 迭代目录自身产物（tracks/*.md、.pre-changed 等）不算越界
 FOR f IN CHANGED:
   IF f 由主 agent 在 ⑥.1 或汇总中修改: CONTINUE
   owner = 在 tracks/*.md「修改的文件」「新增的测试」中列出 f 的角色
@@ -220,8 +244,8 @@ FOR f IN CHANGED:
 FOR 每条「公共文件修改请求」: 主 agent 评估后执行（如安装依赖、注册路由），执行结果记入 tracks/foundation.md
 ```
 
-若 PostToolUse 编辑检查 hook 对子 agent 的编辑不生效，
-主 agent 在此对 owner 为子 agent 的代码文件统一跑一次 `LINT_TOOL`，失败项退回对应角色修复。
+multi 模式下主 agent 在此对 owner 为子 agent 的代码文件统一跑一次 `LINT_TOOL`
+（PostToolUse hook 已触发时属冗余但无害），失败项退回对应角色修复。
 
 ## blocked 处理
 
@@ -233,7 +257,25 @@ FOR 每条「公共文件修改请求」: 主 agent 评估后执行（如安装�
 
 - apply 重新进入时（phase 仍为 `approved`），若 status.json 已有 `tracks`：跳过值为 `done` / `skipped` 的 Track，从 `pipeline_stage` 所在步骤继续。
 - 续跑时重新解析执行模式，可与上次不同（如 multi 中断后以 single 续跑剩余 Track）；更新 `agent_mode`，`agent_mode_reason` 前缀 "续跑: "。
-- 无任务的 Track 在 ⑥.0 即记为 `skipped`。
+- 无任务的 Track 在 ⑥.0 即记为 `skipped`；**`foundation` 例外**——只有同时满足"没有 infra / shared 任务"
+  **且**"design.md「### 5.3 新增依赖」为空或写 `无`"两个条件才记 `skipped`；只要有一项不满足（哪怕只是要装依赖，没有
+  infra/shared 任务），⑥.1 仍要跑一遍（至少完成依赖安装）。
+
+## 修复回合
+
+Gate 2（⑧，`--review` 模式）或 ⑨ test-pipeline 失败后需要修复代码，SKILL.md「循环与回退规则」的回退目标
+是「步骤⑥ 开发」，但角色模型下**不**重新派发子 agent、也不整体重跑 ⑥.0-⑥.3，规则如下：
+
+1. **谁来修**：无论 single/multi 模式，修复统一由**主 agent**以单 agent 方式直接改代码；改动仍须落在
+   该问题所属角色（backend / frontend / test）的白名单内——公共文件本来就允许主 agent 改，不算越界。
+2. **记录**：修复完成后，把改动文件 + 原因追加到问题所属的 `$ITER_DIR/tracks/<track>.md`，新增一个
+   「修复记录」小节（不覆盖、不删除原有「完成的任务与 AC」「修改的文件」等小节）。
+3. **回归范围**：
+   - 必须重新执行 SKILL.md ⑥.5「勾选属实自检」，确认 tasks.md 状态与修复后的真实实现一致；
+   - 只有修复改变了 AC 行为（而非纯格式化 / lint 修复）时，才重新跑一次 ⑦ 查漏；否则跳过 ⑦。
+4. **Track 状态**：已经是 `done` 的 Track 保持 `done`，不因修复回合被重置为 `in_progress`，也不重新派发
+   任何子 agent（无论 single/multi）。
+5. **轮数**：修复回合仍计入 Gate 2 / ⑨ 各自的 `REVIEW_MAX_ROUNDS`，超限行为不变（控制台报错，中止，人工介入）。
 
 ## 自动查找最近 proposal
 

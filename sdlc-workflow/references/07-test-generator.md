@@ -183,9 +183,10 @@ TEST_FRAMEWORK=${TEST_FRAMEWORK:-jest}
 # 1. 读取 tasks.md，提取验收标准
 ACCEPTANCE_CRITERIA=$(cat "$TASKS_FILE" | grep -A 10 "验收标准")
 
-# 2. 生成单元测试（镜像源码目录）
+# 2. 生成单元测试（镜像源码目录，只新增——开发角色已写的测试文件不得被覆盖）
 mkdir -p "tests/unit/web/logic"
-cat > "tests/unit/web/logic/${SLUG}.test.ts" << 'EOF'
+TEST_FILE="tests/unit/web/logic/${SLUG}.test.ts"
+[ -e "$TEST_FILE" ] || cat > "$TEST_FILE" << 'EOF'
 // 单元测试 - 使用 $TEST_FRAMEWORK
 import { describe, it, expect, beforeEach } from '$TEST_FRAMEWORK';
 ...
@@ -207,7 +208,7 @@ ls -la "tests/unit/web/logic/${SLUG}.test.ts"
 |----------|----------|
 | tasks.md 不存在 | 回退到步骤④ |
 | tests/ 目录不存在 | 自动创建 unit/reports 子目录 |
-| 代码与测试不匹配 | 生成 TODO 标记，待 Claude Code 实现后补充 |
+| 代码与测试不匹配 | 保留失败用例，在 tracks/test.md「与设计的偏差」写明，状态记 partial（不生成 TODO 标记，见规则 9） |
 | 覆盖率目标未达成 | 在报告中标注，待后续迭代补充 |
 
 ## 相关文件

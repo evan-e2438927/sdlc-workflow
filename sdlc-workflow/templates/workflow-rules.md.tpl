@@ -43,7 +43,7 @@
 - E2E 测试必须写入 `tests/e2e/`，并维护"需求 ID / 场景 ID / 文件路径"的唯一映射，不得重复覆盖同一需求路径
 - `tasks.md` 是执行状态单据：任务实现完成后，必须将任务标题从 `[ ]` 回写为 `[x]`，并同步勾选真实完成的验收标准
 - 每个任务必须声明 Track 字段（取值：`frontend` | `backend` | `shared` | `infra` | `unit-test` | `qa`），用于按角色组织阅读和分派
-- Track 必须与目标文件路径自洽：`apps/web/*`/`apps/native/*`/`packages/ui/*` → frontend；`apps/server/*`/`packages/api/*`/`packages/db/*` → backend；`packages/{config,env,auth}/*` → shared；`db/migrations/*` 与根目录配置/CI 文件 → infra；`tests/unit/*` → unit-test；`tests/e2e/*` → qa
+- Track 必须与目标文件路径自洽：`apps/web/*`/`apps/native/*`/`packages/ui/*`/`tests/unit/web/*`/`tests/unit/packages/ui/*` → frontend；`apps/server/*`/`packages/api/*`/`packages/db/*`/`tests/unit/server/*`/`tests/unit/packages/api/*`/`tests/unit/packages/db/*` → backend；`packages/{config,env,auth}/*`/`packages/contracts/*`/`tests/unit/packages/{config,env,auth,contracts}/*` → shared；`db/migrations/*` 与根目录配置/CI 文件 → infra；`tests/unit/*` → unit-test；`tests/e2e/*` → qa
 - 一个任务只能属于一个 Track；跨端需求（如同时改前端表单与后端 API）必须在拆任务阶段拆为多个任务，禁止一个任务跨 Track
 - `tasks.md` 必须在"任务总览"之后提供"任务 Track 汇总（按角色视图）"表，覆盖所有任务 ID，且总数与 Phase 总览一致
 - `unit-test` / `qa` Track 仅允许出现在 Phase 3；Phase 1/2 实现任务里随手写的单元测试不计为独立 Track

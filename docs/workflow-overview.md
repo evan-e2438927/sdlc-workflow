@@ -176,7 +176,7 @@ sdlc-workflow
 | 项 | 说明 |
 |-----|------|
 | **何时用** | `proposal` 产出审核通过后，实现代码 |
-| **做什么** | 读取 status.json → 开发（frontend/backend/unit-test）→ 单元测试 → [Gate 2] → lint + unit |
+| **做什么** | 读取 status.json → ⑥ 开发（打地基 → 前后端角色 → 汇总）→ ⑦ 查漏（test 角色）→ [Gate 2] → lint + unit |
 | **产物** | 代码变更 + 单元测试（不提交、不 push） |
 | **阶段覆盖** | 阶段三 |
 | **前置条件** | status.json 中 `phase` 为 `pending_review` 或 `approved` |

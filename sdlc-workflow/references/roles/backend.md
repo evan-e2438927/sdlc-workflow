@@ -14,6 +14,8 @@
 - `packages/api/**`
 - `packages/db/**`
 - `tests/unit/server/**`
+- `tests/unit/packages/api/**`
+- `tests/unit/packages/db/**`
 - `$ITER_DIR/tracks/backend.md`
 - existing project：以 `.claude/EXISTING_STRUCTURE.md` 中后端对应的实际目录替换上述源码与测试路径
 
@@ -27,6 +29,7 @@
 - 修改 `tasks.md`、`design.md`、`requirements.md`、`status.json`
 - 修改其他 Track 的路径（如 `apps/web/**`、`tests/unit/web/**`）
 - 偏离契约：确需偏离时停止该任务，在汇报「与设计的偏差」中说明，由主 agent 决定
+- 不在全仓运行带 `--fix` / 格式化写回的命令（只对自己白名单内文件运行）；覆盖率等生成产物不得写入白名单外路径
 
 ## 遇到阻塞
 必须修改公共文件或白名单外文件才能继续时：**停止该任务**，汇报状态标 `blocked`，
