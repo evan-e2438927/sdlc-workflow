@@ -465,6 +465,7 @@ your-project/
 | `TEST_BOOTSTRAP_POLICY` | `report` | 测试基础设施缺口处理（report/auto/never） |
 | `REVIEW_MAX_ROUNDS` | `1` | Gate/Test 最大循环轮数 |
 | `AGENT_MODE` | `auto` | apply 执行模式（auto/single/multi），`--agents` 参数覆盖 |
+| `EDIT_GUARD` | `on` | multi 模式越界守卫：角色子 agent 写本次允许清单外的文件时在写入前拒绝 |
 | `GIT_BRANCH_PREFIX` | `feat/` | Git 分支前缀 |
 | `COMMIT_TYPE` | （空） | Conventional Commits type，留空按迭代 type 推断 |
 | `COMMIT_SCOPE` | （空） | Conventional Commits scope，留空自动推断 |

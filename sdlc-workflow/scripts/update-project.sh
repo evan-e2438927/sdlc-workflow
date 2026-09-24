@@ -12,27 +12,34 @@ PROJECT_ROOT="${1:-.}"
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CLAUDE_DIR="$PROJECT_ROOT/.claude"
 
-# 安装 PostToolUse 检查 hook + 合并 settings.json（幂等）
+# 安装 SDLC hooks（PostToolUse 编辑检查 + PreToolUse 越界守卫）并合并 settings.json（幂等）
 install_sdlc_hook() {
   local root="$1"
   mkdir -p "$root/.claude/hooks"
-  cp "$SKILL_DIR/templates/hooks/sdlc-post-edit-check.sh" "$root/.claude/hooks/sdlc-post-edit-check.sh"
-  chmod +x "$root/.claude/hooks/sdlc-post-edit-check.sh"
+  local h
+  for h in sdlc-post-edit-check.sh sdlc-pre-edit-guard.sh; do
+    cp "$SKILL_DIR/templates/hooks/$h" "$root/.claude/hooks/$h"
+    chmod +x "$root/.claude/hooks/$h"
+  done
   local settings="$root/.claude/settings.json"
   local tpl="$SKILL_DIR/templates/settings.json.tpl"
   if [ ! -f "$settings" ]; then
     cp "$tpl" "$settings"
   elif command -v jq >/dev/null 2>&1; then
-    # 若尚无我们的 hook，则合并追加一个 PostToolUse 条目
-    if ! jq -e '.hooks.PostToolUse[]?.hooks[]? | select(.command|test("sdlc-post-edit-check"))' "$settings" >/dev/null 2>&1; then
-      local tmp; tmp="$(mktemp)"
-      jq --slurpfile add "$tpl" '
-        .hooks = (.hooks // {})
-        | .hooks.PostToolUse = ((.hooks.PostToolUse // []) + $add[0].hooks.PostToolUse)
-      ' "$settings" > "$tmp" && mv "$tmp" "$settings" || rm -f "$tmp"
-    fi
+    # 按事件分别检查：尚无我们的 hook 才从模板合并追加该事件的条目
+    local pair ev script tmp
+    for pair in PostToolUse:sdlc-post-edit-check PreToolUse:sdlc-pre-edit-guard; do
+      ev="${pair%%:*}"; script="${pair#*:}"
+      if ! jq -e --arg ev "$ev" --arg s "$script" '.hooks[$ev][]?.hooks[]? | select(.command|test($s))' "$settings" >/dev/null 2>&1; then
+        tmp="$(mktemp)"
+        jq --slurpfile add "$tpl" --arg ev "$ev" '
+          .hooks = (.hooks // {})
+          | .hooks[$ev] = ((.hooks[$ev] // []) + $add[0].hooks[$ev])
+        ' "$settings" > "$tmp" && mv "$tmp" "$settings" || rm -f "$tmp"
+      fi
+    done
   else
-    echo "  ⚠ 已安装 hook 脚本，但缺少 jq 无法自动合并 settings.json；请手动把 templates/settings.json.tpl 的 PostToolUse 合并进 $settings" >&2
+    echo "  ⚠ 已安装 hook 脚本，但缺少 jq 无法自动合并 settings.json；请手动把 templates/settings.json.tpl 的 PreToolUse / PostToolUse 合并进 $settings" >&2
   fi
 }
 
@@ -191,6 +198,7 @@ ensure_gitignore() {
 ensure_gitignore ".claude/.sdlc-config"
 ensure_gitignore ".claude/.sdlc-config.local"
 ensure_gitignore ".claude/*.bak"
+ensure_gitignore ".claude/.sdlc-active-iteration"
 # qa 二进制产物不入库（保留 tests/reports/*.md 验收报告）
 ensure_gitignore "# SDLC qa 二进制产物（保留 tests/reports/*.md）"
 ensure_gitignore "tests/reports/**/screenshots/"

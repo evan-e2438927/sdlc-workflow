@@ -27,6 +27,12 @@ LINT_TOOL=eslint
 # 用的是该包自己的版本与配置）；找不到再用 PATH 上的；都没有则不检查。子 agent 的编辑同样会触发本 hook。
 EDIT_CHECK=on
 
+# [可选] 多 agent 越界守卫   枚举: on | off   默认: on
+# multi 模式 apply 期间，PreToolUse hook 在角色子 agent（sdlc-backend-dev / frontend / test）Edit/Write 前
+# 检查目标文件是否在本次工作包允许清单（$ITER_DIR/tracks/.allow-<role>）内；不在则拒绝写入并提示按 blocked 处理。
+# 主 agent、single 模式、非 apply 阶段不受影响；用 Bash 写文件拦不到（由汇总阶段越界检测兜底）。
+EDIT_GUARD=on
+
 # [固定] E2E 框架   固定: playwright
 # qa 命令（步骤 ⑩）编写并通过 Playwright MCP 执行浏览器功能验收
 E2E_FRAMEWORK=playwright
