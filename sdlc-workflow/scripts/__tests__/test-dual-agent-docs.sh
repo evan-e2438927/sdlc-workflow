@@ -12,12 +12,11 @@ exists() { [ -f "$1" ] || { echo "FAIL: 缺少文件 $1"; fail=1; }; }
 
 # ── Task 2: Track 统一 + Gate 1 名单 ──
 has   "$R/05-design-reviewer.md" '["frontend","backend","shared","infra","unit-test","qa"]'
-has   "$R/05-design-reviewer.md" '"unit-test": ["tests/unit/"]'
-has   "$R/05-design-reviewer.md" '["tests/e2e/"]'
-has   "$R/05-design-reviewer.md" '"packages/contracts/"'
+has   "$R/track-paths.md" '"unit-test": ["tests/unit/"]'
+has   "$R/track-paths.md" '"qa":        ["tests/e2e/"]'
+has   "$R/track-paths.md" '"packages/contracts/"'
 lacks "$R/05-design-reviewer.md" 'track == "test"'
 lacks "$R/05-design-reviewer.md" '（frontend / backend / shared / infra / test）'
-has   "$R/04-task-generator.md"  '`packages/auth/**`, `packages/contracts/**`'
 has   "$SKILL_DIR/SKILL.md"      'track: frontend|backend|shared|infra|unit-test|qa'
 
 # ── Task 3: 接口契约 ──
@@ -119,8 +118,8 @@ n=$(grep -c '=== 未跟踪的新文件 ===' "$R/08-code-reviewer.md"); [ "$n" = 
 n=$(grep -c '=== tracks 汇报 ===' "$R/08-code-reviewer.md"); [ "$n" = "3" ] || { echo "FAIL: 08 === tracks 汇报 === 出现 $n 次，应为 3"; fail=1; }
 
 # F3: 测试文件归属路径在 04/05/roles/tpl 间同步
-has "$R/04-task-generator.md" 'tests/unit/packages/api/'
-has "$R/05-design-reviewer.md" 'tests/unit/packages/api/'
+has "$R/04-task-generator.md" 'references/track-paths.md'
+has "$R/05-design-reviewer.md" 'TRACK_PATH_RULES = references/track-paths.md 的 tracks 字段'
 has "$R/roles/backend.md" 'tests/unit/packages/api/**'
 has "$R/roles/backend.md" 'tests/unit/packages/db/**'
 has "$R/roles/frontend.md" 'tests/unit/packages/ui/**'

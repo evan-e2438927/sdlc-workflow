@@ -73,14 +73,14 @@
 
 ### 2.0 Track 取值与归属规则
 
-| Track      | 含义                       | 典型目标文件路径                                                     |
-|------------|----------------------------|----------------------------------------------------------------------|
-| `frontend` | Web/Native 前端实现        | `apps/web/**`, `apps/native/**`, `packages/ui/**`, `tests/unit/web/**`, `tests/unit/packages/ui/**`                    |
-| `backend`  | 后端 API / Worker / 数据层 | `apps/server/**`, `packages/api/**`, `packages/db/**`, `tests/unit/server/**`, `tests/unit/packages/api/**`, `tests/unit/packages/db/**`                |
-| `shared`   | 跨端共享包                 | `packages/config/**`, `packages/env/**`, `packages/auth/**`, `packages/contracts/**`, `tests/unit/packages/config/**`, `tests/unit/packages/env/**`, `tests/unit/packages/auth/**`, `tests/unit/packages/contracts/**`          |
-| `infra`    | 基础设施（迁移、配置、CI） | `db/migrations/**`, 根目录配置文件, `.github/workflows/**`           |
-| `unit-test`| 独立单元测试任务（限 Phase 3，apply 执行） | `tests/unit/**`                                     |
-| `qa`       | 浏览器验收规格（限 Phase 3，qa 命令执行）   | `tests/e2e/**`（脚本由 qa 命令生成）                 |
+| Track      | 含义                                       | 路径范围 |
+|------------|--------------------------------------------|----------|
+| `frontend` | Web/Native 前端实现（含自己那部分单测）     | 见 `references/track-paths.md` 的 `tracks.frontend` |
+| `backend`  | 后端 API / Worker / 数据层（含自己那部分单测）| 见 `references/track-paths.md` 的 `tracks.backend` |
+| `shared`   | 跨端共享包（含契约落地）                   | 见 `references/track-paths.md` 的 `tracks.shared` |
+| `infra`    | 基础设施（迁移、配置、CI）                 | 见 `references/track-paths.md` 的 `tracks.infra` |
+| `unit-test`| 独立单元测试任务（限 Phase 3，apply ⑦ 执行）| 见 `references/track-paths.md` 的 `tracks.unit-test` |
+| `qa`       | 浏览器验收规格（限 Phase 3，qa 命令执行）   | 见 `references/track-paths.md` 的 `tracks.qa`（脚本由 qa 命令生成） |
 
 **Track 归属规则**：
 

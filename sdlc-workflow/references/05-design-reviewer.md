@@ -126,14 +126,8 @@ Gate 1 必须验证每个任务都声明了 Track 字段、Track 与目标文件
 
 ```
 TRACK_CONSISTENCY_CHECK:
-  TRACK_PATH_RULES = {
-    "frontend":  ["apps/web/", "apps/native/", "packages/ui/", "tests/unit/web/", "tests/unit/packages/ui/"],
-    "backend":   ["apps/server/", "packages/api/", "packages/db/", "tests/unit/server/", "tests/unit/packages/api/", "tests/unit/packages/db/"],
-    "shared":    ["packages/config/", "packages/env/", "packages/auth/", "packages/contracts/", "tests/unit/packages/config/", "tests/unit/packages/env/", "tests/unit/packages/auth/", "tests/unit/packages/contracts/"],
-    "infra":     ["db/migrations/", ".github/workflows/", "<root-config-files>"],
-    "unit-test": ["tests/unit/"],
-    "qa":        ["tests/e2e/"]
-  }
+  TRACK_PATH_RULES = references/track-paths.md 的 tracks 字段
+  # 形如 {"backend": ["apps/server/", ...], ...}；existing project 以 .claude/EXISTING_STRUCTURE.md 映射替换默认前缀
 
   1. 字段存在性:
      FOR EACH task IN tasks.md:
