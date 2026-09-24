@@ -34,5 +34,20 @@ has   "$R/05-design-reviewer.md"  '### 2.3 接口契约检查规则（Gate 1 必
 has   "$R/05-design-reviewer.md"  '10) 接口契约:'
 n=$(grep -c '10) 接口契约' "$R/05-design-reviewer.md"); [ "$n" = "3" ] || { echo "FAIL: 05 item 10 出现 $n 次，应为 3"; fail=1; }
 
+# ── Task 4: 角色说明 + 子 agent 入口 ──
+exists "$R/roles/track-report.md"
+has    "$R/roles/track-report.md" '- 状态: done | partial | blocked'
+for role in backend frontend test; do
+  f="$R/roles/$role.md"
+  exists "$f"
+  for sec in '## 职责' '## 可改路径白名单' '## 必读' '## 禁止' '## 遇到阻塞'; do has "$f" "$sec"; done
+  has "$f" "\$ITER_DIR/tracks/$role.md"
+  a="$REPO_DIR/agents/sdlc-$role-dev.md"
+  exists "$a"
+  has "$a" "name: sdlc-$role-dev"
+  has "$a" 'blocked: 缺少角色说明'
+done
+has "$R/roles/test.md" '只新增测试'
+
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1
