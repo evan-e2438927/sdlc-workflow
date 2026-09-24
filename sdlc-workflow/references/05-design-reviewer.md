@@ -33,9 +33,9 @@ codex exec --full-auto "审查以下设计文档和任务分解。
    - 是否存在模糊的、不可验证的 AC 描述（如"正常工作"、"数据正确"）
    - 每个 Requirement 是否至少覆盖 happy-path 和 error 两个场景维度
 8) Track 一致性:
-   - 每个任务是否声明了 Track 字段（frontend / backend / shared / infra / test）
+   - 每个任务是否声明了 Track 字段（frontend / backend / shared / infra / unit-test / qa）
    - Track 取值是否与"目标文件"路径自洽
-   - test Track 任务是否仅出现在 Phase 3
+   - unit-test / qa Track 任务是否仅出现在 Phase 3
    - "任务 Track 汇总"表是否覆盖所有任务且总数与 Phase 总览一致
 9) 澄清完备性（防止凭未澄清假设做设计决策）:
    - design.md 中凡解决了 requirements.md 里 [❓待确认] / [⚠️ 假设] 项的技术决策，是否都在「设计假设」小节显式登记（含关联 ASM-ID + 理由 + 假设错误的影响）
@@ -122,18 +122,19 @@ Gate 1 必须验证每个任务都声明了 Track 字段、Track 与目标文件
 ```
 TRACK_CONSISTENCY_CHECK:
   TRACK_PATH_RULES = {
-    "frontend": ["apps/web/", "apps/native/", "packages/ui/"],
-    "backend":  ["apps/server/", "packages/api/", "packages/db/"],
-    "shared":   ["packages/config/", "packages/env/", "packages/auth/"],
-    "infra":    ["db/migrations/", ".github/workflows/", "<root-config-files>"],
-    "test":     ["tests/unit/", "tests/e2e/"]
+    "frontend":  ["apps/web/", "apps/native/", "packages/ui/"],
+    "backend":   ["apps/server/", "packages/api/", "packages/db/"],
+    "shared":    ["packages/config/", "packages/env/", "packages/auth/", "packages/contracts/"],
+    "infra":     ["db/migrations/", ".github/workflows/", "<root-config-files>"],
+    "unit-test": ["tests/unit/"],
+    "qa":        ["tests/e2e/"]
   }
 
   1. 字段存在性:
      FOR EACH task IN tasks.md:
        IF "Track" NOT IN task.fields:
          FAIL "$task.id 缺少 Track 字段"
-       IF task.track NOT IN ["frontend","backend","shared","infra","test"]:
+       IF task.track NOT IN ["frontend","backend","shared","infra","unit-test","qa"]:
          FAIL "$task.id Track 取值非法: $task.track"
 
   2. Track ↔ 目标文件 自洽性:
@@ -145,10 +146,10 @@ TRACK_CONSISTENCY_CHECK:
            IF "主要修改面" NOT IN task.description:
              FAIL "$task.id Track=$track 与目标文件 $file 不自洽"
 
-  3. test Track 限制:
-     FOR EACH task WITH track == "test":
+  3. unit-test / qa Track 限制:
+     FOR EACH task WITH track IN ["unit-test","qa"]:
        IF task.phase != "Phase 3":
-         FAIL "$task.id 是 test Track，必须落在 Phase 3"
+         FAIL "$task.id 是 $task.track Track，必须落在 Phase 3"
 
   4. Track 汇总表一致性:
      SUMMARY_TABLE = parse_track_summary(tasks.md)  # "任务 Track 汇总" 表
@@ -163,9 +164,9 @@ TRACK_CONSISTENCY_CHECK:
 
 ```
 8) Track 一致性:
-   - 每个任务是否声明了 Track 字段（frontend / backend / shared / infra / test）
+   - 每个任务是否声明了 Track 字段（frontend / backend / shared / infra / unit-test / qa）
    - Track 取值是否与"目标文件"路径自洽
-   - test Track 任务是否仅出现在 Phase 3
+   - unit-test / qa Track 任务是否仅出现在 Phase 3
    - "任务 Track 汇总"表是否覆盖所有任务且总数与 Phase 总览一致
 9) 澄清完备性（防止凭未澄清假设做设计决策）:
    - design.md 中凡解决了 requirements.md 里 [❓待确认] / [⚠️ 假设] 项的技术决策，是否都在「设计假设」小节显式登记（含关联 ASM-ID + 理由 + 假设错误的影响）
@@ -276,9 +277,9 @@ while [ $round -le $max_rounds ]; do
    - 是否存在模糊的、不可验证的 AC 描述
    - 每个 Requirement 是否至少覆盖 happy-path 和 error 两个场景维度
 8) Track 一致性:
-   - 每个任务是否声明了 Track 字段（frontend / backend / shared / infra / test）
+   - 每个任务是否声明了 Track 字段（frontend / backend / shared / infra / unit-test / qa）
    - Track 取值是否与"目标文件"路径自洽
-   - test Track 任务是否仅出现在 Phase 3
+   - unit-test / qa Track 任务是否仅出现在 Phase 3
    - "任务 Track 汇总"表是否覆盖所有任务且总数与 Phase 总览一致
 9) 澄清完备性（防止凭未澄清假设做设计决策）:
    - design.md 中凡解决了 requirements.md 里 [❓待确认] / [⚠️ 假设] 项的技术决策，是否都在「设计假设」小节显式登记（含关联 ASM-ID + 理由 + 假设错误的影响）

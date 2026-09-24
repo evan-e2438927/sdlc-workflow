@@ -76,7 +76,7 @@
 |------------|----------------------------|----------------------------------------------------------------------|
 | `frontend` | Web/Native 前端实现        | `apps/web/**`, `apps/native/**`, `packages/ui/**`                    |
 | `backend`  | 后端 API / Worker / 数据层 | `apps/server/**`, `packages/api/**`, `packages/db/**`                |
-| `shared`   | 跨端共享包                 | `packages/config/**`, `packages/env/**`, `packages/auth/**`          |
+| `shared`   | 跨端共享包                 | `packages/config/**`, `packages/env/**`, `packages/auth/**`, `packages/contracts/**`          |
 | `infra`    | 基础设施（迁移、配置、CI） | `db/migrations/**`, 根目录配置文件, `.github/workflows/**`           |
 | `unit-test`| 独立单元测试任务（限 Phase 3，apply 执行） | `tests/unit/**`                                     |
 | `qa`       | 浏览器验收规格（限 Phase 3，qa 命令执行）   | `tests/e2e/**`（脚本由 qa 命令生成）                 |

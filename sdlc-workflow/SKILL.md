@@ -828,4 +828,4 @@ LOG "✅ PR: <url> | 分支: $CURRENT_BRANCH"
 21. **Worktree 注册表**：`.worktrees/worktree-registry.json` 记录所有并行工作区元数据，`pr-creator` 完成后更新 `pr_url`
 22. **Worktree 文件冲突检测**：创建并行工作区前检查目标文件与已有工作区的交集，存在冲突时警告
 23. **五命令分工**：apply 只到 lint + unit（phase: applied，不提交）；`qa` 做 Playwright 浏览器功能验收（phase: qa_passed，可跳过）；`accept` 总结变更 → 更新文档 → 本地 commit（phase: accepted，不 push、不建 PR）；`pr` push + gh pr create（phase: pr_created，唯一远程动作）。doit 自动串联，`--qa` 时含 qa 步骤
-24. **Track 拆分**：task-generator 必须将任务按 `track: frontend|backend|unit-test|qa` 拆分；apply 只实现前三类，`track: qa` 的浏览器验收脚本由 `qa` 命令编写执行
+24. **Track 拆分**：task-generator 必须将任务按 `track: frontend|backend|shared|infra|unit-test|qa` 拆分（定义见 `references/04-task-generator.md` §2.0）。执行归属：infra / shared → apply ⑥.1 主 agent；backend / frontend → ⑥.2 开发角色；unit-test → ⑦ 测试角色；qa → `qa` 命令
