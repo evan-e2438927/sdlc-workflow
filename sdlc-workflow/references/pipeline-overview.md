@@ -80,16 +80,17 @@ graph TD
 
     subgraph APPLY_FLOW [apply 流程]
       A_CHECK["读取 status.json<br/>校验 phase"]
-      A_CHECK -->|approved / pending_review| A_S6_DEP["⑥.1 依赖分析 + 拓扑分层"]
+      A_CHECK -->|approved / pending_review| A_S6_PACK["⑥.0 按 Track 打包工作包<br/>解析 AGENT_MODE"]
       A_CHECK -->|rejected / applied| A_ABORT["❌ 中止"]
 
-      A_S6_DEP --> A_S6_MODE{"并行层 > 1 且任务 ≥ 3?"}
-      A_S6_MODE -->|是| A_S6_TEAM["⑥.3b Agent Team 并行<br/>按层分发子 Agent"]
-      A_S6_MODE -->|否| A_S6_SEQ["⑥.3a 顺序逐任务开发"]
-      A_S6_TEAM --> A_S6["⑥.4 tasks.md 回写"]
-      A_S6_SEQ --> A_S6["⑥.4 tasks.md 回写"]
+      A_S6_PACK --> A_S6_FOUND["⑥.1 主 agent 打地基<br/>infra / shared / 契约 / 依赖"]
+      A_S6_FOUND --> A_S6_MODE{"执行模式"}
+      A_S6_MODE -->|multi| A_S6_MULTI["⑥.2 backend / frontend<br/>子 agent 并行"]
+      A_S6_MODE -->|single| A_S6_SINGLE["⑥.2 主 agent 依次<br/>扮演 backend / frontend"]
+      A_S6_MULTI --> A_S6["⑥.3 汇总<br/>越界检测 → tasks.md 回写"]
+      A_S6_SINGLE --> A_S6
 
-      A_S6 --> A_S7["⑦ test-generator<br/>→ tests/unit/（仅单元测试）"]
+      A_S6 --> A_S7["⑦ 查漏（test 角色）<br/>按 AC 补单测 + 覆盖率"]
       A_S7 -->|默认| A_S9
       A_S7 -->|"--review"| A_S8["⑧ code-reviewer · Gate 2<br/>Codex CLI 审查代码（可选）"]
       A_S8 -->|FAIL & round ≤ N| A_S6
@@ -159,8 +160,8 @@ graph TD
 | [⑤] | design-reviewer | Evaluator-Optimizer | design.md + tasks.md | PASS/FAIL | Codex CLI | proposal --review |
 | [⑤.1] | 增量文档同步 | Tool Wrapper | design.md 修订 diff | 更新后的 ARCHITECTURE/SECURITY | Claude Code | proposal --review |
 | — | **status.json 写入** | — | proposal 摘要 | status.json (pending_review) | — | **仅 proposal** |
-| ⑥ | Claude Code 开发 | Orchestrator-Workers | tasks.md（frontend/backend/unit-test track，依赖分析→拓扑分层） | 代码变更 | Claude Code + Agent Team（并行层） | apply/doit |
-| ⑦ | test-generator | Generator | tasks.md（unit-test track） | tests/unit/ | Claude Code | apply/doit |
+| ⑥ | 开发 | Orchestrator-Workers | tasks.md + design.md 接口契约（按 Track 打包工作包） | 代码变更 + tracks/*.md | 主 agent 打地基 + backend / frontend 角色（单 / 多 agent） | apply/doit |
+| ⑦ | 查漏 | Evaluator | requirements.md AC 清单 + 开发角色单测 | tests/unit/ + coverage.md | test 角色 | apply/doit |
 | [⑧] | code-reviewer | Evaluator-Optimizer | git diff + .claude/CODING_GUIDELINES.md + .claude/SECURITY.md | PASS/FAIL | Codex CLI | apply --review |
 | ⑨ | test-pipeline | Pipeline | tests/unit/ | tests/reports/ | Lint → Unit（两阶段） | apply/doit |
 | ⑨.1 | 测试修复文档同步 | Tool Wrapper | design.md/tasks.md 修复 diff | 更新后的 ARCHITECTURE/SECURITY | Claude Code | apply/doit |
@@ -175,7 +176,7 @@ graph TD
 |---------|------|
 | **Sequential Chain** | 五命令 proposal → apply → qa → accept → pr 顺序串联 |
 | **Routing** | 步骤① 根据输入类型（文本/文件/URL）路由到不同提取策略 |
-| **Parallelization** | 步骤⑥ Agent Team 按拓扑层并行开发 |
+| **Parallelization** | 步骤⑥.2 backend / frontend 角色并行开发（多 agent 模式）|
 | **Orchestrator-Workers** | SKILL.md = Orchestrator；references/ 各步骤规范 = Workers |
 | **Evaluator-Optimizer** | design-reviewer + code-reviewer + test-pipeline 三处评估-优化循环 |
 

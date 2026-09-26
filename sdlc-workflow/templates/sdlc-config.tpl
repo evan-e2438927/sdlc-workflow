@@ -23,8 +23,15 @@ LINT_TOOL=eslint
 # [可选] 编辑即检查   枚举: on | off   默认: on
 # PostToolUse hook 在每次 Edit/Write 后对改动的代码文件跑 LINT_TOOL；失败时把错误反馈给模型让其修复
 # （PostToolUse 不能硬阻断，编辑已发生）。缺少 linter 时自动降级为不反馈。
-# 注：仅当 LINT_TOOL 可在 PATH 解析到时才运行；仅装在 node_modules/.bin 的项目本地 linter 会被跳过。
+# linter 解析：优先使用离被改文件最近的 node_modules/.bin/<LINT_TOOL>（向上找到项目根为止，并在该包目录下执行，
+# 用的是该包自己的版本与配置）；找不到再用 PATH 上的；都没有则不检查。子 agent 的编辑同样会触发本 hook。
 EDIT_CHECK=on
+
+# [可选] 多 agent 越界守卫   枚举: on | off   默认: on
+# multi 模式 apply 期间，PreToolUse hook 在角色子 agent（sdlc-backend-dev / frontend / test）Edit/Write 前
+# 检查目标文件是否在本次工作包允许清单（$ITER_DIR/tracks/.allow-<role>）内；不在则拒绝写入并提示按 blocked 处理。
+# 主 agent、single 模式、非 apply 阶段不受影响；用 Bash 写文件拦不到（由汇总阶段越界检测兜底）。
+EDIT_GUARD=on
 
 # [固定] E2E 框架   固定: playwright
 # qa 命令（步骤 ⑩）编写并通过 Playwright MCP 执行浏览器功能验收
@@ -44,6 +51,17 @@ TEST_BOOTSTRAP_POLICY=report
 # Gate1(设计审查)、Gate2(代码审查)、测试修复 各环节的最大重试次数
 # 超过仍未通过 → 中止 Pipeline → 等待人工介入（仅 --review 时生效 Gate）
 REVIEW_MAX_ROUNDS=1
+
+# ──────────────────────────────────────────────────────────────
+# 执行模式
+# ──────────────────────────────────────────────────────────────
+
+# [可选] apply 开发阶段的执行模式   枚举: auto | single | multi   默认: auto
+# - auto:   前端与后端都有任务、且运行时支持子 agent 时走 multi，否则 single（mini 固定 single）
+# - single: 主 agent 依次扮演后端 / 前端 / 测试角色
+# - multi:  后端、前端角色子 agent 并行，测试角色在其后查漏；运行时不支持子 agent 时自动降级 single
+# 运行时参数 --agents single|multi 优先于本配置。两种模式产出等价，只影响执行速度。
+AGENT_MODE=auto
 
 # ──────────────────────────────────────────────────────────────
 # 上下文 / 历史

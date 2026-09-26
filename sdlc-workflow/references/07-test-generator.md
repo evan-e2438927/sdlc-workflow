@@ -1,17 +1,22 @@
-# 步骤 ⑦: Test Generator — 单元测试生成
+# 步骤 ⑦: Test Generator — 查漏补缺（test 角色）
 
-> 范围：apply 阶段只生成**单元测试**（处理 `track: unit-test` 的任务）。
+> 执行者：test 角色（`references/roles/test.md`）。单 agent 模式由主 agent 扮演，多 agent 模式由 `sdlc-test-dev` 子 agent 执行。
+> 时机：apply ⑥.3 开发汇总完成之后（不与开发并行）。
+> 职责：① 实现 `track: unit-test` 的任务；② 对照 requirements.md 的 AC 清单与开发角色已写的单测**查漏补缺**；③ 生成覆盖率报告。
+> 开发角色已为自己的代码写了单测，本步骤**只新增**测试，不删改其断言。
 > 浏览器自动化 / E2E 脚本（`track: qa`）由 `qa` 命令（步骤 ⑩）编写执行，不在此处生成。
 
 ## 输入
 
 1. `docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/tasks.md`（track: unit-test）
 2. `git diff`（代码变更）
+3. requirements.md 的 AC 清单；开发角色已写的单测（`tests/unit/**`）及 `tracks/backend.md`、`tracks/frontend.md` 的「新增的测试」
 
 ## 输出
 
-1. `tests/unit/web|server|packages/...`
+1. `tests/unit/web|server|packages/...`（仅新增）
 2. `tests/reports/<slug>-coverage.md`
+3. `$ITER_DIR/tracks/test.md`（格式见 `references/roles/track-report.md`）
 
 ## 详细行为
 
@@ -26,6 +31,8 @@
 5. 测试样例必须引用真实 workspace 路径，不沿用过时的 `src/*` 假设
 6. 每个 test case 的描述必须引用对应的 AC-ID 和场景维度，如 `it('AC-002 (error): 密码错误返回 401')`
 7. 标注为 qa / playwright-mcp 验证方式的 AC 不在此生成，只需在 coverage.md 中标记为 "deferred to qa"
+8. 查漏顺序：列出 requirements.md 全部 AC → 按用例描述中的 AC-ID 标记已被开发角色单测覆盖的 AC → 对未覆盖且非 deferred to qa 的 AC 补写用例；每个 Requirement 至少覆盖 happy-path + error
+9. 新增用例因源码缺陷失败时：不改源码，保留失败用例，在 tracks/test.md「与设计的偏差」写明，状态记 partial
 ```
 
 ### 2. 单元测试生成
@@ -176,9 +183,10 @@ TEST_FRAMEWORK=${TEST_FRAMEWORK:-jest}
 # 1. 读取 tasks.md，提取验收标准
 ACCEPTANCE_CRITERIA=$(cat "$TASKS_FILE" | grep -A 10 "验收标准")
 
-# 2. 生成单元测试（镜像源码目录）
+# 2. 生成单元测试（镜像源码目录，只新增——开发角色已写的测试文件不得被覆盖）
 mkdir -p "tests/unit/web/logic"
-cat > "tests/unit/web/logic/${SLUG}.test.ts" << 'EOF'
+TEST_FILE="tests/unit/web/logic/${SLUG}.test.ts"
+[ -e "$TEST_FILE" ] || cat > "$TEST_FILE" << 'EOF'
 // 单元测试 - 使用 $TEST_FRAMEWORK
 import { describe, it, expect, beforeEach } from '$TEST_FRAMEWORK';
 ...
@@ -200,7 +208,7 @@ ls -la "tests/unit/web/logic/${SLUG}.test.ts"
 |----------|----------|
 | tasks.md 不存在 | 回退到步骤④ |
 | tests/ 目录不存在 | 自动创建 unit/reports 子目录 |
-| 代码与测试不匹配 | 生成 TODO 标记，待 Claude Code 实现后补充 |
+| 代码与测试不匹配 | 保留失败用例，在 tracks/test.md「与设计的偏差」写明，状态记 partial（不生成 TODO 标记，见规则 9） |
 | 覆盖率目标未达成 | 在报告中标注，待后续迭代补充 |
 
 ## 相关文件
@@ -212,6 +220,7 @@ ls -la "tests/unit/web/logic/${SLUG}.test.ts"
   - tests/unit/web|server|packages/...
   - tests/reports/<slug>-coverage.md
 - 参考：
+  - references/roles/test.md（test 角色说明：白名单、禁止项、阻塞处理）
   - references/09-test-pipeline.md（下一步：lint + unit 执行）
   - references/08-code-reviewer.md（Gate 2）
   - 浏览器 E2E 脚本生成 → `qa` 命令（步骤 ⑩）

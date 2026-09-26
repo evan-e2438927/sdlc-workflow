@@ -28,11 +28,25 @@ codex exec --full-auto "审查以下代码变更。
 5) 错误处理完备性
 6) 文件是否落在正确 workspace
 7) 已完成任务是否在 tasks.md 中同步勾选
+8) 接口契约一致性：后端路由/请求/响应/错误码与 design.md「接口契约」一致；前端调用的方法、路径、请求体与契约一致（ts-types 形态须 import 契约类型，不得重复定义）
+9) 越界：各 Track 的改动是否落在对应角色白名单内（白名单见下）；$ITER_DIR/tracks/*.md 是否如实列出修改文件
+
+角色白名单（Codex 看不到 references/roles/*.md，须内联给出）：
+- backend: apps/server/**, packages/api/**, packages/db/**, tests/unit/server/**, tests/unit/packages/{api,db}/**
+- frontend: apps/web/**, apps/native/**, packages/ui/**, tests/unit/web/**, tests/unit/packages/ui/**
+- test: tests/unit/**, tests/reports/<slug>-coverage.md
+- 公共文件（package.json、lockfile、根配置、契约文件）只允许主 agent 修改
 
 给出 PASS/FAIL 及具体问题列表。
 
 === git diff ===
 $(git diff --no-color)
+
+=== 未跟踪的新文件 ===
+$(git ls-files --others --exclude-standard | while read -r f; do echo "--- $f"; cat "$f"; done)
+
+=== tracks 汇报 ===
+$(cat "$(dirname "$TASKS_FILE")"/tracks/*.md 2>/dev/null)
 
 === CODING_GUIDELINES.md ===
 $(cat .claude/CODING_GUIDELINES.md)
@@ -52,6 +66,8 @@ $(cat .claude/SECURITY.md)"
 | 错误处理 | 异常捕获、日志记录 | 关键路径有错误处理 |
 | 目录结构 | 文件放置位置 | Web 在 `apps/web`，Server 在 `apps/server`，共享逻辑在 `packages/*` |
 | 任务状态 | tasks.md 勾选与事实一致 | 已完成任务与验收标准已同步回写 |
+| 接口契约 | 后端实现与前端调用对照 design.md「接口契约」 | 方法、路径、请求/响应结构、错误码两端一致 |
+| 越界 | 改动文件对照角色白名单与 tracks/*.md | 无未汇报或越界的改动 |
 
 ### 3. OWASP Top 10 检查清单
 
@@ -126,14 +142,31 @@ while [ $round -le $max_rounds ]; do
 6) 文件是否落在正确 workspace
 7) 测试是否错误写入源码目录
 8) 已完成任务是否在 tasks.md 中同步勾选
+9) 接口契约一致性：后端路由/请求/响应/错误码与 design.md「接口契约」一致；前端调用与契约一致（ts-types 形态须 import 契约类型）
+10) 越界：各 Track 的改动是否落在对应角色白名单内（白名单见下）；$ITER_DIR/tracks/*.md 是否如实列出修改文件
+
+角色白名单（Codex 看不到 references/roles/*.md，须内联给出）：
+- backend: apps/server/**, packages/api/**, packages/db/**, tests/unit/server/**, tests/unit/packages/{api,db}/**
+- frontend: apps/web/**, apps/native/**, packages/ui/**, tests/unit/web/**, tests/unit/packages/ui/**
+- test: tests/unit/**, tests/reports/<slug>-coverage.md
+- 公共文件（package.json、lockfile、根配置、契约文件）只允许主 agent 修改
 
 给出 PASS/FAIL 及具体问题列表。
 
 === git diff ===
 $DIFF
 
+=== 未跟踪的新文件 ===
+$(git ls-files --others --exclude-standard | while read -r f; do echo "--- $f"; cat "$f"; done)
+
 === tasks.md ===
 $(cat "$TASKS_FILE")
+
+=== tracks 汇报 ===
+$(cat "$(dirname "$TASKS_FILE")"/tracks/*.md 2>/dev/null)
+
+=== design.md 接口契约 ===
+$(sed -n -e '/^## 3\. 接口契约/,/^## 4\. /p' -e '/^## 3\. API 接口设计/,/^## 4\. /p' "$(dirname "$TASKS_FILE")/design.md")
 EOF
 )"
   if ! result=$(codex exec --full-auto "$PROMPT" 2> /tmp/code-review-codex.stderr); then
@@ -206,6 +239,8 @@ set -euo pipefail
 
 round=1
 max_rounds=${REVIEW_MAX_ROUNDS:-1}
+ITER_DIR="docs/iterations/$DATE/$SEQ-$SLUG-$TYPE"
+TASKS_FILE="$ITER_DIR/tasks.md"
 
 while [ $round -le $max_rounds ]; do
   echo "🔍 Code Review 第 $round 轮..."
@@ -222,11 +257,33 @@ while [ $round -le $max_rounds ]; do
 4) 编码规范符合度
 5) 错误处理完备性
 6) 文件是否落在正确 workspace
+7) 测试是否错误写入源码目录
+8) 已完成任务是否在 tasks.md 中同步勾选
+9) 接口契约一致性：后端路由/请求/响应/错误码与 design.md「接口契约」一致；前端调用与契约一致（ts-types 形态须 import 契约类型）
+10) 越界：各 Track 的改动是否落在对应角色白名单内（白名单见下）；$ITER_DIR/tracks/*.md 是否如实列出修改文件
+
+角色白名单（Codex 看不到 references/roles/*.md，须内联给出）：
+- backend: apps/server/**, packages/api/**, packages/db/**, tests/unit/server/**, tests/unit/packages/{api,db}/**
+- frontend: apps/web/**, apps/native/**, packages/ui/**, tests/unit/web/**, tests/unit/packages/ui/**
+- test: tests/unit/**, tests/reports/<slug>-coverage.md
+- 公共文件（package.json、lockfile、根配置、契约文件）只允许主 agent 修改
 
 给出 PASS/FAIL 及具体问题列表。
 
 === git diff ===
 $DIFF
+
+=== 未跟踪的新文件 ===
+$(git ls-files --others --exclude-standard | while read -r f; do echo "--- $f"; cat "$f"; done)
+
+=== tasks.md ===
+$(cat "$TASKS_FILE")
+
+=== tracks 汇报 ===
+$(cat "$(dirname "$TASKS_FILE")"/tracks/*.md 2>/dev/null)
+
+=== design.md 接口契约 ===
+$(sed -n -e '/^## 3\. 接口契约/,/^## 4\. /p' -e '/^## 3\. API 接口设计/,/^## 4\. /p' "$(dirname "$TASKS_FILE")/design.md")
 
 === CODING_GUIDELINES.md ===
 $(cat .claude/CODING_GUIDELINES.md)

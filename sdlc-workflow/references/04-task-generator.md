@@ -28,6 +28,7 @@
 10. 每个任务必须显式声明 Track（frontend / backend / shared / infra / unit-test / qa），且与目标文件路径自洽；跨端任务必须拆为多个任务，禁止一个任务跨 Track
 11. `unit-test` / `qa` Track 仅出现在 Phase 3；Phase 1/2 实现任务自带的单元测试不算独立 Track。`qa` Track 只写浏览器验收规格（Given-When-Then + 选择器约束），不写实现代码——脚本由 `qa` 命令生成执行
 12. 每个任务必须声明「适用规范」字段：从 design.md 的「遵循的项目规范」中挑出与本任务目标文件相关的规范，列出 skill 名 + 一句要点；无相关规范写 "无"，不得省略字段
+13. 契约依赖：design.md 契约形态为 `ts-types` 时，Phase 1 必须包含「契约落地」任务（Track: shared，目标文件为 design.md「契约文件」）。frontend 任务对接口形状的依赖指向契约（或契约落地任务），**不得仅为获知接口形状而依赖 backend 任务**；确有运行时依赖（如必须等后端种子数据）时方可依赖 backend 任务，并在「依赖关系」中写明原因
 ```
 
 ### 2. 任务结构
@@ -72,14 +73,14 @@
 
 ### 2.0 Track 取值与归属规则
 
-| Track      | 含义                       | 典型目标文件路径                                                     |
-|------------|----------------------------|----------------------------------------------------------------------|
-| `frontend` | Web/Native 前端实现        | `apps/web/**`, `apps/native/**`, `packages/ui/**`                    |
-| `backend`  | 后端 API / Worker / 数据层 | `apps/server/**`, `packages/api/**`, `packages/db/**`                |
-| `shared`   | 跨端共享包                 | `packages/config/**`, `packages/env/**`, `packages/auth/**`          |
-| `infra`    | 基础设施（迁移、配置、CI） | `db/migrations/**`, 根目录配置文件, `.github/workflows/**`           |
-| `unit-test`| 独立单元测试任务（限 Phase 3，apply 执行） | `tests/unit/**`                                     |
-| `qa`       | 浏览器验收规格（限 Phase 3，qa 命令执行）   | `tests/e2e/**`（脚本由 qa 命令生成）                 |
+| Track      | 含义                                       | 路径范围 |
+|------------|--------------------------------------------|----------|
+| `frontend` | Web/Native 前端实现（含自己那部分单测）     | 见 `references/track-paths.md` 的 `tracks.frontend` |
+| `backend`  | 后端 API / Worker / 数据层（含自己那部分单测）| 见 `references/track-paths.md` 的 `tracks.backend` |
+| `shared`   | 跨端共享包（含契约落地）                   | 见 `references/track-paths.md` 的 `tracks.shared` |
+| `infra`    | 基础设施（迁移、配置、CI）                 | 见 `references/track-paths.md` 的 `tracks.infra` |
+| `unit-test`| 独立单元测试任务（限 Phase 3，apply ⑦ 执行）| 见 `references/track-paths.md` 的 `tracks.unit-test` |
+| `qa`       | 浏览器验收规格（限 Phase 3，qa 命令执行）   | 见 `references/track-paths.md` 的 `tracks.qa`（脚本由 qa 命令生成） |
 
 **Track 归属规则**：
 
@@ -184,10 +185,10 @@ T-002 ──┘           │
 ```
 ````
 
-> **Agent Team 并行提示**：步骤⑥ 会根据依赖关系图构建拓扑分层，同层且目标文件无交集的任务将被分发给子 Agent 并行执行。因此，任务分解时应：
-> - 在 **依赖关系** 字段中精确声明前置任务，避免遗漏隐式依赖
-> - 在 **目标文件** 字段中完整列出该任务会修改的所有文件路径
-> - 尽可能让同层任务的目标文件不重叠，以最大化并行度
+> **角色并行提示**：apply ⑥.2 中 backend 与 frontend 两个角色可并行开发（多 agent 模式下由两个子 agent 同时执行）。因此，任务分解时应：
+> - 在 **依赖关系** 字段中精确声明前置任务；frontend 对接口形状的依赖指向契约，而不是 backend 任务
+> - 在 **目标文件** 字段中完整列出该任务会修改的所有文件路径，且只落在本 Track 路径内
+> - 需要改 `package.json` / lockfile / 根配置的工作归入 infra 或 shared 任务（由主 agent 在 ⑥.1 执行），不要放进 backend / frontend 任务
 
 ### 6. 完整 tasks.md 模板
 

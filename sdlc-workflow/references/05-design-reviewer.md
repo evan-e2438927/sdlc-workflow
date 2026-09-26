@@ -33,14 +33,18 @@ codex exec --full-auto "审查以下设计文档和任务分解。
    - 是否存在模糊的、不可验证的 AC 描述（如"正常工作"、"数据正确"）
    - 每个 Requirement 是否至少覆盖 happy-path 和 error 两个场景维度
 8) Track 一致性:
-   - 每个任务是否声明了 Track 字段（frontend / backend / shared / infra / test）
+   - 每个任务是否声明了 Track 字段（frontend / backend / shared / infra / unit-test / qa）
    - Track 取值是否与"目标文件"路径自洽
-   - test Track 任务是否仅出现在 Phase 3
+   - unit-test / qa Track 任务是否仅出现在 Phase 3
    - "任务 Track 汇总"表是否覆盖所有任务且总数与 Phase 总览一致
 9) 澄清完备性（防止凭未澄清假设做设计决策）:
    - design.md 中凡解决了 requirements.md 里 [❓待确认] / [⚠️ 假设] 项的技术决策，是否都在「设计假设」小节显式登记（含关联 ASM-ID + 理由 + 假设错误的影响）
    - 是否存在把假设当既定事实、未经标注就写进设计正文的决策
    - 交互模式（proposal/mini）下，是否存在 provenance=never-asked（从未提问）却影响设计的低置信度项——若有则 FAIL，要求先澄清
+10) 接口契约:
+   - 同时有 frontend 与 backend 任务时，design.md 是否有「接口契约」接口表，契约形态是否与项目实际一致
+   - tasks.md 引用的接口是否都在契约中；ts-types 形态是否有 Phase 1 契约落地任务
+   - frontend 任务是否存在"仅为获知接口形状"而依赖 backend 任务的情况
 
 给出 PASS/FAIL 及具体问题列表。
 
@@ -69,6 +73,7 @@ $(cat .claude/SECURITY.md)"
 | 目录结构 | workspace 落位正确 | Web 在 `apps/web`，Server 在 `apps/server`，共享逻辑在 `packages/*` |
 | **AC 覆盖度** | **需求级 AC 到任务级 AC 的映射完整性** | **见下方 AC 覆盖度检查规则** |
 | **Track 一致性** | **每个任务声明 Track 且与目标文件路径自洽** | **见下方 Track 一致性检查规则** |
+| **接口契约** | **同时存在 frontend 与 backend 任务时契约完整且被任务遵循** | **见下方接口契约检查规则** |
 | **项目规范一致性** | **design.md「遵循的项目规范」与 CTX.skills 命中项是否一致、tasks.md 每任务是否有适用规范字段** | **命中的项目规范全部被遵循，无静默冲突** |
 | **澄清完备性** | **被假设驱动的设计决策是否已显式登记并澄清** | **交互模式下无 never-asked 的设计影响项；假设决策均登记在「设计假设」小节** |
 
@@ -121,19 +126,14 @@ Gate 1 必须验证每个任务都声明了 Track 字段、Track 与目标文件
 
 ```
 TRACK_CONSISTENCY_CHECK:
-  TRACK_PATH_RULES = {
-    "frontend": ["apps/web/", "apps/native/", "packages/ui/"],
-    "backend":  ["apps/server/", "packages/api/", "packages/db/"],
-    "shared":   ["packages/config/", "packages/env/", "packages/auth/"],
-    "infra":    ["db/migrations/", ".github/workflows/", "<root-config-files>"],
-    "test":     ["tests/unit/", "tests/e2e/"]
-  }
+  TRACK_PATH_RULES = references/track-paths.md 的 tracks 字段
+  # 形如 {"backend": ["apps/server/", ...], ...}；existing project 以 .claude/EXISTING_STRUCTURE.md 映射替换默认前缀
 
   1. 字段存在性:
      FOR EACH task IN tasks.md:
        IF "Track" NOT IN task.fields:
          FAIL "$task.id 缺少 Track 字段"
-       IF task.track NOT IN ["frontend","backend","shared","infra","test"]:
+       IF task.track NOT IN ["frontend","backend","shared","infra","unit-test","qa"]:
          FAIL "$task.id Track 取值非法: $task.track"
 
   2. Track ↔ 目标文件 自洽性:
@@ -145,10 +145,10 @@ TRACK_CONSISTENCY_CHECK:
            IF "主要修改面" NOT IN task.description:
              FAIL "$task.id Track=$track 与目标文件 $file 不自洽"
 
-  3. test Track 限制:
-     FOR EACH task WITH track == "test":
+  3. unit-test / qa Track 限制:
+     FOR EACH task WITH track IN ["unit-test","qa"]:
        IF task.phase != "Phase 3":
-         FAIL "$task.id 是 test Track，必须落在 Phase 3"
+         FAIL "$task.id 是 $task.track Track，必须落在 Phase 3"
 
   4. Track 汇总表一致性:
      SUMMARY_TABLE = parse_track_summary(tasks.md)  # "任务 Track 汇总" 表
@@ -163,15 +163,48 @@ TRACK_CONSISTENCY_CHECK:
 
 ```
 8) Track 一致性:
-   - 每个任务是否声明了 Track 字段（frontend / backend / shared / infra / test）
+   - 每个任务是否声明了 Track 字段（frontend / backend / shared / infra / unit-test / qa）
    - Track 取值是否与"目标文件"路径自洽
-   - test Track 任务是否仅出现在 Phase 3
+   - unit-test / qa Track 任务是否仅出现在 Phase 3
    - "任务 Track 汇总"表是否覆盖所有任务且总数与 Phase 总览一致
 9) 澄清完备性（防止凭未澄清假设做设计决策）:
    - design.md 中凡解决了 requirements.md 里 [❓待确认] / [⚠️ 假设] 项的技术决策，是否都在「设计假设」小节显式登记（含关联 ASM-ID + 理由 + 假设错误的影响）
    - 是否存在把假设当既定事实、未经标注就写进设计正文的决策
    - 交互模式（proposal/mini）下，是否存在 provenance=never-asked（从未提问）却影响设计的低置信度项——若有则 FAIL，要求先澄清
+10) 接口契约:
+   - 同时有 frontend 与 backend 任务时，design.md 是否有「接口契约」接口表，契约形态是否与项目实际一致
+   - tasks.md 引用的接口是否都在契约中；ts-types 形态是否有 Phase 1 契约落地任务
+   - frontend 任务是否存在"仅为获知接口形状"而依赖 backend 任务的情况
 ```
+
+### 2.3 接口契约检查规则（Gate 1 必做）
+
+```
+CONTRACT_CHECK:
+  HAS_FE = any(task.track == "frontend" for task in tasks.md)
+  HAS_BE = any(task.track == "backend"  for task in tasks.md)
+
+  1. 存在性:
+     IF HAS_FE AND HAS_BE AND design.md「## 3. 接口契约」缺失或写 "无":
+       FAIL "同时存在 frontend 与 backend 任务，但缺少接口契约"
+  2. 形态一致:
+     IF 契约形态 NOT IN [table, ts-types, openapi, none] OR 与 03-design-generator.md §1.6 判定不符:
+       # 例外：TS monorepo 判为 ts-types，但 design.md 登记了沿用既有惯例的理由（「契约形态判定说明」，
+       #       含现有惯例证据）而记为 table → 视为一致，不 FAIL；已有 OpenAPI 文件却记为 table 不适用此例外
+       FAIL "契约形态非法或与项目实际不符（如已有 OpenAPI 文件却记为 table）"
+  3. 引用完整:
+     FOR EACH 任务描述 / AC 中出现的接口（方法 + 路径）:
+       IF 不在契约接口表中: FAIL "$task.id 引用了契约外的接口 $method $path"
+  4. 契约落地:
+     IF 契约形态 == ts-types AND Phase 1 不存在 Track=shared 且目标文件为契约文件的任务:
+       FAIL "ts-types 形态缺少 Phase 1 契约落地任务"
+  5. 依赖方向:
+     FOR EACH frontend 任务依赖了 backend 任务:
+       IF 「依赖关系」未写明运行时原因: FAIL "$task.id 仅为接口形状依赖 backend，应改为依赖契约"
+```
+
+> ⚠️ **历史迭代兼容**：本次改动之前生成的迭代可能没有「接口契约」小节（旧版 design.md 用的是「## 3. API 接口设计」，不满足上面「存在性」检查的标题匹配）。
+> 对这类迭代跑 Gate 1 前，先重新生成 proposal（含新版契约小节）或手工把该小节标题改名为「## 3. 接口契约」，否则检查 1 会因标题不匹配而 FAIL。
 
 ### 3. 循环逻辑
 
@@ -276,14 +309,18 @@ while [ $round -le $max_rounds ]; do
    - 是否存在模糊的、不可验证的 AC 描述
    - 每个 Requirement 是否至少覆盖 happy-path 和 error 两个场景维度
 8) Track 一致性:
-   - 每个任务是否声明了 Track 字段（frontend / backend / shared / infra / test）
+   - 每个任务是否声明了 Track 字段（frontend / backend / shared / infra / unit-test / qa）
    - Track 取值是否与"目标文件"路径自洽
-   - test Track 任务是否仅出现在 Phase 3
+   - unit-test / qa Track 任务是否仅出现在 Phase 3
    - "任务 Track 汇总"表是否覆盖所有任务且总数与 Phase 总览一致
 9) 澄清完备性（防止凭未澄清假设做设计决策）:
    - design.md 中凡解决了 requirements.md 里 [❓待确认] / [⚠️ 假设] 项的技术决策，是否都在「设计假设」小节显式登记（含关联 ASM-ID + 理由 + 假设错误的影响）
    - 是否存在把假设当既定事实、未经标注就写进设计正文的决策
    - 交互模式（proposal/mini）下，是否存在 provenance=never-asked（从未提问）却影响设计的低置信度项——若有则 FAIL，要求先澄清
+10) 接口契约:
+   - 同时有 frontend 与 backend 任务时，design.md 是否有「接口契约」接口表，契约形态是否与项目实际一致
+   - tasks.md 引用的接口是否都在契约中；ts-types 形态是否有 Phase 1 契约落地任务
+   - frontend 任务是否存在"仅为获知接口形状"而依赖 backend 任务的情况
 
 给出 PASS/FAIL 及具体问题列表。
 
