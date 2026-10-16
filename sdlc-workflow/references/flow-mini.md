@@ -58,6 +58,18 @@ docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/
    - 验证能力检测
    - 回写任务状态
 
+### Step 4.5. 写入 phase
+
+mini 与 proposal 走同一条主线，只是不停顿（见 SKILL.md「迭代状态（phase）」）：
+
+```bash
+"$SDLC_STATUS" transition "$ITER_DIR" pending_review --by mini --flags '{"review":<bool>,"qa":<bool>,"agents":"single"}'
+"$SDLC_STATUS" transition "$ITER_DIR" approved --by mini
+```
+
+Step 9 通过后 `transition … applied --by apply`；`--qa` 时 Step 9.5 按 flow-qa.md 迁移到 `qa_passed` / `qa_failed`；
+Step 10 之后的 accept / pr 按各自 flow 迁移到 `accepted` / `pr_created`。
+
 ### Step 5. Gate 1（仅 `--review`）
 
 在修改业务代码前，若指定 `--review`，执行 mini Gate 1：
@@ -134,4 +146,4 @@ Gate 1 通过（或跳过）后，开始修改业务代码。
 1. 不得在 Step 1-4 之前直接编辑业务代码
 2. `--review` 时不得跳过 Gate 1 / Gate 2
 3. 不得跳过 validation capability detection
-4. **Token 耗尽保护**：context_usage > 70% 时先 /compact 再继续；token 不足时写入 `status.json: pipeline_stage="mini-incomplete"` + ABORT，禁止静默标记完成
+4. **Token 耗尽保护**：context_usage > 80% 时先 /compact 再继续；token 不足时停在当前 phase 直接中止，禁止静默标记完成；之后用户要求继续时，按 `mode=mini` 与 `flags` 续跑（见 SKILL.md「迭代状态（phase）」）

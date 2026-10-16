@@ -21,6 +21,7 @@ description: >-
 4. **④ task-generator** → `tasks.md`：按 track 拆分（frontend / backend / unit-test / qa），每个任务标注 `track:` 并引用 AC-ID。
 5. **[⑤ Gate 1]** 仅 `--review`：Codex 设计审查。
 
-写 `status.json`（phase: pending_review）后暂停，提示运行 `apply`。
+经状态脚本写入 phase `pending_review`（`"$SDLC_STATUS" transition "$ITER_DIR" pending_review --by proposal`）后暂停，提示运行 `apply`。
+审核期间用户在对话里提修改意见：原地修改，requirements / design / tasks 三份文档联动，phase 不变（见 `flow-proposal.md`「审核期间的修改（对话）」）。
 
 > 完整规范见 `sdlc-workflow` skill 的 `references/flow-proposal.md` 及 `references/01-`~`05-*.md`。

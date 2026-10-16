@@ -74,7 +74,7 @@ mini 模式下：
 2. Gate 2 不取消，只聚焦误改和越界变更
 3. 若改动只涉及纯视觉样式，可不强制新增 unit test
 4. 若改动涉及逻辑，则必须补最小 unit test
-5. 最终通过结论仍然必须基于 **Playwright MCP** 的真实浏览器验收；`--qa` 时按
+5. 加 `--qa` 时，最终通过结论基于 **Playwright MCP** 的真实浏览器验收，按
    `references/flow-qa.md` 执行，含**通过态截图** → `tests/reports/<slug>/screenshots/`（gitignore，
    由 pr 经 `pr-assets` 分支嵌入 PR）
 
