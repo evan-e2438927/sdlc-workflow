@@ -278,7 +278,8 @@ else:
                 pass
 
         emoji = {'created': '🆕', 'pending_review': '⏸️', 'approved': '✅',
-                 'in-dev': '🔨', 'applied': '🚀', 'rejected': '❌'}.get(local_phase, '❓')
+                 'in-dev': '🔨', 'applied': '🚀', 'qa_failed': '🔧', 'qa_passed': '🧪',
+                 'accepted': '📦', 'pr_created': '🔗', 'rejected': '❌'}.get(local_phase, '❓')
 
         print(f'{emoji} [{seq}] {slug}')
         print(f'   分支:   {branch}')

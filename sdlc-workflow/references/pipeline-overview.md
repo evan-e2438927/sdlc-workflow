@@ -14,7 +14,7 @@ review
 |------|------|----------|-----------|
 | `proposal` | 需求拆解，产出 requirements/design/tasks（按 track 拆分），暂停待审 | 不写代码 | pending_review |
 | `apply` | 实现 frontend/backend/unit-test track + 单元测试 + lint | 不做浏览器测试、不提交、不推 PR | applied |
-| `qa` | 编写并执行 qa track 的 Playwright 浏览器功能验收 | 不写业务代码、不提交 | qa_passed |
+| `qa` | 编写并执行 qa track 的 Playwright 浏览器功能验收 | 不写业务代码、不提交 | qa_passed / qa_failed |
 | `accept` | 总结变更 → 更新文档 → 本地 commit | 不写业务代码、不做功能测试、不 push、不建 PR | accepted |
 | `pr` | push 当前分支 → gh pr create | 不写代码、不改文档（唯一远程动作） | pr_created |
 
@@ -22,6 +22,9 @@ review
 见 `references/context-loader.md`。
 
 `doit` = 上述五步全自动串联（`--qa` 时含 qa）；`mini` = 轻量串联；`review` = 单独跑 Codex Gate。
+
+phase 迁移只经状态脚本 `sdlc-status.sh`，取值与迁移表见 SKILL.md「迭代状态（phase）」。qa 发现代码缺陷 → `qa_failed`
+→ apply 自动进入**修复模式**（主 agent 对照 `qa-failures.md` 修复、补回归单测、跑 ⑨）→ 回到 `applied` → 重跑 qa。
 
 ## 1. 流程图
 
@@ -81,6 +84,8 @@ graph TD
     subgraph APPLY_FLOW [apply 流程]
       A_CHECK["读取 status.json<br/>校验 phase"]
       A_CHECK -->|approved / pending_review| A_S6_PACK["⑥.0 按 Track 打包工作包<br/>解析 AGENT_MODE"]
+      A_CHECK -->|qa_failed| A_REPAIR["修复模式<br/>按 qa-failures.md 修复 + 回归单测"]
+      A_REPAIR --> A_S9
       A_CHECK -->|rejected / applied| A_ABORT["❌ 中止"]
 
       A_S6_PACK --> A_S6_FOUND["⑥.1 主 agent 打地基<br/>infra / shared / 契约 / 依赖"]
@@ -110,7 +115,9 @@ graph TD
       Q_WRITE --> Q_RUN["⑩.2 Playwright MCP 执行<br/>navigate → snapshot → click → screenshot"]
       Q_RUN --> Q_REPORT["⑩.3 生成 e2e 报告"]
       Q_REPORT -->|全部 PASS| Q_OK["更新 status.json<br/>phase: qa_passed"]
-      Q_REPORT -->|有 FAIL| Q_FAIL["记录失败，建议修复后重跑 apply"]
+      Q_REPORT -->|脚本/选择器问题| Q_FIX["qa 内就地修复脚本<br/>（最多 N 轮）"]
+      Q_FIX --> Q_RUN
+      Q_REPORT -->|代码缺陷| Q_FAIL["写 qa-failures.md<br/>phase: qa_failed → apply 修复模式"]
     end
 
     subgraph ACCEPT_FLOW [accept 验收提交流程（本地）]
@@ -334,7 +341,9 @@ git diff (代码变更)   ──────→  🔍 Gate 2: code-reviewer
 | E2E_FRAMEWORK | playwright | 固定 E2E 框架（qa 命令用） |
 | LINT_TOOL | eslint | Lint 工具（eslint/biome） |
 | TEST_BOOTSTRAP_POLICY | report | 测试基础设施缺口处理（report/auto/never） |
-| REVIEW_MAX_ROUNDS | 1 | Codex 审查最大轮数（`--review` 时生效） |
+| REVIEW_MAX_ROUNDS | 1 | 失败后最多自动修复轮数（0 = 不自动修；Gate 1/2 仅 `--review` 时运行），见 SKILL.md「修复轮数（唯一定义）」 |
+| AGENT_MODE | auto | apply 执行模式（auto / single / multi），运行时 `--agents` 覆盖 |
+| EDIT_GUARD | on | multi 模式越界守卫（PreToolUse） |
 | GIT_BRANCH_PREFIX | feat/ | Git 分支前缀 |
 | COMMIT_TYPE | (空) | Conventional Commits type（留空按迭代 type 推断） |
 | COMMIT_SCOPE | (空) | Conventional Commits scope（留空自动推断） |

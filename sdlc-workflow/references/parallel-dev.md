@@ -96,7 +96,7 @@ wt-<seq>-<slug>-<type>/
 ```
 
 行为：
-1. 检查 status.json phase == `applied`（PR 已创建）
+1. 检查 status.json phase == `pr_created`（PR 已创建）
 2. `git worktree remove ../wt-<seq>-<slug>-<type>`
 3. 从注册表移除
 4. 可选：清理远程分支
@@ -338,7 +338,7 @@ git rebase origin/main  # 同步 hotfix
 # 行为：
 # 1. 检查所有注册的 worktree
 # 2. 若 PR 已合并 → 提示 remove
-# 3. 若 phase == applied 且 PR 已超过 7 天 → 提示 remove
+# 3. 若 phase == pr_created 且 PR 已超过 7 天 → 提示 remove
 # 4. 执行 git worktree prune 清理残留
 ```
 
