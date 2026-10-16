@@ -63,5 +63,15 @@ lacks "$R/flow-apply.md" 'jq '"'"'.phase = "approved"'
 has   "$REPO_DIR/skills/sdlc-apply/SKILL.md" 'qa_failed'
 has   "$REPO_DIR/skills/sdlc-qa/SKILL.md"    'qa_failed'
 
+# ── Task 7: accept / pr ──
+has   "$R/flow-accept.md"   '"$SDLC_STATUS" find-latest qa_passed applied'
+has   "$R/flow-accept.md"   '"$SDLC_STATUS" transition "$ITER_DIR" accepted --by accept'
+has   "$R/flow-accept.md"   '上次 QA 失败、修复后尚未重新验收，确定跳过 qa 提交吗？'
+lacks "$R/flow-accept.md"   'find_latest_acceptable()'
+lacks "$R/flow-accept.md"   '.accepted_at = now'
+has   "$R/12-pr-creator.md" '"$SDLC_STATUS" find-latest accepted'
+has   "$R/12-pr-creator.md" '"$SDLC_STATUS" transition "$ITER_DIR" pr_created --by pr'
+lacks "$R/12-pr-creator.md" '.pr_created_at = now'
+
 # ── END ──
 [ $fail -eq 0 ] && echo PASS; exit $fail

@@ -17,8 +17,8 @@
 /sdlc-workflow accept docs/iterations/2026-04-16/001-user-login-feature/
 ```
 
-若不指定路径，自动查找最近一个 `phase == "qa_passed"`（或 `phase == "applied"`，
-即跳过 qa 时）的迭代目录。
+若不指定路径，用 `"$SDLC_STATUS" find-latest qa_passed applied` 自动定位
+（`SDLC_STATUS` 见 SKILL.md「迭代状态（phase）」）。
 
 ## 前置条件
 
@@ -35,12 +35,22 @@ PHASE=$(jq -r '.phase' "$STATUS_FILE")
 case "$PHASE" in
   "qa_passed") echo "✅ QA 已通过，开始定稿提交" ;;
   "applied")   echo "⚠️ 未运行 qa（浏览器验收），将直接定稿提交" ;;
-  "accepted")  echo "⚠️ 该迭代已 accept 过" ;;
+  "accepted")  echo "⚠️ 该迭代已 accept 过，如需推送请运行 sdlc-pr"; exit 1 ;;
+  "qa_failed") echo "❌ QA 发现代码缺陷尚未修复，请先运行 sdlc-apply（修复模式）"; exit 1 ;;
   *)
     echo "❌ 当前 phase 为 $PHASE，请先完成 apply"
     exit 1
     ;;
 esac
+
+# 跳过 qa 的确认：最近一次 qa_failed 之后没有 qa_passed → 先问用户
+if [ "$PHASE" = "applied" ] && jq -e '
+     (.history // []) as $h
+     | ([$h | to_entries[] | select(.value.to == "qa_failed") | .key] | max) as $f
+     | $f != null and ([$h | to_entries[] | select(.value.to == "qa_passed" and .key > $f)] | length) == 0
+   ' "$STATUS_FILE" >/dev/null; then
+  ASK "上次 QA 失败、修复后尚未重新验收，确定跳过 qa 提交吗？"   # 用户确认才继续；否则提示运行 sdlc-qa 并中止
+fi
 ```
 
 ## 执行步骤
@@ -85,8 +95,7 @@ Commit message 采用 Conventional Commits：<type>(scope): <摘要>，正文引
 
 ```bash
 # 本地提交成功
-jq '.phase = "accepted" | .accepted_at = now' \
-  "$STATUS_FILE" > tmp.json && mv tmp.json "$STATUS_FILE"
+"$SDLC_STATUS" transition "$ITER_DIR" accepted --by accept
 
 echo "✅ 已本地提交 | 变更: N files"
 echo "👉 推送并创建 PR: /sdlc-workflow:pr"
@@ -103,21 +112,8 @@ echo "👉 推送并创建 PR: /sdlc-workflow:pr"
 ## 自动查找最近可验收迭代
 
 ```bash
-find_latest_acceptable() {
-  find docs/iterations/ -name "status.json" -type f \
-    | while read f; do
-        phase=$(jq -r '.phase' "$f")
-        if [ "$phase" = "qa_passed" ] || [ "$phase" = "applied" ]; then
-          echo "$f"
-        fi
-      done \
-    | sort -r \
-    | head -1 \
-    | xargs dirname
-}
-
 if [ -z "$ITER_DIR" ]; then
-  ITER_DIR=$(find_latest_acceptable)
+  ITER_DIR=$("$SDLC_STATUS" find-latest qa_passed applied)
   if [ -z "$ITER_DIR" ]; then
     echo "❌ 未找到已完成 apply 的迭代目录"
     exit 1
@@ -135,7 +131,7 @@ fi
 | 输入 | git diff | 变更总结来源 |
 | 输出 | 受影响文档 | README / ARCHITECTURE / SECURITY / CLAUDE 等 |
 | 输出 | 本地 commit | git-committer 产出（未推送）|
-| 输出 | `docs/iterations/.../status.json` | 更新 phase 为 accepted |
+| 输出 | `docs/iterations/.../status.json` | 经状态脚本迁移到 accepted |
 
 ## 流程中的位置
 
