@@ -125,11 +125,12 @@ echo "📋 测试报告: $REPORT_FILE"
 ### 7. 循环修复逻辑
 
 ```bash
-round=1
-max_rounds=${REVIEW_MAX_ROUNDS:-1}
+# 见 SKILL.md「修复轮数（唯一定义）」：最多自动修复 N 轮，N=0 表示失败即停
+N=${REVIEW_MAX_ROUNDS:-1}
+fixes=0
 
-while [ $round -le $max_rounds ]; do
-  echo "🧪 测试执行第 $round 轮..."
+while :; do
+  echo "🧪 测试执行（已修 $fixes 轮）..."
 
   run_lint
   run_unit_tests
@@ -139,13 +140,13 @@ while [ $round -le $max_rounds ]; do
     exit 0
   fi
 
-  if [ $round -eq $max_rounds ]; then
-    echo "❌ 测试修复超过 $max_rounds 轮，需人工介入"
+  if [ "$fixes" -ge "$N" ]; then
+    echo "❌ 测试已自动修复 $N 轮仍未通过，需人工介入"
     exit 1
   fi
 
   echo "⚠️ 测试失败，Claude Code 修复中..."
-  round=$((round + 1))
+  fixes=$((fixes + 1))
 done
 ```
 
@@ -161,7 +162,8 @@ REPORT_FILE="tests/reports/${SLUG}-${TIMESTAMP}.md"
 
 LINT_TOOL=${LINT_TOOL:-eslint}
 TEST_FRAMEWORK=${TEST_FRAMEWORK:-jest}
-REVIEW_MAX_ROUNDS=${REVIEW_MAX_ROUNDS:-1}
+# 见 SKILL.md「修复轮数（唯一定义）」：最多自动修复 N 轮，N=0 表示失败即停
+N=${REVIEW_MAX_ROUNDS:-1}
 
 run_lint() {
   case "$LINT_TOOL" in
@@ -180,10 +182,10 @@ run_unit_tests() {
   esac
 }
 
-round=1
+fixes=0
 
-while [ $round -le $REVIEW_MAX_ROUNDS ]; do
-  echo "🧪 测试执行第 $round 轮..."
+while :; do
+  echo "🧪 测试执行（已修 $fixes 轮）..."
   LINT_FAILED=0
   UNIT_FAILED=0
 
@@ -206,19 +208,19 @@ REPORT
     exit 0
   fi
 
-  if [ $round -eq $REVIEW_MAX_ROUNDS ]; then
-    echo "❌ 测试修复超过 $REVIEW_MAX_ROUNDS 轮"
+  if [ "$fixes" -ge "$N" ]; then
+    echo "❌ 测试已自动修复 $N 轮仍未通过，需人工介入"
     exit 1
   fi
 
   echo "⚠️ 测试失败，修复中..."
-  round=$((round + 1))
+  fixes=$((fixes + 1))
 done
 ```
 
 ## 上下文保护
 
-- 进入 test-pipeline 前，若 `context_usage > 70%` 必须先执行 `/compact`
+- 进入 test-pipeline 前，若 `context_usage > 80%` 必须先执行 `/compact`（阈值与 SKILL.md 一致）
 - 进入前必须将 `pipeline_stage="test-pipeline"` 写入 status.json
 
 ## 错误处理

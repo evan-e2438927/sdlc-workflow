@@ -119,13 +119,14 @@ A10: SSRF
 ### 4. 循环逻辑
 
 ```bash
-round=1
-max_rounds=${REVIEW_MAX_ROUNDS:-1}
+# 见 SKILL.md「修复轮数（唯一定义）」：最多自动修复 N 轮，N=0 表示失败即停
+N=${REVIEW_MAX_ROUNDS:-1}
+fixes=0
 ITER_DIR="docs/iterations/$DATE/$SEQ-$SLUG-$TYPE"
 TASKS_FILE="$ITER_DIR/tasks.md"
 
-while [ $round -le $max_rounds ]; do
-  echo "🔍 Code Review 第 $round 轮..."
+while :; do
+  echo "🔍 Code Review （已修 $fixes 轮）..."
 
   # 获取代码变更
   DIFF=$(git diff --no-color)
@@ -183,8 +184,8 @@ EOF
     # 提取问题列表
     issues=$(echo "$result" | grep -A 100 "问题列表" || echo "$result")
 
-    if [ $round -lt $max_rounds ]; then
-      echo "⚠️ Code Review 失败，第 $round 轮问题："
+    if [ "$fixes" -lt "$N" ]; then
+      echo "⚠️ Code Review 失败，（已修 $fixes 轮）问题："
       echo "$issues"
 
       # Claude Code 根据反馈修复代码
@@ -195,12 +196,12 @@ EOF
       DIFF=$(git diff --no-color)
 
     else
-      echo "❌ Code Review 超过 $max_rounds 轮，需人工介入"
+      echo "❌ Code Review 已自动修复 $N 轮仍未通过，需人工介入"
       exit 1
     fi
   fi
 
-  round=$((round + 1))
+  fixes=$((fixes + 1))
 done
 ```
 
@@ -237,13 +238,14 @@ Codex 返回格式：
 #!/bin/bash
 set -euo pipefail
 
-round=1
-max_rounds=${REVIEW_MAX_ROUNDS:-1}
+# 见 SKILL.md「修复轮数（唯一定义）」：最多自动修复 N 轮，N=0 表示失败即停
+N=${REVIEW_MAX_ROUNDS:-1}
+fixes=0
 ITER_DIR="docs/iterations/$DATE/$SEQ-$SLUG-$TYPE"
 TASKS_FILE="$ITER_DIR/tasks.md"
 
-while [ $round -le $max_rounds ]; do
-  echo "🔍 Code Review 第 $round 轮..."
+while :; do
+  echo "🔍 Code Review （已修 $fixes 轮）..."
 
   DIFF=$(git diff --no-color)
 
@@ -304,15 +306,15 @@ EOF
     exit 0
   fi
 
-  if [ $round -eq $max_rounds ]; then
-    echo "❌ Code Review 超过 $max_rounds 轮，需人工介入"
+  if [ "$fixes" -ge "$N" ]; then
+    echo "❌ Code Review 已自动修复 $N 轮仍未通过，需人工介入"
     exit 1
   fi
 
   echo "⚠️ Code Review 失败，修复中..."
   # Claude Code 修复代码
 
-  round=$((round + 1))
+  fixes=$((fixes + 1))
 done
 ```
 

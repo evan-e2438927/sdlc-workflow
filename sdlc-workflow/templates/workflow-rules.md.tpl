@@ -12,7 +12,7 @@
   - 破坏性变更：type 后加 `!` 或在 footer 写 `BREAKING CHANGE: <说明>`（触发 MAJOR）
   - 配置：type 取 `.claude/.sdlc-config` 的 COMMIT_TYPE（留空则按迭代 <type> 推断），scope 取 COMMIT_SCOPE（留空自动推断）
 - 配置统一放 `.claude/.sdlc-config`（KEY=VALUE，gitignored）
-- Review/Test 循环上限由 REVIEW_MAX_ROUNDS 控制（默认 1 轮）
+- 失败后最多自动修复 REVIEW_MAX_ROUNDS 轮（默认 1；Gate 1/2 仅 --review 时运行）
 - 超限中止 Pipeline，等待人工介入
 - 禁止直推 main/master 分支（push + PR 仅在 `pr` 命令中执行）
 - 禁止日志泄露敏感信息（密钥/Token/密码）

@@ -36,5 +36,17 @@ has   "$REPO_DIR/skills/sdlc-doit/SKILL.md" '--by doit --flags'
 has   "$REPO_DIR/skills/sdlc-doit/SKILL.md" '按 status.json 的 flags 续跑'
 lacks "$REPO_DIR/skills/sdlc-doit/SKILL.md" '不写 `pending_review` 暂停点'
 
+# ── Task 5: 修复轮数 ──
+for f in 05-design-reviewer.md 08-code-reviewer.md 09-test-pipeline.md; do
+  has   "$R/$f" '见 SKILL.md「修复轮数（唯一定义）」'
+  lacks "$R/$f" 'while [ $round -le'
+  lacks "$R/$f" '[ $round -eq $'
+  lacks "$R/$f" '[ $round -lt $'
+done
+has   "$SKILL_DIR/templates/sdlc-config.tpl" '最多自动修复轮数（0–10）'
+lacks "$SKILL_DIR/templates/sdlc-config.tpl" '正整数(1-10)'
+has   "$SKILL_DIR/templates/workflow-rules.md.tpl" '最多自动修复 REVIEW_MAX_ROUNDS 轮'
+lacks "$R/09-test-pipeline.md" 'context_usage > 70%'
+
 # ── END ──
 [ $fail -eq 0 ] && echo PASS; exit $fail
