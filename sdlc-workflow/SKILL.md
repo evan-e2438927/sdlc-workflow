@@ -13,7 +13,7 @@ metadata:
   openclaw:
     emoji: "🏭"
     requires:
-      bins: ["codex", "gh"]
+      bins: ["codex", "gh", "jq"]
     install:
       - id: codex
         kind: npm
@@ -83,12 +83,12 @@ sdlc-apply docs/iterations/2026-04-16/001-user-login-feature/
 sdlc-apply --review docs/iterations/2026-04-16/001-user-login-feature/
 ```
 
-若不指定路径，自动查找最近一个 `phase == "pending_review" | "approved"` 的迭代目录。
+若不指定路径，用 `"$SDLC_STATUS" find-latest pending_review approved qa_failed` 自动定位。
 
 前置检查：
 - status.json 存在且 `phase` 为 `pending_review`（视为审核通过）或 `approved`
-- `phase == applied` → 拒绝重复执行
-- `phase == rejected` → 提示修改后重新 proposal
+- `phase == qa_failed` → 进入修复模式（按 `qa-failures.md` 修复缺陷，再跑 ⑨）
+- 其他 phase（如 `applied`、`rejected`）→ 拒绝执行
 
 执行步骤 ⑥-⑨（默认跳过 Gate 2，加 `--review` 则执行 ⑧）：
 ```
@@ -121,7 +121,7 @@ sdlc-qa [<迭代目录>]
 
 apply（`phase == applied`）后运行。读取 tasks.md 中 `track: qa` 的任务，编写 Playwright
 脚本到 `tests/e2e/<slug>/`，通过 Playwright MCP 执行，产出 `tests/reports/<slug>-e2e-report.md`。
-全部通过后将 status.json 更新为 `phase: "qa_passed"`。
+全部通过 → `phase: "qa_passed"`；发现代码缺陷 → 写 `qa-failures.md`，`phase: "qa_failed"`，由 apply 修复模式处理。
 
 ### accept — 验收提交（更新文档 + 本地 commit）
 
@@ -304,6 +304,30 @@ worktree 内 `<project>` 指向该 worktree 根目录，全局级仍为 `~/.clau
 
 该目录下包含：requirements.md, design.md, tasks.md, status.json
 
+## 迭代状态（phase）
+
+phase 取值：pending_review | approved | applied | qa_failed | qa_passed | accepted | pr_created | rejected
+
+```
+（无）──①–④ 完成──▶ pending_review ──apply / doit·mini 自动──▶ approved ──⑨ 通过──▶ applied
+                       │  ▲                                                          │
+                       └──┘ 对话修改，phase 不变                                      ├─qa 全部通过─▶ qa_passed ─accept─▶ accepted ─pr─▶ pr_created
+                                                                                      ├─qa 代码缺陷─▶ qa_failed ─apply 修复模式 ⑨ 通过─▶ applied
+                                                                                      └─accept（跳过 qa）─────────────────▶ accepted
+accepted 之前任意 phase ──用户放弃──▶ rejected
+```
+
+- **唯一写入口**：`phase`、`*_at` 时间戳、`history`、`mode`、`flags` 只能经状态脚本写入，非法迁移由脚本拒绝并列出允许的下一步。
+  其余进度字段（`tracks`、`agent_mode`、`summary`、`pipeline_stage`、`pr_url`）照旧直接写。
+- **脚本路径** `SDLC_STATUS`：Claude Code 为 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/scripts/sdlc-status.sh`；Codex / 手动安装为本 skill 目录内 `scripts/sdlc-status.sh`。迁移表单源：同目录 `state-machine.json`。
+  - `"$SDLC_STATUS" transition "$ITER_DIR" <目标phase> --by <命令> [--note <说明>] [--flags '<json>']`
+  - `"$SDLC_STATUS" find-latest <phase>...` → 最近一个处于这些 phase 的迭代目录
+- **创建**：首次迁移（到 `pending_review`）时写入 `mode`（proposal / doit / mini）；doit / mini 同时用 `--flags` 记录 `review` / `qa` / `agents`。
+- **审核期间修改**：`pending_review` 时用户在对话里提修改意见，原地修改、phase 不变（规则见 `references/flow-proposal.md`「审核期间的修改（对话）」）。
+- **放弃**：用户表示放弃某个迭代时，`transition … rejected --by user`；工作区代码不回滚。
+- **doit / mini 续跑**：用户要求继续一个 `mode=doit`（或 `mode=mini`）的迭代时，按当前 phase 与 `flags` 接续剩余步骤直到 `pr_created`
+  （`approved` 由 apply「断点续跑」接手；`applied` 后按 `flags.qa` 决定是否先跑 qa）。`mode=proposal` 只续完当前命令。
+
 ## Pipeline 编排
 
 ### 步骤概览
@@ -405,25 +429,15 @@ MKDIR -p "$ITER_DIR"
 IF NOT --review:
   SKIP Gate 1
 
-round=1
-WHILE round <= REVIEW_MAX_ROUNDS:
-  result=$(codex exec --full-auto "审查设计...
-    额外检查第 7 项: AC 覆盖度
-    - requirements.md 每个 AC-ID 是否在 tasks.md 被引用
-    - tasks.md AC 是否保留 Given-When-Then + 场景维度
-    - 是否存在模糊不可验证的 AC
-    - 每个 Requirement 是否至少覆盖 happy-path + error")
-  IF result == PASS:
-    LOG "✅ 设计 Review PASS"
-    BREAK
-  ELSE:
-    IF round < REVIEW_MAX_ROUNDS:
-      LOG "⚠️ 设计 Review 第{round}轮: <问题>"
-      CLAUDE 修订 design.md + tasks.md
-    ELSE:
-      LOG "❌ 设计 Review 超过 {N} 轮，需人工介入"
-      ABORT
-  round+=1
+# 循环按「修复轮数（唯一定义）」：检查 = Codex 设计审查，修复 = CLAUDE 修订 design.md + tasks.md
+result=$(codex exec --full-auto "审查设计...
+  额外检查第 7 项: AC 覆盖度
+  - requirements.md 每个 AC-ID 是否在 tasks.md 被引用
+  - tasks.md AC 是否保留 Given-When-Then + 场景维度
+  - 是否存在模糊不可验证的 AC
+  - 每个 Requirement 是否至少覆盖 happy-path + error")
+PASS → LOG "✅ 设计 Review PASS"
+超限 → LOG "❌ 设计 Review 已自动修复 N 轮仍未通过，需人工介入"; ABORT
 ```
 
 #### ⑤.1 Gate 1 后增量文档同步
@@ -431,7 +445,7 @@ WHILE round <= REVIEW_MAX_ROUNDS:
 Gate 1 通过后，若经过 ≥1 轮修订，必须同步更新受影响的文档：
 
 ```
-IF Gate 1 审查经过修订（round > 1）:
+IF Gate 1 审查经过修订（已修轮数 ≥ 1）:
   DIFF = diff(requirements.md + design.md + tasks.md 原始版本, 当前版本)
   IF DIFF 涉及需求范围变更:
     同步更新 requirements.md 中的 [⚠️ 假设] 标注
@@ -457,20 +471,10 @@ IF 当前为 proposal 模式:
   TASK_COUNT=$(从 tasks.md 提取任务数)
   TOTAL_HOURS=$(从 tasks.md 提取总工时)
 
-  # 写入 status.json
-  WRITE "$ITER_DIR/status.json" {
-    "phase": "pending_review",
-    "proposal_at": "$(date -Iseconds)",
-    "reviewed_at": null,
-    "applied_at": null,
-    "reviewer": null,
-    "iter_dir": "$ITER_DIR",
-    "summary": {
-      "requirement_count": $REQ_COUNT,
-      "task_count": $TASK_COUNT,
-      "estimated_hours": $TOTAL_HOURS
-    }
-  }
+  # 写入 phase（脚本），再补 summary（进度字段，直接写）
+  "$SDLC_STATUS" transition "$ITER_DIR" pending_review --by proposal
+  jq --argjson r $REQ_COUNT --argjson t $TASK_COUNT --argjson h $TOTAL_HOURS \
+    '.summary = {requirement_count:$r, task_count:$t, estimated_hours:$h}' status.json > 临时文件 && mv
 
   LOG "📋 需求拆解完成，等待人工审核"
   LOG "   📂 迭代目录: $ITER_DIR"
@@ -479,8 +483,11 @@ IF 当前为 proposal 模式:
 
   STOP  # proposal 到此结束
 
-IF 当前为 doit 模式:
-  # 不写 status.json，直接继续步骤 ⑥
+IF 当前为 doit / mini 模式:
+  # 与 proposal 走同一条主线，只是不停顿；mode=doit 与 flags 供中断后续跑
+  "$SDLC_STATUS" transition "$ITER_DIR" pending_review --by doit --flags '{"review":<bool>,"qa":<bool>,"agents":"<auto|single|multi>"}'
+  "$SDLC_STATUS" transition "$ITER_DIR" approved --by doit       # mini 同理，--by mini
+  # 直接继续步骤 ⑥
 ```
 
 #### ⑤→⑥ 上下文检查点
@@ -505,18 +512,18 @@ IF 当前为 apply 模式:
 
   IF PHASE == "pending_review":
     # 用户直接 apply 视为审核通过
-    UPDATE STATUS_FILE: phase="approved", reviewed_at=now, reviewer="cli-apply"
+    "$SDLC_STATUS" transition "$ITER_DIR" approved --by apply
     LOG "🚀 Proposal 审核通过，开始开发"
 
   ELSE IF PHASE == "approved":
-    LOG "🚀 开始执行需求开发"
+    LOG "🚀 开始执行需求开发（含断点续跑）"
 
-  ELSE IF PHASE == "applied":
-    ERROR "该 proposal 已执行过 apply"
-    ABORT
+  ELSE IF PHASE == "qa_failed":
+    LOG "🔧 QA 发现代码缺陷，进入修复模式"   # 见 references/flow-apply.md「修复模式（phase = qa_failed）」
 
-  ELSE IF PHASE == "rejected":
-    ERROR "该 proposal 已被拒绝，请修改后重新 proposal"
+  ELSE:
+    # applied / rejected 等：不能开始 apply，由脚本在后续迁移时拒绝；此处直接提示
+    ERROR "当前 phase=$PHASE，不能执行 apply"
     ABORT
 ```
 
@@ -569,20 +576,10 @@ Gate 2 的"状态漂移"检查只在 `--review` 时跑，但"勾选是否属实"
 IF NOT --review:
   SKIP Gate 2
 
-round=1
-WHILE round <= REVIEW_MAX_ROUNDS:
-  result=$(codex exec --full-auto "审查代码...")
-  IF result == PASS:
-    LOG "✅ Code Review PASS"
-    BREAK
-  ELSE:
-    IF round < REVIEW_MAX_ROUNDS:
-      LOG "⚠️ Code Review 第{round}轮: <问题>"
-      CLAUDE 修复代码
-    ELSE:
-      LOG "❌ Code Review 超过 {N} 轮，需人工介入"
-      ABORT
-  round+=1
+# 循环按「修复轮数（唯一定义）」：检查 = Codex 代码审查，修复 = CLAUDE 修复代码（flow-apply.md「修复回合」）
+result=$(codex exec --full-auto "审查代码...")
+PASS → LOG "✅ Code Review PASS"
+超限 → LOG "❌ Code Review 已自动修复 N 轮仍未通过，需人工介入"; ABORT
 ```
 
 Gate 2 还必须检查 `tasks.md` 状态是否与真实实现一致：
@@ -613,24 +610,19 @@ STAGE 1: npx $LINT_TOOL .        # 快速失败
 STAGE 2: npx $TEST_FRAMEWORK     # unit tests
 # 浏览器 E2E 不在此处——已独立为 qa 命令（步骤 ⑩）
 
-IF any failure:
-  IF round < REVIEW_MAX_ROUNDS:
-    LOG "⚠️ 失败用例: <列表>"
-    CLAUDE 修复
+# 失败时按「修复轮数（唯一定义）」循环；每轮修复：
+  LOG "⚠️ 失败用例: <列表>"
+  CLAUDE 修复（flow-apply.md「修复回合」）
 
-    # ⑨.1 测试修复后增量文档同步
-    IF 修复过程中修改了 design.md 或 tasks.md:
-      同步 .claude/ARCHITECTURE.md / .claude/SECURITY.md 受影响章节
+  # ⑨.1 测试修复后增量文档同步
+  IF 修复过程中修改了 design.md 或 tasks.md:
+    同步 .claude/ARCHITECTURE.md / .claude/SECURITY.md 受影响章节
 
-    # ⑨.2 上下文检查点
-    IF context_usage > 80%:
-      执行 /compact
-      重新加载: 失败测试报告 + tasks.md + git diff --cached 摘要
-
-    retry
-  ELSE:
-    LOG "❌ 测试修复超过 {N} 轮，需人工介入"
-    ABORT
+  # ⑨.2 上下文检查点
+  IF context_usage > 80%:
+    执行 /compact
+    重新加载: 失败测试报告 + tasks.md + git diff --cached 摘要
+超限 → LOG "❌ 测试已自动修复 N 轮仍未通过，需人工介入"; ABORT
 
 LOG "✅ 测试通过: <通过数>/<总数>"
 ```
@@ -640,7 +632,7 @@ LOG "✅ 测试通过: <通过数>/<总数>"
 #### ⑨.3 Apply 完成（仅 apply / doit）
 ```
 # test-pipeline 通过即为 apply 终点——不提交、不推 PR
-UPDATE status.json: phase="applied", applied_at=now
+"$SDLC_STATUS" transition "$ITER_DIR" applied --by apply     # 修复模式：--note qa-fix
 LOG "✅ 开发完成: N 个任务 | 测试: lint + unit 全部通过"
 LOG "👉 浏览器验收: sdlc-qa   👉 提交: sdlc-accept"
 ```
@@ -659,11 +651,11 @@ FOR EACH qa 场景:
   失败时：同样 mv 诊断图到 tests/reports/<slug>/screenshots/
 执行完毕 teardown 后台 dev server（释放端口）
 生成 tests/reports/<slug>-e2e-report.md
-IF 全部 PASS: UPDATE status.json: phase="qa_passed"
+IF 全部 PASS: "$SDLC_STATUS" transition "$ITER_DIR" qa_passed --by qa
 ELSE: 按根因分流——
-  脚本/选择器问题 → qa 内就地修复重跑（≤REVIEW_MAX_ROUNDS），phase 保持 applied
-  代码缺陷 → phase 退回 approved（.qa_failed_at=now），提示修复后重跑 apply
-  超限 → 中止，输出失败列表 + 截图，人工介入
+  脚本/选择器问题 → qa 内就地修复重跑（按「修复轮数（唯一定义）」），phase 保持 applied
+  代码缺陷 → 写 $ITER_DIR/qa-failures.md → "$SDLC_STATUS" transition "$ITER_DIR" qa_failed --by qa
+            → 提示运行 sdlc-apply（自动进入修复模式）；doit --qa 时自动修复后重跑 qa（按修复轮数计数）
 ```
 
 #### ⑪ docs-updater（accept 命令 / doit）
@@ -694,7 +686,7 @@ ELSE:
 #### ⑫.1 Accept 状态更新（accept 命令 / doit）
 
 ```
-UPDATE status.json: phase="accepted", accepted_at=now
+"$SDLC_STATUS" transition "$ITER_DIR" accepted --by accept
 LOG "✅ 已本地提交 | 变更: N files"
 LOG "👉 推送并创建 PR: sdlc-pr"
 ```
@@ -712,23 +704,44 @@ PR_URL=$(gh pr view --json url --jq .url)
 #### ⑬.1 PR 状态更新与完成输出
 
 ```
-UPDATE status.json: phase="pr_created", pr_created_at=now, pr_url=<url>
+"$SDLC_STATUS" transition "$ITER_DIR" pr_created --by pr
+jq '.pr_url = "<url>"' 写入 status.json（进度字段，直接写）
 LOG "✅ PR: <url> | 分支: $CURRENT_BRANCH"
 ```
 
 ## 循环与回退规则
 
-| 循环点 | 触发条件 | 回退到 | 最大轮数 | 超限行为 |
-|--------|----------|--------|----------|----------|
-| Gate 1 (⑤) | Codex 返回 FAIL（--review 时） | 步骤③ design-generator | REVIEW_MAX_ROUNDS | 控制台报错，中止 |
-| Gate 2 (⑧) | Codex 返回 FAIL（--review 时） | 步骤⑥ 开发（修复回合，见 flow-apply.md「修复回合」） | REVIEW_MAX_ROUNDS | 控制台报错，中止 |
-| Test (⑨) | 测试失败 | 步骤⑥ 开发（修复回合，见 flow-apply.md「修复回合」） | REVIEW_MAX_ROUNDS | 控制台报错，中止 |
+### 修复轮数（唯一定义）
+
+所有「检查 → 失败 → 修复 → 再检查」的循环都按这一条，其他文档只引用、不重写：
+
+```
+已修轮数 = 0
+循环：
+  执行检查
+  通过 → 结束
+  已修轮数 == N → 停下，phase 不变，输出失败项，转人工
+  修复；已修轮数 + 1
+```
+
+`N = REVIEW_MAX_ROUNDS`，默认 1（失败后修一次、再检查一次）；`0` = 不自动修复，失败即停。
+
+| 循环 | 何时生效 | 修复方式 | 计数范围 |
+|------|----------|----------|----------|
+| Gate 1 设计审查 (⑤) | 仅 `--review` | 修订 design.md + tasks.md | 一次 proposal / doit |
+| Gate 2 代码审查 (⑧) | 仅 `--review` | 修复回合，见 flow-apply.md「修复回合」 | 一次 apply（含修复模式） |
+| ⑨ lint + unit | 始终 | 修复回合，见 flow-apply.md「修复回合」 | 一次 apply |
+| qa 脚本 / 选择器修复 (⑩) | 始终 | 就地修脚本 | 一次 qa |
+| QA 缺陷回流（qa → 修复模式 → qa） | 仅 doit `--qa` 时自动 | apply 修复模式 | 一次 doit |
+
+- 计数不落盘：用户每次手动运行命令都从 0 开始（重新运行本身就是人工决定）。
+- doit 超限：停在当前 phase，不 accept、不 pr。
 
 ## 全局规则
 
 1. **执行模式**：apply 开发阶段（⑥ ⑦）支持单 agent / 多 agent 两种模式（`AGENT_MODE`，见 `references/flow-apply.md`），两种模式产出等价；其余步骤由主 agent 执行
 2. **双模型把关（可选）**：Claude Code 生成，Codex CLI 审查；`--review` 时启用 Gate 1 + Gate 2
-3. **循环上限**：每个 Gate/Test ≤ REVIEW_MAX_ROUNDS（默认 1，--review 时生效）
+3. **修复轮数**：失败后最多自动修复 REVIEW_MAX_ROUNDS 轮（默认 1；Gate 1/2 仅 `--review` 时运行），唯一定义见「修复轮数（唯一定义）」
 4. **Conventional Commits**：统一遵循 [Conventional Commits 1.0.0](https://www.conventionalcommits.org/zh-hans/v1.0.0/)，格式 `<type>[scope][!]: description`（type: feat/fix/docs/style/refactor/perf/test/build/ci/chore/revert；破坏性变更加 `!` 或 footer `BREAKING CHANGE:`）。权威定义见 `references/11-git-committer.md`
 5. **禁止直推**：所有变更通过 feature branch + PR
 6. **安全优先**：禁止在日志中泄露敏感信息
@@ -741,7 +754,7 @@ LOG "✅ PR: <url> | 分支: $CURRENT_BRANCH"
 13. **审查门禁不可降级**：Codex CLI 不可用时若指定 `--review` 必须中止，不能自动跳过 Gate
 14. **全栈目录约束**：默认采用 Better-T-Stack 风格 monorepo，业务代码不应随意落到根目录级 `web/`/`api/`/`server/`
 15. **文档统一放置**：ARCHITECTURE.md、SECURITY.md、CODING_GUIDELINES.md 与 CLAUDE.md 统一放在 `.claude/` 目录
-16. **proposal 状态管理**：proposal 完成后必须写入 status.json；apply 启动前必须校验 status.json
+16. **状态管理**：phase 迁移只经 `"$SDLC_STATUS"`（见「迭代状态（phase）」），不手写 `.phase`；各命令启动前先校验当前 phase
 17. **上下文管理**：Pipeline 步骤间检测上下文占用，超过 80% 时执行 `/compact`。关键检查点：开发前（④→⑥）、测试前（⑦→⑨）、测试修复 retry 前（⑨ 内）。compact 前必须确保当前步骤产物已写入文件，compact 后须经统一上下文加载入口重新加载迭代目录产物 + 全局/项目 `.claude/` 规范
 17.1 **统一上下文加载**：所有命令在步骤 ① 前经唯一入口加载规范——先全局 `~/.claude/` 再项目 `<project>/.claude/`（项目覆盖全局）；加载清单与优先级只在 `references/context-loader.md` 定义一次，命令与 reference 不得各自罗列 `.claude/*` 清单
 18. **角色分工**：⑥.1 主 agent 打地基（infra / shared / 契约 / 依赖）；⑥.2 backend 与 frontend 角色开发（多 agent 模式下并行）；⑦ test 角色查漏；⑨ test-pipeline 串行（lint → unit）
@@ -749,5 +762,5 @@ LOG "✅ PR: <url> | 分支: $CURRENT_BRANCH"
 20. **Worktree 端口隔离**：并行工作区的 dev server 端口按 `PORT=3000+seq, API_PORT=4000+seq` 分配，避免冲突
 21. **Worktree 注册表**：`.worktrees/worktree-registry.json` 记录所有并行工作区元数据，`pr-creator` 完成后更新 `pr_url`
 22. **Worktree 文件冲突检测**：创建并行工作区前检查目标文件与已有工作区的交集，存在冲突时警告
-23. **五命令分工**：apply 只到 lint + unit（phase: applied，不提交）；`qa` 做 Playwright 浏览器功能验收（phase: qa_passed，可跳过）；`accept` 总结变更 → 更新文档 → 本地 commit（phase: accepted，不 push、不建 PR）；`pr` push + gh pr create（phase: pr_created，唯一远程动作）。doit 自动串联，`--qa` 时含 qa 步骤
+23. **五命令分工**：apply 只到 lint + unit（phase: applied，不提交）；`qa` 做 Playwright 浏览器功能验收（phase: qa_passed；代码缺陷 → qa_failed → apply 修复模式；可跳过）；`accept` 总结变更 → 更新文档 → 本地 commit（phase: accepted，不 push、不建 PR）；`pr` push + gh pr create（phase: pr_created，唯一远程动作）。doit 自动串联，`--qa` 时含 qa 步骤
 24. **Track 拆分**：task-generator 必须将任务按 `track: frontend|backend|shared|infra|unit-test|qa` 拆分（定义见 `references/04-task-generator.md` §2.0）。执行归属：infra / shared → apply ⑥.1 主 agent；backend / frontend → ⑥.2 开发角色；unit-test → ⑦ 测试角色；qa → `qa` 命令
