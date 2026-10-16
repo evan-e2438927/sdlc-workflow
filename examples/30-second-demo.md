@@ -108,7 +108,7 @@ sdlc-pr        # push → 创建 PR
 
 说明：
 
-> apply 自动找到最近的 pending proposal，做开发 + 单测 + lint；qa 跑浏览器验收；accept 在本地定稿提交；pr 才推送发布。各阶段独立、可单独重跑。
+> apply 自动找到最近的 pending proposal，做开发 + 单测 + lint；qa 跑浏览器验收（发现代码缺陷时进入 `qa_failed`，再跑一次 apply 即自动修复）；accept 在本地定稿提交；pr 才推送发布。各阶段独立、可单独重跑。
 
 7. 展示最终验收产物
 

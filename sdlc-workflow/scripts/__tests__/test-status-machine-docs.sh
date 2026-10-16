@@ -82,5 +82,26 @@ has   "$SKILL_DIR/scripts/sdlc-worktree.sh" "'pr_created':"
 lacks "$SKILL_DIR/scripts/sdlc-worktree.sh" "if w.get('phase') == 'applied':"
 has   "$SKILL_DIR/scripts/sdlc-worktree.sh" "if w.get('phase') in ('pr_created', 'rejected'):"
 
+# ── Task 9: 用户文档 + phase 一致性 ──
+has "$REPO_DIR/docs/implementation-plan.md" '> 注：状态机的现行定义见 `sdlc-workflow/SKILL.md`「迭代状态（phase）」'
+for f in README.md README.zh-CN.md DESIGN-PROMO.md DESIGN-PROMO.zh-CN.md docs/workflow-overview.md; do
+  has "$REPO_DIR/$f" 'qa_failed'
+done
+python3 - "$SKILL_DIR" "$REPO_DIR" <<'PY' || fail=1
+import json, re, sys, pathlib
+skill, repo = map(pathlib.Path, sys.argv[1:])
+want = set(json.loads((skill/"scripts/state-machine.json").read_text())["transitions"]) - {""}
+def check(name, got):
+    if got != want: print(f"FAIL: {name} phase 集合 {sorted(got)} != 迁移表 {sorted(want)}"); return 1
+    return 0
+bad = 0
+m = re.search(r"^phase 取值：(.+)$", (skill/"SKILL.md").read_text(encoding="utf-8"), re.M)
+bad |= check("SKILL.md", {p.strip() for p in m.group(1).split("|")} if m else set())
+for f in ("README.md", "README.zh-CN.md"):
+    m = re.search(r'"phase": "([^"]+)"', (repo/f).read_text(encoding="utf-8"))
+    bad |= check(f, {p.strip() for p in m.group(1).split("|")} if m else set())
+sys.exit(bad)
+PY
+
 # ── END ──
 [ $fail -eq 0 ] && echo PASS; exit $fail

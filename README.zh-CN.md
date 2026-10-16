@@ -36,7 +36,7 @@
 |------|------|--------|-----------|
 | 需求拆解 | `proposal` | 需求 → 澄清 → 设计 → 任务（按 track 拆分）→ [Gate1] → **暂停等人工审核** | pending_review |
 | 开发 | `apply` | 实现 frontend/backend/unit-test → 单元测试 → [Gate2] → lint+unit | applied |
-| 浏览器验收 | `qa` | 把 qa track 写成 Playwright 脚本并通过 Playwright MCP 执行 | qa_passed |
+| 浏览器验收 | `qa` | 把 qa track 写成 Playwright 脚本并通过 Playwright MCP 执行 | qa_passed / qa_failed |
 | 定稿 | `accept` | 总结变更 → 更新文档 → **本地 commit**（不 push） | accepted |
 | 发布 | `pr` | `git push` → `gh pr create`（唯一与远程交互的动作） | pr_created |
 
@@ -233,7 +233,7 @@ sdlc-mini 把按钮颜色改成蓝色          # 小任务轻量流程
 | `sdlc-update` | `[项目目录]` | 两阶段升级同步：阶段一安全同步脚手架（幂等，不覆盖用户内容）；阶段二漂移感知增量刷新（基线自动刷新、用户文档逐项确认） | — |
 | `sdlc-proposal` | `<需求> [--review]` | 需求拆解（①-④）→ 等待人工审核 | pending_review |
 | `sdlc-apply` | `[--review] [--agents single\|multi] [迭代目录]` | 开发 + 单元测试 + lint（⑥-⑨，不提交） | applied |
-| `sdlc-qa` | `[迭代目录]` | Playwright 浏览器功能验收（⑩） | qa_passed |
+| `sdlc-qa` | `[迭代目录]` | Playwright 浏览器功能验收（⑩）；代码缺陷 → `qa_failed`，由下一次 `apply` 修复 | qa_passed / qa_failed |
 | `sdlc-accept` | `[迭代目录]` | 总结变更 → 更新文档 → 本地 commit（⑪⑫） | accepted |
 | `sdlc-pr` | `[迭代目录]` | push → 创建 PR（⑬，唯一远程动作） | pr_created |
 | `sdlc-doit` | `[--review] [--qa] [--agents single\|multi] <需求>` | 全自动，一路到 PR（①-⑬） | — |
@@ -274,6 +274,8 @@ graph TD
 
     CMD -->|qa| QA["⑩ Playwright 浏览器功能验收"]
     QA --> Q_END["qa_passed"]
+    QA -->|代码缺陷| Q_FAIL["qa_failed"]
+    Q_FAIL -->|apply 修复模式| A_END
     Q_END --> ACCEPT
 
     CMD -->|accept| ACCEPT["⑪⑫ 总结变更 → 文档 → 本地 commit"]
@@ -290,19 +292,25 @@ graph TD
     MINI --> END
 ```
 
-每轮迭代的状态记录在 `docs/iterations/.../status.json`，会话中断后下个 session 据此续跑：
+每轮迭代的状态记录在 `docs/iterations/.../status.json`，会话中断后下个 session 据此续跑。phase 的变更由内部脚本执行，只放行合法迁移并追加 `history`，不需要手改：
 
 ```json
 {
-  "phase": "pending_review | approved | rejected | applied | qa_passed | accepted | pr_created",
+  "phase": "pending_review | approved | applied | qa_failed | qa_passed | accepted | pr_created | rejected",
+  "mode": "proposal | doit | mini",
+  "flags": { "review": true, "qa": true, "agents": "auto" },
   "proposal_at": "2026-04-13T14:00:00+08:00",
-  "reviewed_at": null,
-  "applied_at": null,
-  "accepted_at": null,
+  "reviewed_at": "2026-04-13T15:00:00+08:00",
   "pr_url": null,
-  "iter_dir": "docs/iterations/2026-04-13/001-user-login-feature/"
+  "iter_dir": "docs/iterations/2026-04-13/001-user-login-feature",
+  "history": [{ "at": "2026-04-13T14:00:00+08:00", "from": null, "to": "pending_review", "by": "proposal" }]
 }
 ```
+
+- **审核时想改 proposal**：`pending_review` 期间直接在对话里说要改什么，agent 会原地联动修改 requirements / design / tasks，改完再停下等你确认。
+- **QA 发现代码缺陷**：qa 写 `qa-failures.md` 并进入 `qa_failed`；下一次 `apply` 自动进入修复模式（按清单修复、能复现的补回归单测、跑 lint + unit），回到 `applied` 后重跑 qa。
+- **放弃一个迭代**：在对话里说明即可，会被标记为 `rejected`（工作区代码不回滚）。
+- **doit / mini 中断**：让 agent 继续即可，会按原来的 `--review` / `--qa` 参数一路跑到 PR。
 
 ---
 
@@ -444,7 +452,7 @@ your-project/
 │   ├── requirements.md
 │   ├── design.md
 │   ├── tasks.md
-│   └── status.json             # phase: pending_review → applied → qa_passed → accepted → pr_created
+│   └── status.json             # phase: pending_review → approved → applied → qa_passed（或 qa_failed → applied）→ accepted → pr_created
 ├── tests/
 │   ├── unit/                   # 单元测试（apply 生成）
 │   ├── e2e/                    # Playwright 脚本（qa 生成）
@@ -464,7 +472,7 @@ your-project/
 | `LINT_TOOL` | `eslint` | Lint 工具（eslint/biome） |
 | `E2E_FRAMEWORK` | `playwright` | 浏览器验收框架（qa 命令） |
 | `TEST_BOOTSTRAP_POLICY` | `report` | 测试基础设施缺口处理（report/auto/never） |
-| `REVIEW_MAX_ROUNDS` | `1` | Gate/Test 最大循环轮数 |
+| `REVIEW_MAX_ROUNDS` | `1` | 失败后最多自动修复轮数（`0` = 不自动修）；适用于 Gate 1/2（仅 `--review`）、lint + unit、qa 脚本修复、doit `--qa` 的缺陷回流 |
 | `AGENT_MODE` | `auto` | apply 执行模式（auto/single/multi），`--agents` 参数覆盖 |
 | `EDIT_GUARD` | `on` | multi 模式越界守卫：角色子 agent 写本次允许清单外的文件时在写入前拒绝 |
 | `GIT_BRANCH_PREFIX` | `feat/` | Git 分支前缀 |

@@ -1,5 +1,7 @@
 # 新增 `proposal` / `apply` 命令 + 文档目录迁移
 
+> 注：状态机的现行定义见 `sdlc-workflow/SKILL.md`「迭代状态（phase）」。本文是 proposal / apply 拆分时的历史计划，正文保留原貌。
+
 ## 背景
 
 两个改动：

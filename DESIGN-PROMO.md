@@ -123,7 +123,7 @@ Claude Code → generates code and design
 Codex CLI   → reviews independently (Gate 1 reviews design, Gate 2 reviews code)
 
 Gates are off by default, enabled with --review
-Once enabled: review fails → revise → re-review (up to REVIEW_MAX_ROUNDS rounds)
+Once enabled: review fails → revise → re-review (at most REVIEW_MAX_ROUNDS auto-fix rounds)
               review tool unavailable → abort, ❌ never silently skipped
 ```
 
@@ -150,7 +150,7 @@ Each requirement produces a structured iteration directory, with `status.json` r
 docs/iterations/2026-03-27/
   ├── 001-user-login-feature/
   │   ├── requirements.md / design.md / tasks.md
-  │   └── status.json   ← pending_review → applied → qa_passed → accepted → pr_created
+  │   └── status.json   ← pending_review → approved → applied → qa_passed (or qa_failed → applied) → accepted → pr_created
   └── 002-password-reset-fix/ ...
 ```
 
@@ -208,7 +208,9 @@ flowchart TD
     %% ===== qa / accept / pr =====
     A_END --> QA[⑩ qa · Playwright + MCP browser QA]
     QA -->|PASS| Q_END([qa_passed])
-    QA -->|FAIL · code defect| APPLY_START
+    QA -->|FAIL · code defect| QF([qa_failed · qa-failures.md])
+    QF --> REPAIR[apply repair mode<br/>fix listed defects → lint + unit]
+    REPAIR --> A_END
     Q_END --> ACCEPT[⑪⑫ summarize → docs → local commit]
     ACCEPT --> AC_END([accepted])
     AC_END --> PR[⑬ push → gh pr create]
@@ -313,7 +315,7 @@ TEST_FRAMEWORK=jest          # jest | vitest | mocha
 LINT_TOOL=eslint             # eslint | biome
 E2E_FRAMEWORK=playwright     # browser QA framework (qa command)
 TEST_BOOTSTRAP_POLICY=report # report | auto | never
-REVIEW_MAX_ROUNDS=1          # max Gate/Test loop rounds (applies with --review)
+REVIEW_MAX_ROUNDS=1          # max auto-fix rounds after a failure (0 = no auto-fix; Gates run only with --review)
 GIT_BRANCH_PREFIX=feat/      # branch prefix
 COMMIT_TYPE=                 # empty infers from iteration type
 COMMIT_SCOPE=                # empty auto-infers

@@ -123,7 +123,7 @@ Claude Code → 生成代码和设计
 Codex CLI   → 独立审查（Gate 1 审设计，Gate 2 审代码）
 
 Gate 默认关闭，加 --review 时启用
-一旦启用：审查失败 → 修订 → 重新审查（最多 REVIEW_MAX_ROUNDS 轮）
+一旦启用：审查失败 → 修订 → 重新审查（最多自动修复 REVIEW_MAX_ROUNDS 轮）
           审查工具不可用 → 中止，❌ 不允许静默跳过
 ```
 
@@ -150,7 +150,7 @@ accept 把变更定稿到**本地**（更新文档 + commit），你可以先 re
 docs/iterations/2026-03-27/
   ├── 001-user-login-feature/
   │   ├── requirements.md / design.md / tasks.md
-  │   └── status.json   ← pending_review → applied → qa_passed → accepted → pr_created
+  │   └── status.json   ← pending_review → approved → applied → qa_passed（或 qa_failed → applied）→ accepted → pr_created
   └── 002-password-reset-fix/ ...
 ```
 
@@ -208,7 +208,9 @@ flowchart TD
     %% ===== qa / accept / pr =====
     A_END --> QA[⑩ qa · Playwright + MCP 浏览器验收]
     QA -->|PASS| Q_END([qa_passed])
-    QA -->|FAIL · 代码缺陷| APPLY_START
+    QA -->|FAIL · 代码缺陷| QF([qa_failed · qa-failures.md])
+    QF --> REPAIR[apply 修复模式<br/>按清单修复 → lint + unit]
+    REPAIR --> A_END
     Q_END --> ACCEPT[⑪⑫ 总结 → 文档 → 本地 commit]
     ACCEPT --> AC_END([accepted])
     AC_END --> PR[⑬ push → gh pr create]
@@ -313,7 +315,7 @@ TEST_FRAMEWORK=jest          # jest | vitest | mocha
 LINT_TOOL=eslint             # eslint | biome
 E2E_FRAMEWORK=playwright     # 浏览器验收框架（qa 命令）
 TEST_BOOTSTRAP_POLICY=report # report | auto | never
-REVIEW_MAX_ROUNDS=1          # Gate/Test 最大循环轮数（--review 时生效）
+REVIEW_MAX_ROUNDS=1          # 失败后最多自动修复轮数（0 = 不自动修；Gate 仅 --review 时运行）
 GIT_BRANCH_PREFIX=feat/      # 分支前缀
 COMMIT_TYPE=                 # 留空按迭代 type 推断
 COMMIT_SCOPE=                # 留空自动推断

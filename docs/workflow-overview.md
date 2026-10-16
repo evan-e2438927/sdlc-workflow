@@ -36,7 +36,7 @@ Claude Code                              Codex CLI
 
 - **消除自我验证盲区**：生成者对自身输出天然"过于自信"，独立审查者能发现生成者遗漏的安全漏洞、架构违规和逻辑缺陷。
 - **审查维度固定化**：Codex CLI 的审查 prompt 固定嵌入 OWASP Top 10、CODING_GUIDELINES、SECURITY 等规范，不会因上下文膨胀而跳过检查项。
-- **循环修订可控**：FAIL 后回退给 Claude Code 修订，再交 Codex CLI 重审，最多 N 轮（`REVIEW_MAX_ROUNDS`），超限自动上报人工。
+- **循环修订可控**：FAIL 后回退给 Claude Code 修订，再交 Codex CLI 重审，最多自动修复 N 轮（`REVIEW_MAX_ROUNDS`，默认 1，0 = 不自动修），超限停下转人工。
 
 ---
 
@@ -74,8 +74,8 @@ graph LR
 | ⑤ | design-reviewer | **Codex CLI** | **Gate 1**: PASS / FAIL（可行性 / 安全 / 架构 / AC 覆盖度） |
 
 **关键规则**：
-- Gate 1 FAIL 时回退到步骤③重新生成设计，最多循环 N 轮
-- `proposal` 命令在 Gate 1 通过后暂停，写入 `status.json (phase: pending_review)`，等待人工审核
+- Gate 1 FAIL 时回退到步骤③修订设计，最多自动修复 N 轮
+- `proposal` 命令在 Gate 1 通过后暂停，写入 `status.json (phase: pending_review)`，等待人工审核；审核期间直接在对话里提修改意见，agent 原地联动修改三份文档
 - `doit` 命令在 Gate 1 通过后直接进入下一阶段
 
 ### 阶段三：开发审查（⑥⑦⑧）
@@ -91,7 +91,7 @@ graph LR
 **关键规则**：
 - 步骤⑥ 先由主 agent 打地基（infra / shared / 接口契约 / 新增依赖），再由 backend、frontend 角色开发；`AGENT_MODE=auto` 时前后端都有任务且运行时支持子 agent 即走多 agent 并行，否则主 agent 依次扮演各角色；步骤⑦ test 角色按 AC 查漏
 - Gate 2 审查维度：代码质量、安全漏洞（OWASP Top 10）、架构合规、编码规范、错误处理、目录结构、任务回写
-- Gate 2 FAIL 时回退到步骤⑥修复，最多循环 N 轮
+- Gate 2 FAIL 时回退到步骤⑥修复，最多自动修复 N 轮
 
 ### 阶段四：验收交付（qa → accept → pr）
 
@@ -179,7 +179,7 @@ sdlc-workflow
 | **做什么** | 读取 status.json → ⑥ 开发（打地基 → 前后端角色 → 汇总）→ ⑦ 查漏（test 角色）→ [Gate 2] → lint + unit |
 | **产物** | 代码变更 + 单元测试（不提交、不 push） |
 | **阶段覆盖** | 阶段三 |
-| **前置条件** | status.json 中 `phase` 为 `pending_review` 或 `approved` |
+| **前置条件** | status.json 中 `phase` 为 `pending_review` 或 `approved`；为 `qa_failed` 时自动进入修复模式（按 `qa-failures.md` 修复缺陷 → lint + unit → 回到 `applied`） |
 
 ### ④ `qa` — 浏览器功能验收
 
@@ -191,8 +191,8 @@ sdlc-workflow
 |-----|------|
 | **何时用** | `apply` 完成后，做真实浏览器功能验收 |
 | **做什么** | 生成 Playwright 脚本 → Playwright MCP 真实浏览器执行 → 通过态截图 move 到 `tests/reports/<slug>/screenshots/`（gitignore） |
-| **产物** | `tests/reports/<slug>-e2e-report.md` + 证据截图 |
-| **前置条件** | `phase` 为 `applied` |
+| **产物** | `tests/reports/<slug>-e2e-report.md` + 证据截图；发现代码缺陷时另写 `qa-failures.md` |
+| **前置条件** | `phase` 为 `applied`；全部通过 → `qa_passed`，代码缺陷 → `qa_failed`（下一次 apply 修复） |
 
 ### ⑤ `accept` — 定稿本地提交
 
