@@ -147,6 +147,22 @@ setup; run transition "$ITER" pending_review --by proposal >/dev/null
 run transition "$ITER" approved --by apply >/dev/null
 ck "$(ls -A "$P/$ITER")" status.json "R5 迭代目录只有 status.json"
 
+# E1–E3 status.json 不是单个 JSON 对象：exit 2，原文件不变，不留临时文件
+for bad in "" "   " "[]" '{"phase":"pending_review"}{"phase":"approved"}'; do
+  setup; printf '%s' "$bad" > "$P/$ITER/status.json"
+  ck "$(run transition "$ITER" approved --by apply)" 2 "E 非单个对象「$bad」"
+  ck "$(cat "$P/$ITER/status.json")" "$bad" "E 原文件不变「$bad」"
+  ck "$(ls -A "$P/$ITER")" status.json "E 不留临时文件「$bad」"
+done
+
+# G1 未设 CLAUDE_PROJECT_DIR、在子目录里调用：按 git 仓库根定位
+setup; ( cd "$P" && git init -q . ) ; mkdir -p "$P/apps/web"
+g=$( cd "$P/apps/web" && env -u CLAUDE_PROJECT_DIR /bin/bash "$SCRIPT" transition "$ITER" pending_review --by proposal >"$TMP/out" 2>"$TMP/err"; echo $? )
+ck "$g" 0 "G1 子目录调用 transition"
+ck "$(st .phase)" pending_review "G1 写入的是项目根下的迭代"
+g=$( cd "$P/apps/web" && env -u CLAUDE_PROJECT_DIR /bin/bash "$SCRIPT" find-latest pending_review 2>"$TMP/err" )
+ck "$g" "$ITER" "G1 子目录调用 find-latest"
+
 # ── find-latest ──
 mkiter() { mkdir -p "$P/docs/iterations/$1"; printf '{"phase":"%s"}\n' "$2" > "$P/docs/iterations/$1/status.json"; }
 setup; rm -rf "$P/docs"

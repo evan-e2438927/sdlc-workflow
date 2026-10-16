@@ -103,5 +103,15 @@ for f in ("README.md", "README.zh-CN.md"):
 sys.exit(bad)
 PY
 
+# ── Final review fixes ──
+has   "$R/flow-mini.md" '### Step 5.5. 写入 phase'
+lacks "$R/flow-mini.md" '### Step 4.5'
+has   "$R/flow-mini.md" '--note upgraded-to-doit'
+has   "$R/micro-change-mode.md" '--note upgraded-to-doit'
+lacks "$REPO_DIR/skills/sdlc-mini/SKILL.md" 'Step 4.5'
+has   "$SKILL_DIR/SKILL.md" '缺 `mode` 视为 proposal'
+has   "$SKILL_DIR/SKILL.md" 'shell 变量不跨 Bash 调用保留'
+has   "$R/flow-qa.md" '每次进入 qa_failed 时重写整个文件'
+
 # ── END ──
 [ $fail -eq 0 ] && echo PASS; exit $fail

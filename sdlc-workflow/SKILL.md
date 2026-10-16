@@ -320,11 +320,15 @@ accepted 之前任意 phase ──用户放弃──▶ rejected
 - **唯一写入口**：`phase`、`*_at` 时间戳、`history`、`mode`、`flags` 只能经状态脚本写入，非法迁移由脚本拒绝并列出允许的下一步。
   其余进度字段（`tracks`、`agent_mode`、`summary`、`pipeline_stage`、`pr_url`）照旧直接写。
 - **脚本路径** `SDLC_STATUS`：Claude Code 为 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/scripts/sdlc-status.sh`；Codex / 手动安装为本 skill 目录内 `scripts/sdlc-status.sh`。迁移表单源：同目录 `state-machine.json`。
+  shell 变量不跨 Bash 调用保留：每次调用都在同一条命令里先赋值（`SDLC_STATUS="<上面的路径>"; "$SDLC_STATUS" transition …`），或直接写完整路径。
+  脚本按 `$CLAUDE_PROJECT_DIR` → git 仓库根 → 当前目录定位项目根，迭代目录参数相对项目根。
   - `"$SDLC_STATUS" transition "$ITER_DIR" <目标phase> --by <命令> [--note <说明>] [--flags '<json>']`
   - `"$SDLC_STATUS" find-latest <phase>...` → 最近一个处于这些 phase 的迭代目录
 - **创建**：首次迁移（到 `pending_review`）时写入 `mode`（proposal / doit / mini）；doit / mini 同时用 `--flags` 记录 `review` / `qa` / `agents`。
 - **审核期间修改**：`pending_review` 时用户在对话里提修改意见，原地修改、phase 不变（规则见 `references/flow-proposal.md`「审核期间的修改（对话）」）。
 - **放弃**：用户表示放弃某个迭代时，`transition … rejected --by user`；工作区代码不回滚。
+- **旧迭代兼容**：缺 `mode` 视为 proposal（分步，只续完当前命令）；缺 `history` 视为空，首次迁移时开始记录；旧的 epoch 时间戳与
+  `pipeline_stage` 的历史取值读取时容忍，不改写；旧版 qa 失败留下的 `approved` + `qa_failed_at` 按普通 `approved` 处理。
 - **doit / mini 续跑**：用户要求继续一个 `mode=doit`（或 `mode=mini`）的迭代时，按当前 phase 与 `flags` 接续剩余步骤直到 `pr_created`
   （`approved` 由 apply「断点续跑」接手；`applied` 后按 `flags.qa` 决定是否先跑 qa）。`mode=proposal` 只续完当前命令。
 

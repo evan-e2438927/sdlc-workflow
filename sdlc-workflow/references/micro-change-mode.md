@@ -125,7 +125,7 @@ doit 全自动模式下不应依赖多轮 ask/response。若缺少验证能力�
 
 ## 升级规则
 
-若执行过程中发现以下任一情况，必须立即升级到标准 `/sdlc-workflow doit`：
+若执行过程中发现以下任一情况，必须立即升级到标准 `/sdlc-workflow doit`（已写入 phase 时先 `transition … rejected --by mini --note upgraded-to-doit`，细节见 flow-mini.md Step 5.5）：
 
 1. 需求影响超过 3 个目标文件
 2. 需要新增共享包或新目录

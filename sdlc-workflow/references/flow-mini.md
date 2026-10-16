@@ -58,18 +58,6 @@ docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/
    - 验证能力检测
    - 回写任务状态
 
-### Step 4.5. 写入 phase
-
-mini 与 proposal 走同一条主线，只是不停顿（见 SKILL.md「迭代状态（phase）」）：
-
-```bash
-"$SDLC_STATUS" transition "$ITER_DIR" pending_review --by mini --flags '{"review":<bool>,"qa":<bool>,"agents":"single"}'
-"$SDLC_STATUS" transition "$ITER_DIR" approved --by mini
-```
-
-Step 9 通过后 `transition … applied --by apply`；`--qa` 时 Step 9.5 按 flow-qa.md 迁移到 `qa_passed` / `qa_failed`；
-Step 10 之后的 accept / pr 按各自 flow 迁移到 `accepted` / `pr_created`。
-
 ### Step 5. Gate 1（仅 `--review`）
 
 在修改业务代码前，若指定 `--review`，执行 mini Gate 1：
@@ -82,6 +70,22 @@ Step 10 之后的 accept / pr 按各自 flow 迁移到 `accepted` / `pr_created`
 4. 是否目标文件范围足够小
 
 若失败：立即中止或升级到 `/sdlc-workflow doit`
+
+### Step 5.5. 写入 phase
+
+Gate 1 通过（或跳过）后再写入，与 SKILL.md ⑤.2 一致：mini 与 proposal 走同一条主线，只是不停顿（见 SKILL.md「迭代状态（phase）」）：
+
+```bash
+"$SDLC_STATUS" transition "$ITER_DIR" pending_review --by mini --flags '{"review":<bool>,"qa":<bool>,"agents":"single"}'
+"$SDLC_STATUS" transition "$ITER_DIR" approved --by mini
+```
+
+Step 9 通过后 `transition … applied --by apply`；`--qa` 时 Step 9.5 按 flow-qa.md 迁移到 `qa_passed` / `qa_failed`；
+Step 10 之后的 accept / pr 按各自 flow 迁移到 `accepted` / `pr_created`。
+
+**升级到 doit 时的状态处理**：
+- Step 5.5 之前升级（含 Gate 1 判定不属于 mini）：此时还没有 status.json，doit 直接接管同一迭代目录，从 ① 补齐产物后按 doit 写入 `--by doit`。
+- Step 5.5 之后升级（实现中发现超出 mini 范围）：`"$SDLC_STATUS" transition "$ITER_DIR" rejected --by mini --note upgraded-to-doit`，再由 doit 新建迭代；已改的代码保留在工作区，由新迭代接着做。
 
 ### Step 6. Implement
 

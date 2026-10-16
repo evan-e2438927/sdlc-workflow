@@ -2,7 +2,7 @@
 # SDLC 迭代状态机：phase 迁移的唯一写入口，只给 agent 调用。
 #   sdlc-status.sh transition <迭代目录> <目标phase> --by <命令> [--note <说明>] [--flags '<json>']
 #   sdlc-status.sh find-latest <phase> [<phase>...]   → 输出最近一个命中的迭代目录（相对项目根）
-# 迁移表：同目录 state-machine.json。项目根：${CLAUDE_PROJECT_DIR:-$PWD}。
+# 迁移表：同目录 state-machine.json。项目根：$CLAUDE_PROJECT_DIR → git 仓库根 → $PWD。
 # 退出码：0 成功；1 非法迁移 / 未知 phase / find-latest 无命中；2 用法或输入错误；3 缺少 jq。
 set -uo pipefail
 
@@ -11,7 +11,8 @@ SM="$(cd "$(dirname "$0")" && pwd)/state-machine.json"
 die() { echo "[sdlc-status] $2" >&2; exit "$1"; }
 command -v jq >/dev/null 2>&1 || die 3 "缺少 jq，请先安装（macOS: brew install jq；Debian/Ubuntu: apt install jq）"
 
-ROOT="$(cd "${CLAUDE_PROJECT_DIR:-$PWD}" 2>/dev/null && pwd -P)" || die 2 "项目根不存在: ${CLAUDE_PROJECT_DIR:-$PWD}"
+ROOT_IN="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+ROOT="$(cd "$ROOT_IN" 2>/dev/null && pwd -P)" || die 2 "项目根不存在: $ROOT_IN"
 
 # 迭代目录 → 项目根下的相对路径（无尾部 /）；目录不存在时报错
 rel_iter() {
@@ -41,7 +42,8 @@ cmd_transition() {
   rel="$(rel_iter "$iter")" || die 2 "迭代目录不存在或不在项目内: $iter"
   local dir="$ROOT/$rel" file="$ROOT/$rel/status.json" from=""
   if [ -f "$file" ]; then
-    jq empty "$file" >/dev/null 2>&1 || die 2 "status.json 不是合法 JSON，未做任何修改: $rel/status.json"
+    jq -s -e 'length == 1 and (.[0] | type) == "object"' "$file" >/dev/null 2>&1 \
+      || die 2 "status.json 为空或不是单个 JSON 对象，未做任何修改: $rel/status.json"
     from="$(jq -r '.phase // ""' "$file")"
   fi
 
@@ -88,6 +90,7 @@ cmd_transition() {
           + (if $note != "" then {note: $note} else {} end)
         ])
     ' > "$tmp" || die 2 "写入 status.json 失败，原文件未改动"
+  [ -s "$tmp" ] || die 2 "生成的 status.json 为空，原文件未改动"
   mv "$tmp" "$file" || die 2 "写入 status.json 失败，原文件未改动"
   trap - EXIT
 

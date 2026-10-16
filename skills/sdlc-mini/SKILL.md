@@ -23,7 +23,7 @@ description: >-
 8. [qa] 仅 `--qa`：**按 `references/flow-qa.md` 执行**浏览器功能验收，含**通过态截图** → `tests/reports/<slug>/screenshots/`（gitignore，由 pr 经 `pr-assets` 分支嵌入 PR）。
 9. docs-updater（仅更新受影响章节）→ git-committer（本地 commit）→ pr-creator（push + PR）。
 
-**状态**：与 doit 相同，迭代产物写完后经状态脚本写入 `pending_review`（`--by mini --flags …`）并立即转 `approved`；中断后按 status.json 的 flags 续跑（见 `flow-mini.md` Step 4.5）。
+**状态**：与 doit 相同，迭代产物写完后经状态脚本写入 `pending_review`（`--by mini --flags …`）并立即转 `approved`；中断后按 status.json 的 flags 续跑（Gate 1 之后写入，见 `flow-mini.md` Step 5.5，含升级到 doit 时的状态处理）。
 
 **自动升级**：过程中发现影响 > 3 文件 / 改 API / 改数据模型 → 自动切换到 doit。**浏览器验收不精简**（最终通过标准）。
 
