@@ -48,5 +48,20 @@ lacks "$SKILL_DIR/templates/sdlc-config.tpl" '正整数(1-10)'
 has   "$SKILL_DIR/templates/workflow-rules.md.tpl" '最多自动修复 REVIEW_MAX_ROUNDS 轮'
 lacks "$R/09-test-pipeline.md" 'context_usage > 70%'
 
+# ── Task 6: QA 回流 ──
+has   "$R/flow-qa.md"    'qa-failures.md'
+has   "$R/flow-qa.md"    '"$SDLC_STATUS" transition "$ITER_DIR" qa_failed --by qa'
+has   "$R/flow-qa.md"    '"$SDLC_STATUS" find-latest applied'
+has   "$R/flow-qa.md"    '执行全部场景'
+lacks "$R/flow-qa.md"    '.qa_failed_at=now'
+has   "$R/flow-apply.md" '## 修复模式（phase = qa_failed）'
+has   "$R/flow-apply.md" '"$SDLC_STATUS" find-latest pending_review approved qa_failed'
+has   "$R/flow-apply.md" '"$SDLC_STATUS" transition "$ITER_DIR" applied --by apply --note qa-fix'
+has   "$R/flow-apply.md" '仅 e2e 可验'
+lacks "$R/flow-apply.md" 'find_latest_proposal()'
+lacks "$R/flow-apply.md" 'jq '"'"'.phase = "approved"'
+has   "$REPO_DIR/skills/sdlc-apply/SKILL.md" 'qa_failed'
+has   "$REPO_DIR/skills/sdlc-qa/SKILL.md"    'qa_failed'
+
 # ── END ──
 [ $fail -eq 0 ] && echo PASS; exit $fail

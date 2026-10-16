@@ -16,7 +16,9 @@ Playwright 脚本，并通过 Playwright MCP 在真实浏览器中执行功能�
 /sdlc-workflow qa docs/iterations/2026-04-16/001-user-login-feature/
 ```
 
-若不指定路径，自动查找最近一个 `phase == "applied"` 的迭代目录。
+若不指定路径，用 `"$SDLC_STATUS" find-latest applied` 自动定位（`SDLC_STATUS` 见 SKILL.md「迭代状态（phase）」）。
+
+每次运行都**执行全部场景**（不只是上次失败的场景），兼作修复后的回归。
 
 ## 前置条件
 
@@ -86,32 +88,45 @@ dev server 启动：读 package.json scripts（dev > start > serve），后台�
 
 ## 结果
 
-**全部通过** → 更新 `status.json`（phase: "qa_passed"），输出：
+**全部通过** → `"$SDLC_STATUS" transition "$ITER_DIR" qa_passed --by qa`，输出：
 ```
 ✅ QA 通过: N/N 场景 | 覆盖 AC: N 个
 👉 确认无误后提交: /sdlc-workflow:accept
 ```
 
-**存在失败** → 先按失败根因分流处理，**不要笼统地"重跑 apply"**（apply 遇到 `phase==applied`
-会直接中止）：
+**存在失败** → qa 不改业务代码，先按失败根因分流：
 
 ```
 FOR EACH 失败场景，判定根因：
 
 A) 脚本/选择器问题（选择器写错、等待时机、断言过严等，代码本身没错）
-   → 在 qa 内就地修复脚本并重跑，最多 REVIEW_MAX_ROUNDS 轮
-   → phase 保持 applied，无需回 apply
+   → 在 qa 内就地修复脚本并重跑，按 SKILL.md「修复轮数（唯一定义）」计数
+   → phase 保持 applied；修满 N 轮仍失败 → 停下，输出失败列表 + 截图路径，转人工
 
 B) 确属代码缺陷（功能/行为不符合 AC）
-   → 把 phase 退回 approved：
-     jq '.phase="approved" | .qa_failed_at=now' status.json
-   → 提示用户：修复代码后重新运行 /sdlc-workflow:apply（此时 apply 可正常执行）
-
-C) 超过 REVIEW_MAX_ROUNDS 仍失败 → 中止，输出失败列表 + 截图路径，提示人工介入
+   → 写 $ITER_DIR/qa-failures.md（格式见下）
+   → "$SDLC_STATUS" transition "$ITER_DIR" qa_failed --by qa
+   → teardown dev server，提示运行 sdlc-apply（自动进入修复模式，见 flow-apply.md「修复模式（phase = qa_failed）」）
+   → doit --qa：自动执行修复模式后重跑 qa，按「修复轮数（唯一定义）」计数，超限停在 qa_failed
 ```
 
-> 关键：旧文案"修复后重跑 apply"在 phase 仍是 applied 时会被 apply 的前置守卫拒绝。
-> 因此代码缺陷必须先把 phase 退回 approved，apply 才能重入。
+A、B 同时存在时先处理 A，仍有代码缺陷再走 B。
+
+`qa-failures.md` 格式（qa 写入，apply 修复模式读取）：
+
+```markdown
+# QA 缺陷清单：<slug>
+
+### E2E-003-login-lockout
+- AC-ID: AC-007
+- 步骤: 连续 5 次输入错误密码
+- 期望: 第 5 次后提示「账户已锁定 15 分钟」
+- 实际: 第 5 次仍可继续尝试
+- 截图: tests/reports/<slug>/screenshots/E2E-003-login-lockout.png
+- 归属 track: backend
+```
+
+修复完成后由 apply 在文件首行插入 `> 已修复：<ISO 时间>`；qa 重跑全部通过后该文件保留作记录。
 
 ## 输入 / 输出
 
@@ -122,7 +137,8 @@ C) 超过 REVIEW_MAX_ROUNDS 仍失败 → 中止，输出失败列表 + 截图�
 | 输出 | `tests/e2e/<slug>/E2E-*.e2e.ts` | Playwright 脚本 |
 | 输出 | `tests/reports/<slug>-e2e-report.md` | 验收报告 |
 | 输出 | `tests/reports/<slug>/screenshots/<Scenario-ID>.png` | 通过场景证据截图（gitignore、仅本地，供 pr 推送 pr-assets 分支）|
-| 输出 | `docs/iterations/.../status.json` | 更新 phase 为 qa_passed（全部 PASS 时）|
+| 输出 | `docs/iterations/.../qa-failures.md` | 代码缺陷清单（存在代码缺陷时）|
+| 输出 | `docs/iterations/.../status.json` | 经状态脚本迁移到 qa_passed（全部 PASS）或 qa_failed（代码缺陷）|
 
 ## 流程中的位置
 

@@ -12,6 +12,8 @@ description: >-
 
 主线第 2 步。前置 phase `pending_review`(视为审核通过)或 `approved`；产出 phase `applied`。**不提交、不推 PR**。
 
+前置 phase 为 `qa_failed`（qa 发现代码缺陷）时自动进入**修复模式**：跳过开发与查漏，主 agent 对照 `qa-failures.md` 修复、补回归单测，再跑 ⑨，回到 `applied`（见 `flow-apply.md`「修复模式（phase = qa_failed）」）。
+
 ## 步骤（⑥-⑨，默认跳过 Gate 2，加 --review 则 ⑧）
 
 执行模式：`AGENT_MODE`（auto / single / multi，默认 auto），运行时 `--agents single|multi` 覆盖。两种模式流程相同、产出等价，只是执行者不同。
