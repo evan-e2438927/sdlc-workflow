@@ -147,5 +147,24 @@ setup; run transition "$ITER" pending_review --by proposal >/dev/null
 run transition "$ITER" approved --by apply >/dev/null
 ck "$(ls -A "$P/$ITER")" status.json "R5 迭代目录只有 status.json"
 
+# ── find-latest ──
+mkiter() { mkdir -p "$P/docs/iterations/$1"; printf '{"phase":"%s"}\n' "$2" > "$P/docs/iterations/$1/status.json"; }
+setup; rm -rf "$P/docs"
+mkiter 2026-10-15/003-a-feature applied
+mkiter 2026-10-16/001-b-fix applied
+mkiter 2026-10-16/002-c-feature pending_review
+ck "$(run find-latest applied)" 0 "F1 find-latest applied"
+ck "$(cat "$TMP/out")" docs/iterations/2026-10-16/001-b-fix "F1 最近的 applied"
+run find-latest applied pending_review >/dev/null
+ck "$(cat "$TMP/out")" docs/iterations/2026-10-16/002-c-feature "F1 多 phase"
+ck "$(run find-latest accepted)" 1 "F2 无命中"
+ck "$(cat "$TMP/out")" "" "F2 stdout 为空"
+mkdir -p "$P/docs/iterations/2026-10-17/001-broken-fix"; printf '{bad' > "$P/docs/iterations/2026-10-17/001-broken-fix/status.json"
+run find-latest applied >/dev/null
+ck "$(cat "$TMP/out")" docs/iterations/2026-10-16/001-b-fix "F4 跳过损坏的 status.json"
+rm -rf "$P/docs"
+ck "$(run find-latest applied)" 1 "F3 无 docs/iterations"
+ck "$(cat "$TMP/err")" "" "F3 stderr 为空"
+
 # ── END ──
 [ $fail -eq 0 ] && echo PASS; exit $fail

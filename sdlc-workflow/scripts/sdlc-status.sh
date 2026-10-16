@@ -1,8 +1,9 @@
 #!/bin/bash
 # SDLC 迭代状态机：phase 迁移的唯一写入口，只给 agent 调用。
 #   sdlc-status.sh transition <迭代目录> <目标phase> --by <命令> [--note <说明>] [--flags '<json>']
+#   sdlc-status.sh find-latest <phase> [<phase>...]   → 输出最近一个命中的迭代目录（相对项目根）
 # 迁移表：同目录 state-machine.json。项目根：${CLAUDE_PROJECT_DIR:-$PWD}。
-# 退出码：0 成功；1 非法迁移 / 未知 phase；2 用法或输入错误；3 缺少 jq。
+# 退出码：0 成功；1 非法迁移 / 未知 phase / find-latest 无命中；2 用法或输入错误；3 缺少 jq。
 set -uo pipefail
 
 SM="$(cd "$(dirname "$0")" && pwd)/state-machine.json"
@@ -102,7 +103,24 @@ cmd_transition() {
   echo "phase: ${from:-（无）} → $to ($rel)"
 }
 
+# 按「日期目录/序号」逆序（字典序即时间序）取第一个 phase 命中的迭代；损坏的 status.json 跳过
+cmd_find_latest() {
+  [ $# -ge 1 ] || die 2 "用法: find-latest <phase> [<phase>...]"
+  local base="$ROOT/docs/iterations" f ph want
+  [ -d "$base" ] || exit 1
+  while IFS= read -r f; do
+    ph="$(jq -r '.phase // ""' "$f" 2>/dev/null)" || continue
+    for want in "$@"; do
+      if [ "$ph" = "$want" ]; then
+        f="${f%/status.json}"; printf '%s\n' "${f#"$ROOT"/}"; exit 0
+      fi
+    done
+  done < <(find "$base" -mindepth 3 -maxdepth 3 -name status.json -type f 2>/dev/null | sort -r)
+  exit 1
+}
+
 case "${1:-}" in
-  transition) shift; cmd_transition "$@" ;;
-  *) die 2 "用法: sdlc-status.sh transition <迭代目录> <目标phase> --by <命令> [--note <说明>] [--flags '<json>']" ;;
+  transition)  shift; cmd_transition "$@" ;;
+  find-latest) shift; cmd_find_latest "$@" ;;
+  *) die 2 "用法: sdlc-status.sh transition <迭代目录> <目标phase> --by <命令> [--note <说明>] [--flags '<json>'] | find-latest <phase>..." ;;
 esac
