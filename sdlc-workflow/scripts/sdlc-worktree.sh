@@ -406,8 +406,8 @@ for w in data['worktrees']:
             to_remove.append(w['slug'])
             continue
 
-    if w.get('phase') == 'applied':
-        print(f\"  📦 {w['slug']} — 已 applied，可考虑移除\")
+    if w.get('phase') in ('pr_created', 'rejected'):
+        print(f\"  📦 {w['slug']} — 已 {w['phase']}，PR 合并或确认放弃后可移除\")
     else:
         print(f\"  ⏳ {w['slug']} — 进行中 ({w.get('phase', '?')})\")
 

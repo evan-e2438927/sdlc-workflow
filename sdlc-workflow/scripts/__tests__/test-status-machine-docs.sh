@@ -79,6 +79,8 @@ has   "$R/pipeline-overview.md" '修复模式'
 has   "$R/pipeline-overview.md" '| AGENT_MODE |'
 has   "$SKILL_DIR/scripts/sdlc-worktree.sh" "'qa_failed':"
 has   "$SKILL_DIR/scripts/sdlc-worktree.sh" "'pr_created':"
+lacks "$SKILL_DIR/scripts/sdlc-worktree.sh" "if w.get('phase') == 'applied':"
+has   "$SKILL_DIR/scripts/sdlc-worktree.sh" "if w.get('phase') in ('pr_created', 'rejected'):"
 
 # ── END ──
 [ $fail -eq 0 ] && echo PASS; exit $fail
