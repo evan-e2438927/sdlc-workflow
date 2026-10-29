@@ -95,7 +95,7 @@ cmd_transition() {
   trap - EXIT
 
   if [ "$to" = "rejected" ]; then
-    local marker="$ROOT/.claude/.sdlc-active-iteration" m mrel
+    local marker="$ROOT/.agents/.sdlc-active-iteration" m mrel
     if [ -f "$marker" ]; then
       m="$(head -1 "$marker" | tr -d '\r')"
       mrel="$(rel_iter "$m" 2>/dev/null)" || mrel="${m%/}"

@@ -18,6 +18,7 @@ set -euo pipefail
 
 COMMAND="${1:-help}"
 PROJECT_ROOT="${PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REGISTRY_DIR="$PROJECT_ROOT/.worktrees"
 REGISTRY_FILE="$REGISTRY_DIR/worktree-registry.json"
 
@@ -64,11 +65,11 @@ check_worktree_exists() {
   fi
 }
 
-# 读取 .claude/.sdlc-config 中的变量
+# 读取 .agents/.sdlc-config 中的变量
 read_config_var() {
   local key="$1"
   local default="$2"
-  local cfg="$PROJECT_ROOT/.claude/.sdlc-config"
+  local cfg="$PROJECT_ROOT/.agents/.sdlc-config"
   if [ -f "$cfg" ]; then
     local val
     val=$(grep "^${key}=" "$cfg" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
@@ -134,27 +135,38 @@ cmd_create() {
   # 在 worktree 中创建迭代目录
   mkdir -p "$wt_path/$iter_dir"
 
-  # 复制本地 SDLC 配置（.claude/.sdlc-config* 在 .gitignore 中，git worktree 不会带过去）
+  # 复制本地 SDLC 配置（.agents/.sdlc-config* 在 .gitignore 中，git worktree 不会带过去）
   local cfg_copied=0
-  mkdir -p "$wt_path/.claude"
-  for cfg_file in "$PROJECT_ROOT"/.claude/.sdlc-config*; do
+  mkdir -p "$wt_path/.agents"
+  for cfg_file in "$PROJECT_ROOT"/.agents/.sdlc-config*; do
     [ -f "$cfg_file" ] || continue
-    cp "$cfg_file" "$wt_path/.claude/$(basename "$cfg_file")"
+    case "$cfg_file" in *.bak) continue ;; esac
+    cp "$cfg_file" "$wt_path/.agents/$(basename "$cfg_file")"
     cfg_copied=$((cfg_copied + 1))
   done
   echo "   📄 已复制 $cfg_copied 个 .sdlc-config* 文件到 worktree"
 
-  # 端口隔离：覆写 .claude/.sdlc-config 中的 PORT/API_PORT
+  # 端口隔离：覆写 .agents/.sdlc-config 中的 PORT/API_PORT
   local seq_num=$((10#$seq))
   local port=$((3000 + seq_num))
   local api_port=$((4000 + seq_num))
 
-  local wt_cfg="$wt_path/.claude/.sdlc-config"
+  local wt_cfg="$wt_path/.agents/.sdlc-config"
   if [ -f "$wt_cfg" ]; then
     grep -v "^PORT=" "$wt_cfg" | grep -v "^API_PORT=" > "$wt_cfg.tmp" || true
     mv "$wt_cfg.tmp" "$wt_cfg"
     echo "PORT=$port" >> "$wt_cfg"
     echo "API_PORT=$api_port" >> "$wt_cfg"
+  fi
+
+  # 生成平台文件（.claude/settings.json、.mcp.json、.codex/ 等被 gitignore，git worktree 不会带过去）
+  if [ -f "$wt_path/.agents/AGENTS.md" ]; then
+    local sync_rc=0
+    bash "$SCRIPT_DIR/sdlc-sync-agents.sh" "$wt_path" >/dev/null || sync_rc=$?
+    case "$sync_rc" in
+      0) echo "   🔗 已在 worktree 中同步 .agents/ 生成的平台文件" ;;
+      *) echo "   ⚠ worktree 同步未完全成功（退出码 $sync_rc），请在 worktree 中执行：bash $SCRIPT_DIR/sdlc-sync-agents.sh ." ;;
+    esac
   fi
 
   # 更新注册表

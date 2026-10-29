@@ -10,7 +10,7 @@ P="$TMP/p"
 ITER="docs/iterations/2026-10-16/001-demo-feature"
 ISO='^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}$'
 
-setup() { rm -rf "$P"; mkdir -p "$P/.claude" "$P/$ITER"; }
+setup() { rm -rf "$P"; mkdir -p "$P/.agents" "$P/$ITER"; }
 # run <args...>：在项目根执行脚本，回显退出码，stdout 存 $TMP/out，stderr 存 $TMP/err
 run() { ( cd "$P" && CLAUDE_PROJECT_DIR="$P" /bin/bash "$SCRIPT" "$@" >"$TMP/out" 2>"$TMP/err" ); echo $?; }
 # run_path <PATH> <args...>
@@ -95,14 +95,14 @@ ck "$(st '.mode // "absent"')" absent "T8 不补 mode"
 
 # T9 rejected 清理标记文件
 setup; run transition "$ITER" pending_review --by proposal >/dev/null
-printf '%s\n' "$ITER" > "$P/.claude/.sdlc-active-iteration"
+printf '%s\n' "$ITER" > "$P/.agents/.sdlc-active-iteration"
 ck "$(run transition "$ITER" rejected --by user)" 0 "T9 rejected"
-[ -f "$P/.claude/.sdlc-active-iteration" ] && { echo "FAIL T9 指向本迭代的标记文件应删除"; fail=1; }
+[ -f "$P/.agents/.sdlc-active-iteration" ] && { echo "FAIL T9 指向本迭代的标记文件应删除"; fail=1; }
 errhas "工作区代码未回滚" "T9"
 setup; run transition "$ITER" pending_review --by proposal >/dev/null
-printf '%s\n' "docs/iterations/2026-10-16/002-other-feature" > "$P/.claude/.sdlc-active-iteration"
+printf '%s\n' "docs/iterations/2026-10-16/002-other-feature" > "$P/.agents/.sdlc-active-iteration"
 run transition "$ITER" rejected --by user >/dev/null
-[ -f "$P/.claude/.sdlc-active-iteration" ] || { echo "FAIL T9 指向其他迭代的标记文件不应删除"; fail=1; }
+[ -f "$P/.agents/.sdlc-active-iteration" ] || { echo "FAIL T9 指向其他迭代的标记文件不应删除"; fail=1; }
 
 # T10 缺 jq
 setup
@@ -125,9 +125,9 @@ setup
 ck "$(run transition "$ITER/" pending_review --by proposal)" 0 "R1 尾部斜杠"
 ck "$(st .iter_dir)" "$ITER" "R1 iter_dir 去掉尾部斜杠"
 ck "$(run transition "$P/$ITER" approved --by apply)" 0 "R1 绝对路径"
-printf '%s/\n' "$ITER" > "$P/.claude/.sdlc-active-iteration"
+printf '%s/\n' "$ITER" > "$P/.agents/.sdlc-active-iteration"
 run transition "$ITER" rejected --by user >/dev/null
-[ -f "$P/.claude/.sdlc-active-iteration" ] && { echo "FAIL R1 带斜杠的标记文件应删除"; fail=1; }
+[ -f "$P/.agents/.sdlc-active-iteration" ] && { echo "FAIL R1 带斜杠的标记文件应删除"; fail=1; }
 
 # R2 损坏的 status.json 不被覆盖
 setup; printf '{bad' > "$P/$ITER/status.json"
