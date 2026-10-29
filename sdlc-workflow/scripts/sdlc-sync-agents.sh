@@ -133,6 +133,72 @@ for f in "$CORE"/templates/hooks/*.sh; do
   want_file ".agents/hooks/$(basename "$f")" "$f" exec
 done
 
+# ── 5. 平台配置：由 .agents/config.json 整份生成（用户要改就改 config.json）──
+CFG="$ROOT/.agents/config.json"
+[ -f "$CFG" ] || die "缺少 .agents/config.json，请执行 update（会从模板补齐）"
+jq -e 'type == "object"' "$CFG" >/dev/null 2>&1 || die ".agents/config.json 不是合法的 JSON 对象"
+
+# 中立的 mcpServers 写法：transport 为 stdio 或 http（缺省时有 url 视为 http）
+JQ_DEFS='
+  def transport: (.transport // (if .url then "http" else "stdio" end));
+  def servers: (.mcpServers // {});
+'
+GUARD_CMD='bash "${CLAUDE_PROJECT_DIR}/.agents/hooks/sdlc-pre-edit-guard.sh"'
+CHECK_CMD='bash "${CLAUDE_PROJECT_DIR}/.agents/hooks/sdlc-post-edit-check.sh"'
+CODEX_CHECK_CMD='bash "$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.agents/hooks/sdlc-post-edit-check.sh"'
+
+# .claude/settings.json：config.claude.settings + sdlc hooks（追加在用户 hooks 之后）
+jq --arg g "$GUARD_CMD" --arg c "$CHECK_CMD" '
+  (.claude.settings // {}) as $s
+  | $s | .hooks = ($s.hooks // {})
+  | .hooks.PreToolUse  = ((.hooks.PreToolUse  // []) + [{matcher: "Edit|Write|MultiEdit", hooks: [{type: "command", command: $g}]}])
+  | .hooks.PostToolUse = ((.hooks.PostToolUse // []) + [{matcher: "Edit|Write", hooks: [{type: "command", command: $c}]}])
+' "$CFG" > "$TMPD/settings.json" || die "生成 .claude/settings.json 失败（检查 config.claude.settings）"
+want_file .claude/settings.json "$TMPD/settings.json"
+
+# .mcp.json（Claude Code）与 .cursor/mcp.json
+jq "$JQ_DEFS"'{mcpServers: (servers | map_values({type: transport} + del(.transport)))}' "$CFG" > "$TMPD/mcp.json" \
+  || die "生成 .mcp.json 失败（检查 config.mcpServers）"
+want_file .mcp.json "$TMPD/mcp.json"
+jq "$JQ_DEFS"'{mcpServers: (servers | map_values(del(.transport)))}' "$CFG" > "$TMPD/cursor-mcp.json" \
+  || die "生成 .cursor/mcp.json 失败"
+want_file .cursor/mcp.json "$TMPD/cursor-mcp.json"
+
+# .codex/config.toml：头注释 → codex.extraToml 原文（放在前面，顶层键才不会落进 mcp 表）→ [mcp_servers.*]
+# extraToml 中已定义的 [mcp_servers.<name>] 以它为准，不再重复输出。
+jq -j "$JQ_DEFS"'
+  def tkey: if test("^[A-Za-z0-9_-]+$") then . else tojson end;
+  def tval: if type == "string" then tojson
+    elif type == "array" then "[" + (map(tval) | join(", ")) + "]"
+    elif type == "object" then "{ " + (to_entries | map((.key | tkey) + " = " + (.value | tval)) | join(", ")) + " }"
+    else tostring end;
+  (.codex.extraToml // "") as $extra
+  | [ $extra | scan("(?m)^\\[mcp_servers\\.(\"[^\"]+\"|[A-Za-z0-9_-]+)\\]") | .[0]
+      | if startswith("\"") then fromjson else . end ] as $defined
+  | "# 由 sdlc-sync-agents.sh 根据 .agents/config.json 生成，请勿手改（改 config.json 后重新同步）\n"
+  + (if $extra == "" then "" else "\n" + $extra + (if ($extra | endswith("\n")) then "" else "\n" end) end)
+  + ( servers | to_entries
+      | map(select(.key as $k | $defined | any(. == $k) | not))
+      | map(.value as $v
+          | "\n[mcp_servers." + (.key | tkey) + "]\n"
+          + (if ($v | transport) == "http" then
+               "url = " + ($v.url | tval) + "\n"
+               + (if $v.headers then "http_headers = " + ($v.headers | tval) + "\n" else "" end)
+             else
+               "command = " + ($v.command | tval) + "\n"
+               + (if $v.args then "args = " + ($v.args | tval) + "\n" else "" end)
+               + (if $v.env then "env = " + ($v.env | tval) + "\n" else "" end)
+             end))
+      | join(""))
+' "$CFG" > "$TMPD/config.toml" || die "生成 .codex/config.toml 失败（检查 config.mcpServers / codex.extraToml）"
+want_file .codex/config.toml "$TMPD/config.toml"
+
+# .codex/hooks.json：只注册编辑后检查（Codex 输入没有子 agent 身份，越界守卫无法判断角色）
+jq -n --arg c "$CODEX_CHECK_CMD" \
+  '{hooks: {PostToolUse: [{matcher: "apply_patch|Edit|Write", hooks: [{type: "command", command: $c}]}]}}' \
+  > "$TMPD/codex-hooks.json"
+want_file .codex/hooks.json "$TMPD/codex-hooks.json"
+
 # ── 6. .gitignore 托管块 ───────────────────────────────────────
 BEGIN_MARK='# >>> sdlc generated >>>'
 END_MARK='# <<< sdlc generated <<<'

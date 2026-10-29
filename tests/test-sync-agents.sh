@@ -112,5 +112,64 @@ grep -qx 'node_modules/' "$P/.gitignore" && grep -qx 'dist/' "$P/.gitignore" || 
 grep -qx 'old-entry' "$P/.gitignore" && { echo "FAIL S10 托管块未整块重写"; fail=1; }
 ck "$(grep -c '^# >>> sdlc generated >>>$' "$P/.gitignore")" 1 "S10 托管块只出现一次"
 
+# ── Task 5：config.json → 平台文件 ──
+mk p1
+cp "$SKILL_DIR/templates/config.json.tpl" "$P/.agents/config.json"
+ck "$(run "$P")" 0 "P1 写模式"
+for f in .claude/settings.json .mcp.json .cursor/mcp.json .codex/config.toml .codex/hooks.json; do
+  [ -f "$P/$f" ] || { echo "FAIL P1 缺少 $f"; fail=1; }
+done
+ck "$(jq -r '[.hooks.PreToolUse[].hooks[].command] | map(select(test("sdlc-pre-edit-guard"))) | length' "$P/.claude/settings.json")" 1 "P1 settings 有越界守卫"
+ck "$(jq -r '[.hooks.PostToolUse[].hooks[].command] | map(select(test("sdlc-post-edit-check"))) | length' "$P/.claude/settings.json")" 1 "P1 settings 有编辑后检查"
+ck "$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$P/.claude/settings.json")" 'bash "${CLAUDE_PROJECT_DIR}/.agents/hooks/sdlc-pre-edit-guard.sh"' "P1 守卫命令"
+ck "$(jq -r '.hooks | keys | join(",")' "$P/.codex/hooks.json")" "PostToolUse" "P1 codex hooks 只有编辑后检查"
+ck "$(jq -r '.hooks.PostToolUse[0].matcher' "$P/.codex/hooks.json")" "apply_patch|Edit|Write" "P1 codex matcher"
+jq -r '.hooks.PostToolUse[0].hooks[0].command' "$P/.codex/hooks.json" | grep -q 'git rev-parse --show-toplevel.*/.agents/hooks/sdlc-post-edit-check.sh' || { echo "FAIL P1 codex hook 命令应定位项目根"; fail=1; }
+ck "$(jq -r '.mcpServers.playwright.type' "$P/.mcp.json")" stdio "P1 .mcp.json type"
+ck "$(jq -r '.mcpServers.playwright.args[0]' "$P/.mcp.json")" "@playwright/mcp@latest" "P1 .mcp.json args"
+ck "$(jq -r '.mcpServers.playwright | has("transport")' "$P/.cursor/mcp.json")" false "P1 cursor 无 transport"
+grep -qx '\[mcp_servers.playwright\]' "$P/.codex/config.toml" || { echo "FAIL P1 toml 缺 playwright 表"; fail=1; }
+grep -qx 'command = "npx"' "$P/.codex/config.toml" || { echo "FAIL P1 toml command"; fail=1; }
+grep -qx 'args = \["@playwright/mcp@latest"\]' "$P/.codex/config.toml" || { echo "FAIL P1 toml args"; fail=1; }
+
+mk p2
+jq -n '{mcpServers:{
+  docs:{transport:"http",url:"https://example.com/mcp",headers:{Authorization:"Bearer x"}},
+  "my.tool":{transport:"stdio",command:"node",args:["s.js","--flag"],env:{API_KEY:"k\"q"}}},
+  claude:{settings:{permissions:{allow:["Bash(ls:*)"]},hooks:{PostToolUse:[{matcher:"Write",hooks:[{type:"command",command:"echo mine"}]}]}}},
+  codex:{extraToml:"model = \"o3\"\napproval_policy = \"on-request\"\n"}, cursor:{}}' > "$P/.agents/config.json"
+ck "$(run "$P")" 0 "P2 写模式"
+ck "$(jq -r '.permissions.allow[0]' "$P/.claude/settings.json")" "Bash(ls:*)" "P2 用户 permissions 保留"
+ck "$(jq -r '.hooks.PostToolUse | length' "$P/.claude/settings.json")" 2 "P2 用户 hook 在前、sdlc hook 追加"
+ck "$(jq -r '.hooks.PostToolUse[0].hooks[0].command' "$P/.claude/settings.json")" "echo mine" "P2 用户 hook 顺序"
+ck "$(jq -r '.mcpServers.docs.type' "$P/.mcp.json")" http "P3 http type"
+ck "$(jq -r '.mcpServers.docs.headers.Authorization' "$P/.cursor/mcp.json")" "Bearer x" "P3 cursor headers"
+ck "$(jq -r '.mcpServers.docs | has("transport")' "$P/.cursor/mcp.json")" false "P3 cursor 无 transport"
+T="$P/.codex/config.toml"
+grep -qx 'url = "https://example.com/mcp"' "$T" || { echo "FAIL P3 toml url"; fail=1; }
+grep -qx 'http_headers = { Authorization = "Bearer x" }' "$T" || { echo "FAIL P3 toml http_headers"; fail=1; }
+grep -qx '\[mcp_servers."my.tool"\]' "$T" || { echo "FAIL P3 特殊名需加引号"; fail=1; }
+grep -qx 'env = { API_KEY = "k\\"q" }' "$T" || { echo "FAIL P3 toml env 转义"; cat "$T"; fail=1; }
+m="$(grep -n '^model = "o3"$' "$T" | cut -d: -f1)"; t="$(grep -n '^\[mcp_servers\.' "$T" | head -1 | cut -d: -f1)"
+[ -n "$m" ] && [ -n "$t" ] && [ "$m" -lt "$t" ] || { echo "FAIL P4 extraToml 应位于 mcp_servers 表之前（model 行 $m，首表 $t）"; fail=1; }
+
+jq '.mcpServers.extra = {transport:"stdio",command:"x"} | .codex.extraToml += "[mcp_servers.extra]\ncommand = \"keep\"\n"' "$P/.agents/config.json" > "$TMP/c.json" && mv "$TMP/c.json" "$P/.agents/config.json"
+ck "$(run "$P")" 0 "P4b 写模式"
+ck "$(grep -c '^\[mcp_servers.extra\]$' "$T")" 1 "P4b extraToml 中已定义的 server 不重复输出"
+grep -qx 'command = "keep"' "$T" || { echo "FAIL P4b 应保留 extraToml 中的定义"; fail=1; }
+
+echo '{"mcpServers":{}}' > "$P/.mcp.json"
+ck "$(run --check "$P")" 1 "P5 手改生成文件被发现"
+has_out ".mcp.json" "P5 列出 .mcp.json"
+ck "$(run "$P")" 0 "P5 写模式恢复"
+ck "$(jq -r '.mcpServers.docs.type' "$P/.mcp.json")" http "P5 恢复内容"
+before="$(snapshot)"
+ck "$(run "$P")" 0 "P6 再次同步"
+ck "$(snapshot)" "$before" "P6 无变化"
+grep -q '✔' "$TMP/out" && { echo "FAIL P6 不应有变更"; fail=1; }
+rm "$P/.agents/config.json"
+ck "$(run "$P")" 2 "P7 缺 config.json"
+has_out "config.json" "P7 报错指出 config.json"
+
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1
