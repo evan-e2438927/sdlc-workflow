@@ -141,7 +141,7 @@ ensure_user_doc() {
     echo "  ＋ 补齐缺失文档: $name"
   fi
 }
-ensure_user_doc "$SKILL_DIR/templates/CLAUDE.md.tpl"            "$CLAUDE_DIR/CLAUDE.md"            ".claude/CLAUDE.md"
+ensure_user_doc "$SKILL_DIR/templates/AGENTS.md.tpl"            "$CLAUDE_DIR/CLAUDE.md"            ".claude/CLAUDE.md"
 ensure_user_doc "$SKILL_DIR/templates/ARCHITECTURE.md.tpl"      "$CLAUDE_DIR/ARCHITECTURE.md"      ".claude/ARCHITECTURE.md"
 ensure_user_doc "$SKILL_DIR/templates/SECURITY.md.tpl"         "$CLAUDE_DIR/SECURITY.md"         ".claude/SECURITY.md"
 ensure_user_doc "$SKILL_DIR/templates/CODING_GUIDELINES.md.tpl" "$CLAUDE_DIR/CODING_GUIDELINES.md" ".claude/CODING_GUIDELINES.md"

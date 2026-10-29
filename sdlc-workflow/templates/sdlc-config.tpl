@@ -1,12 +1,12 @@
 # ╔══════════════════════════════════════════════════════════════╗
 # ║              SDLC Workflow 配置文件                            ║
-# ║  位置: <project>/.claude/.sdlc-config                         ║
+# ║  位置: <project>/.agents/.sdlc-config                         ║
 # ║  格式: KEY=VALUE（shell 风格，# 开头为注释）                  ║
 # ║  由 /sdlc-workflow init 生成；按需编辑。无敏感信息。          ║
 # ╚══════════════════════════════════════════════════════════════╝
 #
 # 加载规则：统一上下文加载入口读取本文件（见 references/context-loader.md）。
-# 全局默认可放在 ~/.claude/.sdlc-config，项目级 <project>/.claude/.sdlc-config 覆盖之。
+# 全局默认可放在 ~/.agents/.sdlc-config（旧位置 ~/.claude/.sdlc-config 仍会读取），项目级 <project>/.agents/.sdlc-config 覆盖之。
 
 # ──────────────────────────────────────────────────────────────
 # 测试配置

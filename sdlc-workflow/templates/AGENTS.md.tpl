@@ -10,10 +10,10 @@
 <!-- 请描述项目目录结构 -->
 
 ## 开发约定
-- 参考 .claude/ARCHITECTURE.md 了解架构设计
-- 参考 .claude/SECURITY.md 了解安全规范
-- 参考 .claude/CODING_GUIDELINES.md 了解编码规范
-- 若项目为 existing project，先参考 `.claude/PROJECT_BASELINE.md`、`.claude/EXISTING_STRUCTURE.md`、`.claude/TEST_BASELINE.md`
+- 参考 .agents/ARCHITECTURE.md 了解架构设计
+- 参考 .agents/SECURITY.md 了解安全规范
+- 参考 .agents/CODING_GUIDELINES.md 了解编码规范
+- 若项目为 existing project，先参考 `.agents/PROJECT_BASELINE.md`、`.agents/EXISTING_STRUCTURE.md`、`.agents/TEST_BASELINE.md`
 - 提交遵循 Conventional Commits 1.0.0：`<type>[scope][!]: <description>`（type: feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert；破坏性变更加 `!` 或 footer `BREAKING CHANGE:`）
 - 默认遵循 Better-T-Stack 风格目录：
   - `apps/web/src` 放 Web 前端代码
@@ -36,7 +36,7 @@ docs/iterations/
         └── status.json        # proposal/apply 状态
 ```
 
-**在处理新需求时，先阅读 `docs/iterations/` 下最近 `HISTORY_ITER_DEPTH` 个迭代**（默认 2，`0`=全部；见 `.claude/.sdlc-config`）的 requirements.md 与 design.md，了解已有的设计决策、架构变更和业务上下文，避免：
+**在处理新需求时，先阅读 `docs/iterations/` 下最近 `HISTORY_ITER_DEPTH` 个迭代**（默认 2，`0`=全部；见 `.agents/.sdlc-config`）的 requirements.md 与 design.md，了解已有的设计决策、架构变更和业务上下文，避免：
 - 与已有设计冲突
 - 重复实现已存在的功能
 - 引入与历史决策矛盾的方案
@@ -52,10 +52,15 @@ docs/iterations/
 - 验收提交运行 `/sdlc-workflow accept <迭代目录>` → 更新文档 + 本地 commit
 - 推送建 PR 运行 `/sdlc-workflow pr <迭代目录>`
 - 全自动模式运行 `/sdlc-workflow doit <需求>`；小任务运行 `/sdlc-workflow mini <需求>`
-- 配置见 `.claude/.sdlc-config`
+- 配置见 `.agents/.sdlc-config`
 
 ## 自定义 Skills
-把项目专属 skill 放到 `.claude/skills/<name>/SKILL.md`（frontmatter 需含 `name` 与 `description`）。SDLC pipeline 会自动发现它们，并在 `description` 与当前阶段相关时**优先调用**（先 skill、后自造）。
-- Claude Code：harness 原生自动发现。
-- Codex：由统一上下文加载入口扫描目录索引后可用。
+把项目专属 skill 放到 `.agents/skills/<name>/SKILL.md`（frontmatter 需含 `name` 与 `description`）。SDLC pipeline 会自动发现它们，并在 `description` 与当前阶段相关时**优先调用**（先 skill、后自造）。
+- Claude Code：同步脚本自动生成 `.claude/skills/<name>` 软链接，harness 原生发现（软链接需提交）。
+- Codex：原生读取 `.agents/skills/`，并由统一上下文加载入口建立索引。
 - 想让某 skill 只在特定阶段用，在其 `description` 里点明阶段即可，无需额外配置。
+
+## 目录约定（.agents/ 是唯一事实来源）
+- 规则、配置（`.agents/config.json`）、项目 skill、hooks 都放在 `.agents/`；根目录 `AGENTS.md`、`CLAUDE.md` 是指向本文件的软链接。
+- `.claude/settings.json`、`.mcp.json`、`.codex/`、`.cursor/mcp.json` 由 sdlc 同步脚本生成并已 gitignore，不要手改；要改 MCP 或平台设置，改 `.agents/config.json`。
+- 子目录可放自己的 `AGENTS.md`，同步时会在旁边生成 `CLAUDE.md` 软链接。

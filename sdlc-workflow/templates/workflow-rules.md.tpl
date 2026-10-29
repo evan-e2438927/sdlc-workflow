@@ -10,8 +10,8 @@
   - 格式：`<type>[optional scope][!]: <description>`，必要时附 body 与 footer
   - type 取值：feat | fix | docs | style | refactor | perf | test | build | ci | chore | revert
   - 破坏性变更：type 后加 `!` 或在 footer 写 `BREAKING CHANGE: <说明>`（触发 MAJOR）
-  - 配置：type 取 `.claude/.sdlc-config` 的 COMMIT_TYPE（留空则按迭代 <type> 推断），scope 取 COMMIT_SCOPE（留空自动推断）
-- 配置统一放 `.claude/.sdlc-config`（KEY=VALUE，gitignored）
+  - 配置：type 取 `.agents/.sdlc-config` 的 COMMIT_TYPE（留空则按迭代 <type> 推断），scope 取 COMMIT_SCOPE（留空自动推断）
+- 配置统一放 `.agents/.sdlc-config`（KEY=VALUE，gitignored）
 - 失败后最多自动修复 REVIEW_MAX_ROUNDS 轮（默认 1；Gate 1/2 仅 --review 时运行）
 - 超限中止 Pipeline，等待人工介入
 - 禁止直推 main/master 分支（push + PR 仅在 `pr` 命令中执行）
@@ -19,11 +19,11 @@
 - Codex Gate 默认使用 `codex exec --full-auto`
 - Codex CLI 不可用时必须中止，不能自动跳过 Gate
 - 测试文件统一存放 tests/ 目录（unit/ + e2e/ + reports/）
-- 新需求处理前必须参考 docs/iterations/ 最近 HISTORY_ITER_DEPTH 个迭代的历史上下文（默认 2，0=全部；见 .claude/.sdlc-config）
+- 新需求处理前必须参考 docs/iterations/ 最近 HISTORY_ITER_DEPTH 个迭代的历史上下文（默认 2，0=全部；见 .agents/.sdlc-config）
 - 若项目已存在业务代码或工程结构，则进入 existing project mode，必须先生成：
-  - `.claude/PROJECT_BASELINE.md`
-  - `.claude/EXISTING_STRUCTURE.md`
-  - `.claude/TEST_BASELINE.md`
+  - `.agents/PROJECT_BASELINE.md`
+  - `.agents/EXISTING_STRUCTURE.md`
+  - `.agents/TEST_BASELINE.md`
 - existing project mode 下，未经 `design.md` 明确批准，不得调整既有技术架构或重排 workspace
 - 全栈项目默认遵循 Better-T-Stack 风格 monorepo：
   - `apps/web`：Web 前端应用
@@ -58,7 +58,7 @@
   - 缺少任何一项 → 禁止标记 qa 为 qa_passed
 - **Token 耗尽保护**：若 context_usage > 70%，必须先执行 /compact 再进入 test-pipeline（步骤 ⑨）
 - **Pipeline 断点续跑**：status.json 用 `phase` 字段记录进度（pending_review → applied → qa_passed → accepted → pr_created）；新会话启动时读取此字段，从中断阶段继续执行而非跳过
-- 架构文档 `.claude/ARCHITECTURE.md`、安全规范 `.claude/SECURITY.md`、编码规范 `.claude/CODING_GUIDELINES.md`、配置 `.claude/.sdlc-config` 与 `CLAUDE.md` 一同位于 `.claude/` 目录
+- 架构文档 `.agents/ARCHITECTURE.md`、安全规范 `.agents/SECURITY.md`、编码规范 `.agents/CODING_GUIDELINES.md`、配置 `.agents/.sdlc-config` 与项目总入口 `AGENTS.md` 一同位于 `.agents/` 目录（根目录 `AGENTS.md` / `CLAUDE.md` 是指向它的软链接）
 - 主线五命令：`proposal`（→ pending_review，暂停）→ `apply`（→ applied，不提交）→ `qa`（→ qa_passed，可跳过）→ `accept`（→ accepted，本地 commit）→ `pr`（→ pr_created，push + PR）
 - `apply` 命令启动前必须检查 `status.json`，phase 为 `pending_review`（视为审核通过）或 `approved` 时允许执行
 - `doit` 命令为全自动模式，内部执行 proposal + apply + [qa] + accept + pr 不停顿
