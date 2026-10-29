@@ -171,5 +171,30 @@ rm "$P/.agents/config.json"
 ck "$(run "$P")" 2 "P7 缺 config.json"
 has_out "config.json" "P7 报错指出 config.json"
 
+# ── Task 6：--check-paths ──
+mk c1
+mkdir -p "$P/docs/iterations" "$P/web/src"; printf 'x\n' > "$P/docs/ok.md"; printf 'x\n' > "$P/web/src/app.ts"
+cat > "$P/.agents/AGENTS.md" <<'EOF'
+# rules
+- see [ok](../docs/ok.md) and [bad](../docs/missing.md)
+- dirs: `docs/iterations/` and `docs/gone/`
+- skip: [web](https://example.com/a.md) [anchor](#top) `apps/web/src` `.agents/skills/<name>/SKILL.md` `packages/env|api` `src/*.ts` `npm run build` `a b/c.md` `README`
+EOF
+ck "$(run "$P")" 0 "C0 先同步"
+ck "$(run --check-paths "$P")" 1 "C1 失效路径"
+has_out "docs/missing.md" "C1 列出失效链接"
+has_out "docs/gone/" "C1 列出失效反引号路径"
+for ok in docs/ok.md docs/iterations/ example.com '#top' apps/web/src '<name>' 'env|api' 'src/*.ts' 'a b/c.md'; do
+  grep -F -- "$ok" "$TMP/out" | grep -q '✗' && { echo "FAIL C2 不应报告 $ok"; fail=1; }
+done
+printf '# web\nsee [app](src/app.ts) and [nope](src/nope.ts)\n' > "$P/web/AGENTS.md"
+ck "$(run "$P")" 0 "C3 子目录同步"
+ck "$(run --check-paths "$P")" 1 "C3 子目录失效路径"
+has_out "web/AGENTS.md" "C3 指出所在文件"
+has_out "src/nope.ts" "C3 列出子目录失效链接"
+grep -F 'src/app.ts' "$TMP/out" | grep -q '✗' && { echo "FAIL C3 子目录链接应相对其所在目录解析"; fail=1; }
+printf '# rules\n- [ok](../docs/ok.md)\n' > "$P/.agents/AGENTS.md"; printf '# web\n[app](src/app.ts)\n' > "$P/web/AGENTS.md"
+ck "$(run --check-paths "$P")" 0 "C4 路径全部有效"
+
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1

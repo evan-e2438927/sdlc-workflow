@@ -233,6 +233,36 @@ else
 fi
 want_file .gitignore "$TMPD/gitignore"
 
+# ── 7. --check-paths：AGENTS.md 中引用的仓库内路径是否存在 ─────
+# Markdown 链接目标（去掉 #锚点，跳过 scheme:// 与 mailto:）与反引号中的路径
+# （只含 [A-Za-z0-9_.@/-]、含 /、以 / 结尾或末段带扩展名）；代码块内不检查。
+# 相对该 AGENTS.md 所在目录或项目根，任一存在即视为有效。
+check_paths_in() {
+  local rel="$1" fdir tok
+  fdir="$(dirname "$ROOT/$rel")"
+  awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$ROOT/$rel" > "$TMPD/md"
+  {
+    grep -oE '\]\([^)]+\)' "$TMPD/md" | sed -E 's/^\]\(//; s/\)$//; s/[[:space:]]+".*"$//; s/#.*$//' \
+      | grep -vE '^$|^[A-Za-z][A-Za-z0-9+.-]*:'
+    grep -oE '`[^`]+`' "$TMPD/md" | sed -E 's/^`//; s/`$//' \
+      | grep -E '^[A-Za-z0-9_.@/-]+$' | grep '/' | grep -vE '^[/~]' | grep -E '/$|/[^/]*\.[^/]+$|^[^/]*\.[^/]+$'
+  } | sort -u > "$TMPD/paths"
+  while IFS= read -r tok; do
+    [ -n "$tok" ] || continue
+    [ -e "$fdir/$tok" ] || [ -e "$ROOT/$tok" ] || drift "$rel" "broken-path $tok（引用的路径不存在）"
+  done < "$TMPD/paths"
+}
+if [ "$CHECK_PATHS" = 1 ]; then
+  check_paths_in .agents/AGENTS.md
+  while IFS= read -r rel; do
+    [ -n "$rel" ] && [ "$rel" != AGENTS.md ] || continue
+    case "/$rel" in */.*|*/node_modules/*) continue ;; esac
+    [ -f "$ROOT/$rel" ] && check_paths_in "$rel"
+  done <<EOF
+$(list_agents_md)
+EOF
+fi
+
 # ── 结果 ───────────────────────────────────────────────────────
 if [ "$DRIFT" -gt 0 ]; then
   if [ "$MODE" = check ]; then echo "发现 $DRIFT 处与 .agents/ 不一致（执行不带 --check 的同步可修复；冲突需手动处理）"
