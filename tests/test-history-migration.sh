@@ -19,8 +19,8 @@ EOF
 # Act
 bash "$SKILL_DIR/scripts/update-project.sh" "$TMP" >/dev/null
 
-# Assert: old unbounded line gone, bounded reference present, idempotent (run twice)
+# Assert (rules migrated to .agents/AGENTS.md): old unbounded line gone, bounded reference present, idempotent (run twice)
 bash "$SKILL_DIR/scripts/update-project.sh" "$TMP" >/dev/null
-grep -q 'HISTORY_ITER_DEPTH' "$TMP/.claude/CLAUDE.md" || { echo "FAIL: not migrated"; exit 1; }
-! grep -q '务必先阅读 `docs/iterations/` 下的历史迭代' "$TMP/.claude/CLAUDE.md" || { echo "FAIL: old line remains"; exit 1; }
+grep -q 'HISTORY_ITER_DEPTH' "$TMP/.agents/AGENTS.md" || { echo "FAIL: not migrated"; exit 1; }
+! grep -q '务必先阅读 `docs/iterations/` 下的历史迭代' "$TMP/.agents/AGENTS.md" || { echo "FAIL: old line remains"; exit 1; }
 echo PASS

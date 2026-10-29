@@ -19,5 +19,10 @@ jq -r '.hooks.PostToolUse[0].hooks[0].command' "$TMP/.claude/settings.json" | gr
 [ "$(cnt "$TMP/.codex/hooks.json" PostToolUse sdlc-post-edit-check)" = "1" ] || { echo "FAIL: codex hooks 缺编辑后检查"; fail=1; }
 [ "$(cnt "$TMP/.codex/hooks.json" PreToolUse sdlc-pre-edit-guard)" = "0" ] || { echo "FAIL: codex 不应注册越界守卫"; fail=1; }
 
-# ── update 幂等（Task 9）──
+# ── update 幂等：连续两次后每个 hook 仍只注册一次 ──
+bash "$SKILL_DIR/scripts/update-project.sh" "$TMP" >/dev/null 2>&1
+bash "$SKILL_DIR/scripts/update-project.sh" "$TMP" >/dev/null 2>&1
+[ "$(cnt "$TMP/.claude/settings.json" PostToolUse sdlc-post-edit-check)" = "1" ] || { echo "FAIL: update 后编辑后检查重复"; fail=1; }
+[ "$(cnt "$TMP/.claude/settings.json" PreToolUse sdlc-pre-edit-guard)" = "1" ] || { echo "FAIL: update 后越界守卫重复"; fail=1; }
+[ "$(cnt "$TMP/.codex/hooks.json" PostToolUse sdlc-post-edit-check)" = "1" ] || { echo "FAIL: update 后 codex hook 重复"; fail=1; }
 [ "$fail" = "0" ] && echo PASS || exit 1
