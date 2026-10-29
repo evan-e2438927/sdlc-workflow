@@ -181,13 +181,13 @@ jq -j "$JQ_DEFS"'
       | map(select(.key as $k | $defined | any(. == $k) | not))
       | map(.value as $v
           | "\n[mcp_servers." + (.key | tkey) + "]\n"
-          + (if ($v | transport) == "http" then
-               "url = " + ($v.url | tval) + "\n"
-               + (if $v.headers then "http_headers = " + ($v.headers | tval) + "\n" else "" end)
-             else
+          + (if ($v | transport) == "stdio" then
                "command = " + ($v.command | tval) + "\n"
                + (if $v.args then "args = " + ($v.args | tval) + "\n" else "" end)
                + (if $v.env then "env = " + ($v.env | tval) + "\n" else "" end)
+             else
+               "url = " + ($v.url | tval) + "\n"
+               + (if $v.headers then "http_headers = " + ($v.headers | tval) + "\n" else "" end)
              end))
       | join(""))
 ' "$CFG" > "$TMPD/config.toml" || die "生成 .codex/config.toml 失败（检查 config.mcpServers / codex.extraToml）"
