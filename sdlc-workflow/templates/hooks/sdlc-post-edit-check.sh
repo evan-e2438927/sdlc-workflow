@@ -55,7 +55,7 @@ while IFS= read -r FILE; do
   esac
   if [ "$RC" -ne 0 ]; then
     {
-      echo "[sdlc hook] ${LINT_TOOL} 检查未通过：$FILE（linter: $LINT_BIN）"
+      echo "[sdlc hook] ${LINT_TOOL} 检查未通过：${FILE}（linter: ${LINT_BIN}）"
       echo "$OUT"
     } >&2
     FAILED=1

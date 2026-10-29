@@ -39,10 +39,12 @@ CORE="$(cd "$(dirname "$0")/.." && pwd)"
 command -v jq >/dev/null 2>&1 || die "缺少 jq（同步脚本依赖 jq）"
 
 TMPD="$(mktemp -d)"; trap 'rm -rf "$TMPD"' EXIT
-DRIFT=0; CHANGED=0
+DRIFT=0; CHANGED=0; ERRORS=0
 
 changed() { echo "  ✔ $1"; CHANGED=$((CHANGED + 1)); }
 drift()   { echo "  ✗ $1: $2"; DRIFT=$((DRIFT + 1)); }
+# write_failed <rel> <动作>：写入失败（如文件系统不支持软链接、目录不可写），最终以退出码 2 结束
+write_failed() { echo "  ❌ ${1}: ${2}失败"; ERRORS=$((ERRORS + 1)); }
 # conflict <rel> [hint]：实体文件/目录占位，不覆盖
 conflict() {
   if [ "$MODE" = check ]; then echo "  ✗ $1: conflict（实体文件或目录，未覆盖）"
@@ -56,8 +58,8 @@ want_link() {
   local rel="$1" target="$2" p="$ROOT/$1"
   if [ -L "$p" ]; then
     [ "$(readlink "$p")" = "$target" ] && return 0
-    if [ "$MODE" = check ]; then drift "$rel" "wrong-link（指向 $(readlink "$p")，应为 $target）"; return 0; fi
-    rm -f "$p" && ln -s "$target" "$p" && changed "$rel → $target"
+    if [ "$MODE" = check ]; then drift "$rel" "wrong-link（指向 $(readlink "$p")，应为 ${target}）"; return 0; fi
+    if rm -f "$p" && ln -s "$target" "$p"; then changed "$rel → $target"; else write_failed "$rel" "替换软链接"; fi
   elif [ -e "$p" ]; then
     if [ -f "$p" ] && [ "$(cat "$p")" = "$target" ]; then
       conflict "$rel" "该文件内容就是链接目标，像是软链接被检出成了文本文件：Windows 请开启开发者模式并执行 git config core.symlinks true 后重新检出"
@@ -65,8 +67,8 @@ want_link() {
       conflict "$rel"
     fi
   else
-    if [ "$MODE" = check ]; then drift "$rel" "missing（应为 → $target）"; return 0; fi
-    mkdir -p "$(dirname "$p")" && ln -s "$target" "$p" && changed "$rel → $target"
+    if [ "$MODE" = check ]; then drift "$rel" "missing（应为 → ${target}）"; return 0; fi
+    if mkdir -p "$(dirname "$p")" && ln -s "$target" "$p"; then changed "$rel → $target"; else write_failed "$rel" "创建软链接"; fi
   fi
 }
 
@@ -117,7 +119,9 @@ for l in "$ROOT"/.claude/skills/* "$ROOT"/.claude/agents/*; do
   case "$(readlink "$l")" in ../../.agents/skills/*) ;; *) continue ;; esac
   [ -e "$l" ] && continue
   rel="${l#"$ROOT"/}"
-  if [ "$MODE" = check ]; then drift "$rel" "dangling（目标已不存在）"; else rm -f "$l" && changed "删除悬空链接 $rel"; fi
+  if [ "$MODE" = check ]; then drift "$rel" "dangling（目标已不存在）"
+  elif rm -f "$l"; then changed "删除悬空链接 $rel"
+  else write_failed "$rel" "删除悬空链接"; fi
 done
 AGENTS_SRC="$ROOT/.agents/skills/sdlc-workflow/agents"
 if [ -d "$AGENTS_SRC" ]; then
@@ -220,7 +224,7 @@ $END_MARK
 EOF
 GI="$ROOT/.gitignore"
 if [ -f "$GI" ] && grep -qxF "$BEGIN_MARK" "$GI"; then
-  grep -qxF "$END_MARK" "$GI" || die ".gitignore 中托管块缺少结束标记「$END_MARK」，请手动修复"
+  grep -qxF "$END_MARK" "$GI" || die ".gitignore 中托管块缺少结束标记「${END_MARK}」，请手动修复"
   awk -v b="$BEGIN_MARK" -v e="$END_MARK" -v blk="$TMPD/block" '
     $0 == b { while ((getline l < blk) > 0) print l; skip = 1; next }
     skip && $0 == e { skip = 0; next }
@@ -249,7 +253,7 @@ check_paths_in() {
   } | sort -u > "$TMPD/paths"
   while IFS= read -r tok; do
     [ -n "$tok" ] || continue
-    [ -e "$fdir/$tok" ] || [ -e "$ROOT/$tok" ] || drift "$rel" "broken-path $tok（引用的路径不存在）"
+    [ -e "$fdir/$tok" ] || [ -e "$ROOT/$tok" ] || drift "$rel" "broken-path ${tok}（引用的路径不存在）"
   done < "$TMPD/paths"
 }
 if [ "$CHECK_PATHS" = 1 ]; then
@@ -264,6 +268,10 @@ EOF
 fi
 
 # ── 结果 ───────────────────────────────────────────────────────
+if [ "$ERRORS" -gt 0 ]; then
+  echo "❌ 同步未完成：${ERRORS} 处写入失败（见上方 ❌）；Windows 请开启开发者模式并设置 git config core.symlinks true" >&2
+  exit 2
+fi
 if [ "$DRIFT" -gt 0 ]; then
   if [ "$MODE" = check ]; then echo "发现 $DRIFT 处与 .agents/ 不一致（执行不带 --check 的同步可修复；冲突需手动处理）"
   else echo "同步完成，但有 $DRIFT 处冲突未解决（见上方 ⚠）"; fi

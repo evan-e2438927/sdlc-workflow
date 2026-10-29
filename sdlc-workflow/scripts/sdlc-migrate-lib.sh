@@ -24,7 +24,7 @@ sdlc_absorb_root_doc() {
   sdlc_backup "$root" "$bak" "$name"
   { printf '\n## 迁移自 %s\n\n' "$name"; cat "$f"; } >> "$root/.agents/AGENTS.md"
   rm -f "$f"
-  echo "  ⚠ 根目录 $name 的内容已并入 .agents/AGENTS.md「## 迁移自 $name」小节（备份: ${bak#"$root"/}/$name），可能与已有规则重复，请人工整理"
+  echo "  ⚠ 根目录 $name 的内容已并入 .agents/AGENTS.md「## 迁移自 ${name}」小节（备份: ${bak#"$root"/}/${name}），可能与已有规则重复，请人工整理"
 }
 
 # _sdlc_toml_value <toml 值>：单行 TOML 值 → JSON；无法安全转换时返回 1

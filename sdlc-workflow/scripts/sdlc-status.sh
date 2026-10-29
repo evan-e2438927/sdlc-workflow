@@ -2,7 +2,7 @@
 # SDLC 迭代状态机：phase 迁移的唯一写入口，只给 agent 调用。
 #   sdlc-status.sh transition <迭代目录> <目标phase> --by <命令> [--note <说明>] [--flags '<json>']
 #   sdlc-status.sh find-latest <phase> [<phase>...]   → 输出最近一个命中的迭代目录（相对项目根）
-# 迁移表：同目录 state-machine.json。项目根：$CLAUDE_PROJECT_DIR → git 仓库根 → $PWD。
+# 迁移表：同目录 state-machine.json。项目根：$CLAUDE_PROJECT_DIR → git 仓库根 → ${PWD}。
 # 退出码：0 成功；1 非法迁移 / 未知 phase / find-latest 无命中；2 用法或输入错误；3 缺少 jq。
 set -uo pipefail
 
@@ -52,7 +52,7 @@ cmd_transition() {
   [ "$known" = "true" ] || die 1 "当前 phase \"$from\" 不在迁移表中（$rel/status.json），请人工确认"
   allowed="$(jq -r --arg f "$from" '.transitions[$f] | join(" ")' "$SM")"
   if ! jq -e --arg f "$from" --arg t "$to" '.transitions[$f] | index($t) != null' "$SM" >/dev/null; then
-    die 1 "当前 ${from:-（无）}，不能迁移到 $to；允许：${allowed:-（无，终态）}"
+    die 1 "当前 ${from:-（无）}，不能迁移到 ${to}；允许：${allowed:-（无，终态）}"
   fi
 
   local create=false

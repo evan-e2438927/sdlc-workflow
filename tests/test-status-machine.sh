@@ -150,9 +150,9 @@ ck "$(ls -A "$P/$ITER")" status.json "R5 迭代目录只有 status.json"
 # E1–E3 status.json 不是单个 JSON 对象：exit 2，原文件不变，不留临时文件
 for bad in "" "   " "[]" '{"phase":"pending_review"}{"phase":"approved"}'; do
   setup; printf '%s' "$bad" > "$P/$ITER/status.json"
-  ck "$(run transition "$ITER" approved --by apply)" 2 "E 非单个对象「$bad」"
-  ck "$(cat "$P/$ITER/status.json")" "$bad" "E 原文件不变「$bad」"
-  ck "$(ls -A "$P/$ITER")" status.json "E 不留临时文件「$bad」"
+  ck "$(run transition "$ITER" approved --by apply)" 2 "E 非单个对象「${bad}」"
+  ck "$(cat "$P/$ITER/status.json")" "$bad" "E 原文件不变「${bad}」"
+  ck "$(ls -A "$P/$ITER")" status.json "E 不留临时文件「${bad}」"
 done
 
 # G1 未设 CLAUDE_PROJECT_DIR、在子目录里调用：按 git 仓库根定位

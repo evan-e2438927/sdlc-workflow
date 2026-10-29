@@ -151,7 +151,7 @@ grep -qx 'http_headers = { Authorization = "Bearer x" }' "$T" || { echo "FAIL P3
 grep -qx '\[mcp_servers."my.tool"\]' "$T" || { echo "FAIL P3 特殊名需加引号"; fail=1; }
 grep -qx 'env = { API_KEY = "k\\"q" }' "$T" || { echo "FAIL P3 toml env 转义"; cat "$T"; fail=1; }
 m="$(grep -n '^model = "o3"$' "$T" | cut -d: -f1)"; t="$(grep -n '^\[mcp_servers\.' "$T" | head -1 | cut -d: -f1)"
-[ -n "$m" ] && [ -n "$t" ] && [ "$m" -lt "$t" ] || { echo "FAIL P4 extraToml 应位于 mcp_servers 表之前（model 行 $m，首表 $t）"; fail=1; }
+[ -n "$m" ] && [ -n "$t" ] && [ "$m" -lt "$t" ] || { echo "FAIL P4 extraToml 应位于 mcp_servers 表之前（model 行 ${m}，首表 ${t}）"; fail=1; }
 
 jq '.mcpServers.extra = {transport:"stdio",command:"x"} | .codex.extraToml += "[mcp_servers.extra]\ncommand = \"keep\"\n"' "$P/.agents/config.json" > "$TMP/c.json" && mv "$TMP/c.json" "$P/.agents/config.json"
 ck "$(run "$P")" 0 "P4b 写模式"
@@ -195,6 +195,14 @@ has_out "src/nope.ts" "C3 列出子目录失效链接"
 grep -F 'src/app.ts' "$TMP/out" | grep -q '✗' && { echo "FAIL C3 子目录链接应相对其所在目录解析"; fail=1; }
 printf '# rules\n- [ok](../docs/ok.md)\n' > "$P/.agents/AGENTS.md"; printf '# web\n[app](src/app.ts)\n' > "$P/web/AGENTS.md"
 ck "$(run --check-paths "$P")" 0 "C4 路径全部有效"
+
+# ── 软链接创建失败不能报成功 ──
+mk lnfail
+mkdir -p "$P/.claude/skills"; chmod 555 "$P/.claude/skills"
+rc="$(run "$P")"; chmod 755 "$P/.claude/skills"
+[ "$rc" != 0 ] || { echo "FAIL L1 .claude/skills 不可写时同步不应返回 0"; sed 's/^/    out: /' "$TMP/out" | head; fail=1; }
+grep -q '同步完成：\|已是最新' "$TMP/out" && ! grep -q '✗\|❌\|⚠' "$TMP/out" && { echo "FAIL L1 不应报告同步成功"; fail=1; }
+has_out ".claude/skills/alpha" "L1 指出失败的链接"
 
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1

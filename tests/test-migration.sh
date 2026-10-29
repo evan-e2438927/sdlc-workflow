@@ -1,6 +1,6 @@
 #!/bin/bash
 # update 把旧版（.claude/ 布局）项目迁移到 .agents/：内容不丢、平台配置导入、可重复执行。
-# 旧项目用 $SDLC_LEGACY_REF（默认 feat/status-machine）版本的 init 生成；该 ref 不存在时跳过。
+# 旧项目用 ${SDLC_LEGACY_REF}（默认 feat/status-machine）版本的 init 生成；该 ref 不存在时跳过。
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$HERE/.." && pwd)"; SKILL_DIR="$REPO_DIR/sdlc-workflow"

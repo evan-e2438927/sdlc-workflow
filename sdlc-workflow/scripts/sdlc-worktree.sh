@@ -165,7 +165,7 @@ cmd_create() {
     bash "$SCRIPT_DIR/sdlc-sync-agents.sh" "$wt_path" >/dev/null || sync_rc=$?
     case "$sync_rc" in
       0) echo "   🔗 已在 worktree 中同步 .agents/ 生成的平台文件" ;;
-      *) echo "   ⚠ worktree 同步未完全成功（退出码 $sync_rc），请在 worktree 中执行：bash $SCRIPT_DIR/sdlc-sync-agents.sh ." ;;
+      *) echo "   ⚠ worktree 同步未完全成功（退出码 ${sync_rc}），请在 worktree 中执行：bash $SCRIPT_DIR/sdlc-sync-agents.sh ." ;;
     esac
   fi
 

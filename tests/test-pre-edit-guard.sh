@@ -125,6 +125,6 @@ grep -q 'apps/web/src/evil.ts' "$TMP/err" || { echo "FAIL 21 stderr 应指出越
 [ "$(codex_run $BE "$PATCH_DEL")" = "2" ] || { echo "FAIL 23b Delete File 越界应拒绝"; fail=1; }
 [ "$(codex_run - "$PATCH_MIXED")" = "0" ] || { echo "FAIL 24 无 agent_type 的 Codex 输入应放行"; fail=1; }
 JSON_NOJQ="$(codex_run $BE "$PATCH_MIXED" "$NOJQ")"
-[ "$JSON_NOJQ" = "2" ] || { echo "FAIL 25 无 jq 时 Codex 补丁越界应拒绝（得到 $JSON_NOJQ）"; fail=1; }
+[ "$JSON_NOJQ" = "2" ] || { echo "FAIL 25 无 jq 时 Codex 补丁越界应拒绝（得到 ${JSON_NOJQ}）"; fail=1; }
 
 [ "$fail" = "0" ] && echo PASS || exit 1

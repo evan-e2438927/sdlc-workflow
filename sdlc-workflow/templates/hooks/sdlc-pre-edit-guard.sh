@@ -87,7 +87,7 @@ EOF
 
 {
   printf '%s' "$DENIED" | while IFS= read -r rel; do
-    echo "[sdlc guard] $ROLE 不能写 $rel（不在本次工作包允许清单 $ITER_DIR/tracks/.allow-$ROLE 内）。"
+    echo "[sdlc guard] $ROLE 不能写 ${rel}（不在本次工作包允许清单 $ITER_DIR/tracks/.allow-$ROLE 内）。"
   done
   echo "如确需修改：停止该任务，在 $ITER_DIR/tracks/$ROLE.md 标 blocked，并在「公共文件修改请求」写明文件与原因；不要改用 Bash 等方式绕过。"
 } >&2

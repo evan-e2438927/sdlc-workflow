@@ -246,7 +246,7 @@ bash "$SYNC" "$PROJECT_ROOT" || rc=$?
 case "$rc" in
   0) ;;
   1) echo "  ⚠ 同步有冲突未解决（见上方 ⚠），请处理后重新执行 update" ;;
-  *) echo "❌ 同步失败（退出码 $rc）" >&2; exit 2 ;;
+  *) echo "❌ 同步失败（退出码 ${rc}）" >&2; exit 2 ;;
 esac
 
 echo "✅ 同步完成。用户编辑的 ARCHITECTURE.md / SECURITY.md / CODING_GUIDELINES.md 未被改动；"

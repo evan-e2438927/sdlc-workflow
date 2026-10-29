@@ -40,7 +40,7 @@ for f in "$P"/.agents/*.md "$P"/.agents/rules/*.md "$P"/.agents/skills/README.md
   sed 's#~/\.claude/##g' "$f" | grep -En "$RX" && { echo "FAIL I8 $f 仍引用旧 .claude/ 规则路径"; fail=1; }
 done
 # I8b：--check-paths 可运行（模板里有 existing 项目才有的基线文件等条件性引用，只作提示，不要求 0）
-bash "$SYNC" --check-paths "$P" >"$TMP/out" 2>&1; rc=$?; [ "$rc" = 0 ] || [ "$rc" = 1 ] || { echo "FAIL I8b --check-paths 出错（$rc）"; fail=1; }
+bash "$SYNC" --check-paths "$P" >"$TMP/out" 2>&1; rc=$?; [ "$rc" = 0 ] || [ "$rc" = 1 ] || { echo "FAIL I8b --check-paths 出错（${rc}）"; fail=1; }
 
 # I6：existing 项目已有实体根 CLAUDE.md → 备份后并入，根变为软链接
 P="$TMP/existing"; mkdir -p "$P/src"; git -C "$P" init -q
