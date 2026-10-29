@@ -56,10 +56,10 @@ graph LR
 | 动作 | 说明 |
 |------|------|
 | 项目模式检测 | 自动识别 `fresh project` 或 `existing project` |
-| 脚手架生成 | 运行 `init-project.sh`，生成 `.claude/`、`docs/`、`tests/`、`.claude/.sdlc-config` 等基础结构 |
+| 脚手架生成 | 运行 `init-project.sh`，生成 `.agents/`、`docs/`、`tests/`、`.agents/.sdlc-config` 等基础结构 |
 | 基线采集 | existing project 额外生成 `PROJECT_BASELINE.md`、`EXISTING_STRUCTURE.md`、`TEST_BASELINE.md` |
 
-**产物**：`.claude/CLAUDE.md`、`.claude/ARCHITECTURE.md`、`.claude/SECURITY.md`、`.claude/CODING_GUIDELINES.md`、`.claude/.sdlc-config`
+**产物**：`.agents/AGENTS.md`、`.agents/ARCHITECTURE.md`、`.agents/SECURITY.md`、`.agents/CODING_GUIDELINES.md`、`.agents/.sdlc-config`
 
 ### 阶段二：需求设计（①②③④⑤）
 
@@ -100,7 +100,7 @@ graph LR
 | 命令 | 名称 | 执行者 | 产出 |
 |------|------|--------|------|
 | qa | 浏览器验收 | Claude Code | Playwright MCP 真实浏览器验收 + `tests/reports/<slug>-e2e-report.md` |
-| accept | 文档更新 + 本地提交 | Claude Code | 更新项目文档 + CLAUDE.md iterations 引用 → 本地 commit |
+| accept | 文档更新 + 本地提交 | Claude Code | 更新项目文档 + AGENTS.md iterations 引用 → 本地 commit |
 | pr | 推送建 PR | Claude Code | push → `gh pr create` |
 
 **测试分两处执行（无独立 CDP 阶段）**：
@@ -149,8 +149,8 @@ sdlc-workflow
 | 项 | 说明 |
 |-----|------|
 | **何时用** | 首次将项目接入 SDLC 工作流 |
-| **做什么** | 检测项目类型 → 生成脚手架 → 采集基线 → 配置 `.claude/.sdlc-config` |
-| **产物** | `.claude/` 目录、`docs/`、`tests/`、`.claude/.sdlc-config` |
+| **做什么** | 检测项目类型 → 生成脚手架 → 采集基线 → 配置 `.agents/.sdlc-config` |
+| **产物** | `.agents/` 目录、`docs/`、`tests/`、`.agents/.sdlc-config` |
 | **阶段覆盖** | 阶段一 |
 
 ### ② `proposal` — 需求拆解
@@ -203,7 +203,7 @@ sdlc-workflow
 | 项 | 说明 |
 |-----|------|
 | **何时用** | qa 通过（或跳过 qa）后定稿 |
-| **做什么** | 总结变更 → 更新项目文档 + CLAUDE.md iterations 引用 → **本地 commit（不 push）** |
+| **做什么** | 总结变更 → 更新项目文档 + AGENTS.md iterations 引用 → **本地 commit（不 push）** |
 | **产物** | 本地 commit |
 | **前置条件** | `phase` 为 `qa_passed` 或 `applied` |
 

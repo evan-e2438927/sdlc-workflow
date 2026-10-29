@@ -63,9 +63,9 @@ sdlc-init "review=1"
 
 重点展示：
 
-- `.claude/PROJECT_BASELINE.md`
-- `.claude/EXISTING_STRUCTURE.md`
-- `.claude/TEST_BASELINE.md`
+- `.agents/PROJECT_BASELINE.md`
+- `.agents/EXISTING_STRUCTURE.md`
+- `.agents/TEST_BASELINE.md`
 
 说明：
 

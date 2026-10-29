@@ -53,9 +53,9 @@ Plus a few auxiliary lines:
 - 🧍 **Human review gate**: pause after proposal so the design is human-confirmed before coding, so the AI never decides everything alone
 - 🔒 **Dual-model gating**: Claude Code generates, Codex CLI reviews independently (enabled by `--review`; never downgraded, never silently skipped)
 - 🧪 **Evidence-chain acceptance**: qa runs real browser verification with Playwright scripts + Playwright MCP and produces a report; success screenshots are stored under `tests/reports/` (gitignored, kept out of the main branch) and embedded into the PR body by `pr` via an isolated `pr-assets` branch — not "trust me, I tested it"
-- 🧭 **Unified context loading**: the source of conventions (global `~/.claude/` + project `.claude/`, project overrides global) is defined exactly once, converged at a single entry
-- 🧩 **Custom skills discovery**: a project's `.claude/skills/<name>/SKILL.md` is discovered by unified context loading, and the pipeline prefers it at relevant stages (skill first, hand-rolled second); works across both Claude Code and Codex
-- 📦 **Config convergence**: project config lives in one place, `.claude/.sdlc-config`, with no scattered root-level `.env`
+- 🧭 **Unified context loading**: the source of conventions (global `~/.claude/` + project `.agents/`, project overrides global) is defined exactly once, converged at a single entry
+- 🧩 **Custom skills discovery**: a project's `.agents/skills/<name>/SKILL.md` is discovered by unified context loading, and the pipeline prefers it at relevant stages (skill first, hand-rolled second); works across both Claude Code and Codex
+- 📦 **Config convergence**: project config lives in one place, `.agents/.sdlc-config`, with no scattered root-level `.env`
 - 🔧 **Resumable**: each requirement produces a structured iteration directory; `status.json` records the phase, so the next session can continue after an interruption
 - 🛡️ **Safe for existing projects**: existing projects run an intake to generate a baseline first, preventing the AI from rebuilding your directory structure
 - 🌲 **Worktree parallelism**: multiple requirements / agents run at once, with auto-allocated ports and isolated branches and config
@@ -74,7 +74,7 @@ You are already coding with Claude Code / Cursor / Codex, but you have probably 
 | "It's done" when nothing was actually tested | Manually verify one by one | qa requires real browser-interaction evidence and a report |
 | Review depends on you reading the diff | Skip it when there's too much | Codex CLI reviews automatically; the Gate stops on failure |
 | commit / PR done in one shot, hard to roll back | Only option is reset | accept commits locally only; pr pushes and ships after you confirm |
-| Config scattered, secrets included | `.env` everywhere | Unified `.claude/.sdlc-config`, gitignored |
+| Config scattered, secrets included | `.env` everywhere | Unified `.agents/.sdlc-config`, gitignored |
 | Parallel requirements stuck in serial | Queue up; even a hotfix waits | worktree: isolated work tree + branch + ports |
 
 **In one sentence**: an SDLC system that constrains AI behavior with an **engineering contract** instead of prompt tricks.
@@ -113,15 +113,24 @@ Run in the Claude Code terminal:
 /plugin install sdlc-full@sdlc-workflow
 ```
 
-### Codex / generic (skills CLI)
+### npx skills (project-level, recommended for teams)
 
-Cross-runtime install, usable from Codex and other skills-capable environments:
+Installs into the project itself, so the whole team uses one version — in Claude Code and Codex alike:
 
 ```bash
-npx skills add evan-e2438927/sdlc-workflow -y
+cd your-project
+npx skills add evan-e2438927/sdlc-workflow --skill '*' -a claude-code -a codex -y
 ```
 
-> **Note**: the skills CLI's SKILL.md format does not support `-g` (global) install; if you need it globally, use "Manual install" below.
+It creates (commit all of it):
+
+- `.agents/skills/<name>/` — the 12 skills as real files
+- `.agents/skills/<name>` → `../../.agents/skills/<name>` symlinks — Claude Code only discovers skills under `.agents/skills/`
+- `skills-lock.json` — the pinned versions
+
+Then run `sdlc-init` (`/sdlc-init` in Claude Code). Teammates who clone the repo see the rules and the `/sdlc-*` commands right away; the gitignored platform files are regenerated the first time anyone runs an sdlc command.
+
+> The Claude Code plugin and the npx install can coexist, but don't enable both for the same project: the commands show up twice and the versions can differ. sdlc warns when it sees both.
 
 After installing you can use the `sdlc-*` skills: `sdlc-init` / `sdlc-update` / `sdlc-proposal` / `sdlc-apply` / `sdlc-qa` / `sdlc-accept` / `sdlc-pr` / `sdlc-doit` / `sdlc-mini` / `sdlc-review` / `sdlc-worktree`.
 
@@ -154,7 +163,8 @@ ln -sf .claude/sdlc-workflow-repo/sdlc-workflow .claude/skills/sdlc-workflow
 ### Updating
 
 - **Claude Code**: `/plugin update sdlc-full@sdlc-workflow`, then run `sdlc-update` in each project to sync the scaffold
-- **Codex / generic**: `npx skills update`, or `git pull` in the clone directory
+- **npx skills (project)**: `npx skills update`, then `/sdlc-update` (or `sdlc-update`) to sync the scaffold; commit the result
+- **Manual install**: `git pull` in the clone directory, then `sdlc-update`
 
 ### Dependencies
 
@@ -206,7 +216,7 @@ sdlc-mini Change the button color to blue    # lightweight flow for tiny changes
 
 | Step | Command | What you'll see / do | Where artifacts land |
 |------|---------|----------------------|----------------------|
-| 0 | `sdlc-init` | Detects fresh / existing; existing runs a baseline intake first (**don't skip** — this prevents the AI from treating your existing directory as a new project) | `.claude/`, `.claude/.sdlc-config` |
+| 0 | `sdlc-init` | Detects fresh / existing; existing runs a baseline intake first (**don't skip** — this prevents the AI from treating your existing directory as a new project) | `.agents/`, `.agents/.sdlc-config` |
 | 1 | `sdlc-proposal add an export button to the orders page` | Generates requirements / design / tasks, then **auto-pauses** for your review | `docs/iterations/<date>/<seq>-<slug>-feature/` |
 | ⏸ | 👀 **Human review** | Open `design.md` and `tasks.md` to check the plan; ask it to revise if unhappy, continue when satisfied | — (one of the two mandatory stops) |
 | 2 | `sdlc-apply` | Implements code + unit tests + lint per tasks, **no commit** | code changes + `tests/unit/` |
@@ -320,11 +330,12 @@ Before running, every command loads conventions through a **single entry**, and 
 
 ```
 Load order (later overrides earlier):
-  1. Global   ~/.claude/            ← user's cross-project conventions
-  2. Project  <project>/.claude/    ← project-specific conventions, override global
+  1. Global (legacy)  ~/.claude/           ← older cross-project conventions, still read
+  2. Global           ~/.agents/           ← cross-project, cross-tool conventions
+  3. Project          <project>/.agents/   ← project-specific conventions, override global
 ```
 
-Each level loads `CLAUDE.md` / `ARCHITECTURE.md` / `SECURITY.md` / `CODING_GUIDELINES.md` / `rules/*.md`; existing projects additionally load the baseline trio; runtime config is read from `.claude/.sdlc-config`. Commands and references no longer list `.claude/*` on their own.
+Each level loads `AGENTS.md` (`CLAUDE.md` in `~/.claude/`) / `ARCHITECTURE.md` / `SECURITY.md` / `CODING_GUIDELINES.md` / `rules/*.md`; existing projects additionally load the baseline trio; runtime config is read from `.agents/.sdlc-config`. Project skills are discovered in `.agents/skills/` (sdlc's own skills excluded). After loading, every command runs `sdlc-sync-agents.sh --check` and re-syncs automatically when generated files drifted, telling you what changed and what to commit.
 
 ---
 
@@ -352,7 +363,7 @@ See [flow-apply.md](sdlc-workflow/references/flow-apply.md) and [roles/](sdlc-wo
 Uses `git worktree` to keep multiple work trees for one repo at once, each running an independent pipeline.
 
 ```bash
-# Create a parallel work tree (auto-allocates seq, branch, ports, copies .claude/.sdlc-config*)
+# Create a parallel work tree (auto-allocates seq, branch, ports, copies .agents/.sdlc-config*)
 sdlc-worktree create user-login feature
 sdlc-worktree create payment-bug fix
 
@@ -371,8 +382,8 @@ sdlc-worktree gc
 |----------|-----------|
 | Work dir | `../wt-<seq>-<slug>-<type>/`, a sibling of the main repo |
 | Branch | `{GIT_BRANCH_PREFIX}{slug}-{date}-wt{seq}`, git-enforced exclusive |
-| Dev server ports | `PORT=3000+seq, API_PORT=4000+seq`, written to that worktree's `.claude/.sdlc-config` |
-| Config | copied from the main repo's `.claude/.sdlc-config*` (gitignored, not carried over by git worktree) |
+| Dev server ports | `PORT=3000+seq, API_PORT=4000+seq`, written to that worktree's `.agents/.sdlc-config` |
+| Config | copied from the main repo's `.agents/.sdlc-config*` (gitignored, not carried over by git worktree) |
 | Registry | `.worktrees/worktree-registry.json` (committed to main, serving as the multi-agent coordination bus) |
 
 See [parallel-dev.md](sdlc-workflow/references/parallel-dev.md); the script is [sdlc-worktree.sh](sdlc-workflow/scripts/sdlc-worktree.sh).
@@ -392,6 +403,8 @@ sdlc-workflow/ (repo root)
 │   └──   each contains a SKILL.md (thin entry, pointing at references/)
 ├── .claude-plugin/         # Claude Code manifest (marketplace.json + plugin.json, auto-discovers skills/)
 ├── .codex-plugin/          # Codex manifest (plugin.json, skills: ./skills/)
+├── agents/                 # → symlinks into sdlc-workflow/agents/ (Claude Code plugin)
+├── tests/                  # repo tests: bash tests/run-all.sh
 └── sdlc-workflow/          # core skill content (referenced by skills/sdlc-workflow)
 ```
 
@@ -420,15 +433,21 @@ sdlc-workflow/              # core skill
 │   ├── 11-git-committer.md     # local commit + Conventional Commits spec
 │   ├── 12-pr-creator.md        # push + PR
 │   └── micro-change-mode.md
-├── scripts/                # init and parallel-dev scripts
+├── agents/                 # role sub-agents (sdlc-backend/frontend/test-dev), shipped with npx installs
+├── scripts/                # init / update / sync / status / parallel-dev scripts
 │   ├── init-project.sh
-│   ├── update-project.sh         # sync latest scaffold into an initialized project
+│   ├── update-project.sh         # sync latest scaffold, migrate the legacy .claude/ layout
+│   ├── sdlc-sync-agents.sh       # generate platform files from .agents/ (--check / --check-paths)
+│   ├── sdlc-migrate-lib.sh       # import existing platform configs (used by init / update)
+│   ├── sdlc-status.sh            # phase state machine
 │   ├── sdlc-worktree.sh
 │   └── update-workflow-config.sh
 └── templates/              # project templates
-    ├── CLAUDE.md.tpl
+    ├── AGENTS.md.tpl          # → .agents/AGENTS.md
+    ├── config.json.tpl        # → .agents/config.json
+    ├── hooks/                 # → .agents/hooks/ (sdlc-managed)
     ├── workflow-rules.md.tpl
-    ├── sdlc-config.tpl        # → generates .claude/.sdlc-config
+    ├── sdlc-config.tpl        # → generates .agents/.sdlc-config
     ├── ARCHITECTURE.md.tpl
     ├── SECURITY.md.tpl
     └── CODING_GUIDELINES.md.tpl
@@ -436,35 +455,62 @@ sdlc-workflow/              # core skill
 
 ### Target project structure (generated after init)
 
+`.agents/` is the single source of truth; platform directories only hold what differs per tool, and are generated or symlinked by `sdlc-sync-agents.sh`.
+
 ```
 your-project/
-├── .claude/                    # Claude context (kept together)
-│   ├── CLAUDE.md
-│   ├── ARCHITECTURE.md
-│   ├── SECURITY.md
-│   ├── CODING_GUIDELINES.md
-│   ├── PROJECT_BASELINE.md     # existing project
-│   ├── EXISTING_STRUCTURE.md
-│   ├── TEST_BASELINE.md
-│   ├── .sdlc-config            # config (gitignored)
-│   └── rules/workflow-rules.md
+├── AGENTS.md -> .agents/AGENTS.md      # committed symlink (Codex, Cursor, Gemini CLI … read AGENTS.md)
+├── CLAUDE.md -> .agents/AGENTS.md      # committed symlink (Claude Code)
+├── skills-lock.json                    # npx skills install only, committed
+├── .agents/                            # committed
+│   ├── AGENTS.md                       # project entry
+│   ├── ARCHITECTURE.md / SECURITY.md / CODING_GUIDELINES.md
+│   ├── PROJECT_BASELINE.md / EXISTING_STRUCTURE.md / TEST_BASELINE.md   # existing project
+│   ├── rules/workflow-rules.md
+│   ├── config.json                     # MCP servers + platform settings (single source)
+│   ├── hooks/                          # sdlc-managed hook scripts (do not edit)
+│   ├── skills/                         # sdlc itself (npx install) + your project skills
+│   ├── .sdlc-config                    # runtime config (gitignored, per person)
+│   └── .sdlc-active-iteration          # gitignored
+├── .claude/
+│   ├── skills/<name> -> ../../.agents/skills/<name>   # committed symlinks
+│   ├── agents/sdlc-*-dev.md -> ../../.agents/skills/sdlc-workflow/agents/…   # npx install only, committed
+│   └── settings.json                   # generated, gitignored
+├── .codex/config.toml, .codex/hooks.json   # generated, gitignored
+├── .mcp.json, .cursor/mcp.json         # generated, gitignored
+├── web/AGENTS.md + web/CLAUDE.md -> AGENTS.md   # optional subdirectory rules, both committed
 ├── docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/
-│   ├── requirements.md
-│   ├── design.md
-│   ├── tasks.md
+│   ├── requirements.md / design.md / tasks.md
 │   └── status.json             # phase: pending_review → approved → applied → qa_passed（or qa_failed → applied）→ accepted → pr_created
-├── tests/
-│   ├── unit/                   # unit tests (generated by apply)
-│   ├── e2e/                    # Playwright scripts (generated by qa)
-│   └── reports/                # test and acceptance reports
+├── tests/ (unit/, e2e/, reports/)
 └── .worktrees/                 # worktree registry (created once parallelism is enabled)
 ```
+
+### What to commit, what is generated
+
+Rule: **whatever must exist right after a clone, before any command runs, is committed; whatever can be regenerated from `.agents/` is ignored.**
+
+| Committed | Generated and gitignored |
+|-----------|--------------------------|
+| `AGENTS.md`, `CLAUDE.md` and subdirectory `CLAUDE.md` symlinks | `.claude/settings.json` (from `config.claude.settings` + sdlc hooks) |
+| `.agents/` (rules, `config.json`, `hooks/`, `skills/`) | `.mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`, `.codex/hooks.json` |
+| `.claude/skills/*`, `.claude/agents/*` symlinks, `skills-lock.json` | `.agents/.sdlc-config*`, `.agents/.sdlc-active-iteration`, `.agents/.backup/` |
+
+The ignore entries live between `# >>> sdlc generated >>>` and `# <<< sdlc generated <<<` in `.gitignore`; that block is rewritten on every sync, so put your own rules outside it. To change MCP servers or tool settings, edit `.agents/config.json` — generated files are rewritten whole. `sdlc-init`, `sdlc-update` and `sdlc-worktree create` run the sync; every other command runs `--check` first and re-syncs if needed. A real file sitting where a symlink belongs (for example your own `web/CLAUDE.md`) is never overwritten; `--check` reports it as a conflict.
+
+**Windows**: Git may check symlinks out as plain text files. Enable Developer Mode and run `git config core.symlinks true` before cloning (or re-checkout afterwards). The sync check spots a symlink that became a text file and tells you so.
+
+**Codex hooks**: Codex runs project hooks only after you trust them — open `/hooks` in Codex once and trust this project's `.codex/hooks.json`. Codex gets the post-edit lint check; the multi-agent out-of-bounds guard is Claude Code only, because Codex hook input carries no sub-agent identity.
+
+### Migrating from the `.claude/` layout
+
+Projects initialized by an older version keep their rules in `.claude/CLAUDE.md`, `.claude/ARCHITECTURE.md` and friends. Run `sdlc-update`: it backs the old files up to `.agents/.backup/<timestamp>/`, moves them (and custom skills under `.claude/skills/`) into `.agents/`, rewrites the `.claude/…` paths inside them, folds a real root `AGENTS.md` / `CLAUDE.md` into `.agents/AGENTS.md` under a "迁移自 …" heading for you to tidy up, imports `.claude/settings.json`, `.mcp.json`, `.cursor/mcp.json` and `.codex/config.toml` into `.agents/config.json`, then regenerates everything. If those platform files were committed, run `git rm --cached <file>` as the migration report says. Other commands stop on the old layout and ask you to run `sdlc-update` first.
 
 ---
 
 ## Configuration
 
-All in `.claude/.sdlc-config` (`KEY=VALUE` format, generated by `sdlc-init` and added to `.gitignore`). Global defaults can go in `~/.claude/.sdlc-config`, with project-level overriding global:
+Runtime settings live in `.agents/.sdlc-config` (`KEY=VALUE` format, generated by `sdlc-init` and gitignored). Global defaults can go in `~/.agents/.sdlc-config` (the legacy `~/.claude/.sdlc-config` is still read), with project-level overriding global. MCP servers and per-tool settings live in `.agents/config.json` (see "What to commit, what is generated"):
 
 | Key | Default | Description |
 |-----|---------|-------------|
@@ -502,10 +548,10 @@ Commits follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/
 > The next session reads `docs/iterations/` and the `status.json` phase to resume; all intermediate artifacts are persisted.
 
 **Q: What if global and project conventions conflict?**
-> Project-level `.claude/` overrides global `~/.claude/`; runtime command flags (`--review`/`--qa`) have the highest priority.
+> Project-level `.agents/` overrides global `~/.agents/` (and the legacy `~/.claude/`); runtime command flags (`--review`/`--qa`) have the highest priority.
 
 **Q: What if I need to develop multiple requirements in parallel?**
-> Use `worktree create` to open an isolated work tree per requirement; branches, ports, and `.claude/.sdlc-config` are isolated automatically, sessions don't interfere, and `worktree gc` cleans up after merge.
+> Use `worktree create` to open an isolated work tree per requirement; branches, ports, and `.agents/.sdlc-config` are isolated automatically, sessions don't interfere, and `worktree gc` cleans up after merge.
 
 ---
 

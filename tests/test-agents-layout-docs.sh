@@ -34,5 +34,21 @@ has "$SKILL_DIR/SKILL.md" '| 2. 全局 | `~/.agents/` |'
 has "$R/flow-accept.md" 'bash "$SDLC_CORE/scripts/sdlc-sync-agents.sh" --check-paths .'
 has "$R/flow-accept.md" '不阻断'
 
+# D4：两份 README 有 npx skills 安装说明、新目录结构、提交/忽略、Windows 软链接、Codex hooks 信任、升级方式
+for f in "$REPO_DIR/README.md" "$REPO_DIR/README.zh-CN.md"; do
+  has "$f" "npx skills add evan-e2438927/sdlc-workflow --skill '*' -a claude-code -a codex -y"
+  has "$f" 'AGENTS.md -> .agents/AGENTS.md'
+  has "$f" '.agents/config.json'
+  has "$f" 'core.symlinks'
+  has "$f" '/hooks'
+  has "$f" 'npx skills update'
+  has "$f" 'git rm --cached'
+done
+
+# D5：文档中的 .claude/CLAUDE.md 只出现在迁移说明小节（最近的上级标题含「迁移」或 Migrat）
+for f in README.md README.zh-CN.md docs/workflow-overview.md DESIGN-PROMO.md DESIGN-PROMO.zh-CN.md examples/30-second-demo.md docs/git-worktree-guide.md; do
+  awk -v f="$f" '/^#+ / && !/^#+ *[0-9]+\./ { h = $0 } /\.claude\/CLAUDE\.md/ && h !~ /迁移|Migrat/ { printf "FAIL D5 %s:%d 不在迁移小节（标题: %s）\n", f, NR, h; bad = 1 } END { exit bad }' "$REPO_DIR/$f" || fail=1
+done
+
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1

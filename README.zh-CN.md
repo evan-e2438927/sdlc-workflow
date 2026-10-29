@@ -53,9 +53,9 @@
 - 🧍 **人工审核门**：proposal 后暂停，设计经人工确认再开发，避免 AI 全权拍板
 - 🔒 **双模型把关**：Claude Code 生成，Codex CLI 独立审查（`--review` 启用，不降级、不跳过）
 - 🧪 **证据链验收**：qa 用 Playwright 脚本 + Playwright MCP 做浏览器功能验收并出报告，通过态截图存 `tests/reports/`（gitignore、不入主干）并由 pr 经隔离 `pr-assets` 分支嵌入 PR 正文当证据，不靠"我测完了"
-- 🧭 **统一上下文加载**：规范来源（全局 `~/.claude/` + 项目 `.claude/`，项目覆盖全局）只定义一次，单一入口收敛
-- 🧩 **自定义 skills 发现**：项目 `.claude/skills/<name>/SKILL.md` 会被统一上下文加载发现，pipeline 在相关阶段优先调用（先 skill、后自造），Claude Code / Codex 双运行时通用
-- 📦 **配置收敛**：项目配置统一放 `.claude/.sdlc-config`，无散落的根目录 `.env`
+- 🧭 **统一上下文加载**：规范来源（全局 `~/.claude/` + 项目 `.agents/`，项目覆盖全局）只定义一次，单一入口收敛
+- 🧩 **自定义 skills 发现**：项目 `.agents/skills/<name>/SKILL.md` 会被统一上下文加载发现，pipeline 在相关阶段优先调用（先 skill、后自造），Claude Code / Codex 双运行时通用
+- 📦 **配置收敛**：项目配置统一放 `.agents/.sdlc-config`，无散落的根目录 `.env`
 - 🔧 **可恢复**：每轮需求生成结构化 iteration 目录，`status.json` 记录 phase，会话中断后下个 session 可续跑
 - 🛡️ **老项目安全**：existing project 先 intake 生成 baseline，防止 AI 重建你的目录结构
 - 🌲 **Worktree 并行**：多需求 / 多 Agent 同时跑，自动分配端口、隔离分支与配置
@@ -74,7 +74,7 @@
 | 说"已完成"实际没测 | 手动逐个验证 | qa 必须有浏览器交互证据与报告 |
 | 审查全靠自己看 diff | 看不过来就跳过 | Codex CLI 自动审查，Gate 失败就停 |
 | commit / PR 一把梭，难回退 | 出错只能 reset | accept 只本地 commit，确认后 pr 才推送发布 |
-| 配置散落、含密钥 | `.env` 到处放 | 统一 `.claude/.sdlc-config`，gitignored |
+| 配置散落、含密钥 | `.env` 到处放 | 统一 `.agents/.sdlc-config`，gitignored |
 | 多需求并行卡在串行 | 排队，hotfix 也得等 | worktree：独立工作树 + 分支 + 端口隔离 |
 
 **一句话**：用**工程 contract** 而非 prompt 技巧来约束 AI 行为的 SDLC 系统。
@@ -113,15 +113,24 @@
 /plugin install sdlc-full@sdlc-workflow
 ```
 
-### Codex / 通用（skills CLI）
+### npx skills（项目级，团队推荐）
 
-跨运行时安装，Codex 与其他支持 skills 的环境通用：
+装进项目本身，团队统一版本，Claude Code 与 Codex 都能用：
 
 ```bash
-npx skills add evan-e2438927/sdlc-workflow -y
+cd your-project
+npx skills add evan-e2438927/sdlc-workflow --skill '*' -a claude-code -a codex -y
 ```
 
-> **注**：skills CLI 的 SKILL.md 格式不支持 `-g`（全局）安装；如需全局可用，请用下方「手动安装」方式。
+会生成（全部提交）：
+
+- `.agents/skills/<name>/` —— 12 个 skill 的实体文件
+- `.agents/skills/<name>` → `../../.agents/skills/<name>` 软链接 —— Claude Code 只从 `.agents/skills/` 发现 skill
+- `skills-lock.json` —— 锁定版本
+
+然后执行 `sdlc-init`（Claude Code 里 `/sdlc-init`）。同事 clone 后立即能看到规则和 `/sdlc-*` 命令；被 gitignore 的平台文件在第一次执行任意 sdlc 命令时自动补齐。
+
+> Claude Code 插件与 npx 安装可以并存，但同一个项目不要同时启用：命令会重复、版本可能不一致。sdlc 发现两者并存时会提示。
 
 安装后即可使用 `sdlc-*` 系列 skill：`sdlc-init` / `sdlc-update` / `sdlc-proposal` / `sdlc-apply` / `sdlc-qa` / `sdlc-accept` / `sdlc-pr` / `sdlc-doit` / `sdlc-mini` / `sdlc-review` / `sdlc-worktree`。
 
@@ -154,7 +163,8 @@ ln -sf .claude/sdlc-workflow-repo/sdlc-workflow .claude/skills/sdlc-workflow
 ### 更新
 
 - **Claude Code**：`/plugin update sdlc-full@sdlc-workflow`，再在各项目里跑 `sdlc-update` 同步脚手架
-- **Codex / 通用**：`npx skills update`，或在 clone 目录 `git pull`
+- **npx skills（项目级）**：`npx skills update`，再执行 `/sdlc-update`（或 `sdlc-update`）同步脚手架，并提交变更
+- **手动安装**：在 clone 目录 `git pull`，再执行 `sdlc-update`
 
 ### 依赖项
 
@@ -206,7 +216,7 @@ sdlc-mini 把按钮颜色改成蓝色          # 小任务轻量流程
 
 | 步 | 命令 | 你会看到 / 要做什么 | 产物落点 |
 |----|------|--------------------|---------|
-| 0 | `sdlc-init` | 检测 fresh / existing；existing 会先采集 baseline（**别跳过**——这步防止 AI 把你现有目录当新项目重建） | `.claude/`、`.claude/.sdlc-config` |
+| 0 | `sdlc-init` | 检测 fresh / existing；existing 会先采集 baseline（**别跳过**——这步防止 AI 把你现有目录当新项目重建） | `.agents/`、`.agents/.sdlc-config` |
 | 1 | `sdlc-proposal 给订单页加导出按钮` | 生成 requirements / design / tasks，**跑完自动暂停**等你审 | `docs/iterations/<date>/<seq>-<slug>-feature/` |
 | ⏸ | 👀 **人工审核** | 打开 `design.md`、`tasks.md` 复核方案；不满意就让它改，满意再继续 | —（唯一强制停顿点之一） |
 | 2 | `sdlc-apply` | 按 tasks 实现代码 + 单元测试 + lint，**不提交** | 代码变更 + `tests/unit/` |
@@ -320,11 +330,12 @@ graph TD
 
 ```
 加载顺序（后者覆盖前者）：
-  1. 全局级  ~/.claude/            ← 用户跨项目通用规范
-  2. 项目级  <project>/.claude/    ← 项目专属规范，覆盖全局
+  1. 全局（旧）  ~/.claude/           ← 早期的跨项目规范，继续读取
+  2. 全局        ~/.agents/           ← 跨项目、跨工具的通用规范
+  3. 项目        <project>/.agents/   ← 项目专属规范，覆盖全局
 ```
 
-每层加载 `CLAUDE.md` / `ARCHITECTURE.md` / `SECURITY.md` / `CODING_GUIDELINES.md` / `rules/*.md`；existing project 额外加载 baseline 三件套；运行时配置读 `.claude/.sdlc-config`。命令与各 reference 不再各自罗列 `.claude/*` 清单。
+每层加载 `AGENTS.md`（`~/.claude/` 层为 `CLAUDE.md`）/ `ARCHITECTURE.md` / `SECURITY.md` / `CODING_GUIDELINES.md` / `rules/*.md`；existing project 额外加载 baseline 三件套；运行时配置读 `.agents/.sdlc-config`。项目自定义 skill 从 `.agents/skills/` 发现（排除 sdlc 自身的 skill）。加载完成后，每个命令都会执行 `sdlc-sync-agents.sh --check`，生成文件有漂移时自动重新同步，并说明改了什么、哪些需要提交。
 
 ---
 
@@ -352,7 +363,7 @@ apply（及 doit）的开发阶段支持两种执行模式，流程相同、产�
 基于 `git worktree` 让一个仓库同时存在多个工作区，每个工作区跑独立 pipeline。
 
 ```bash
-# 创建并行工作区（自动分配 seq、分支、端口、复制 .claude/.sdlc-config*）
+# 创建并行工作区（自动分配 seq、分支、端口、复制 .agents/.sdlc-config*）
 sdlc-worktree create user-login feature
 sdlc-worktree create payment-bug fix
 
@@ -371,8 +382,8 @@ sdlc-worktree gc
 |------|---------|
 | 工作目录 | `../wt-<seq>-<slug>-<type>/`，主仓的兄弟目录 |
 | 分支 | `{GIT_BRANCH_PREFIX}{slug}-{date}-wt{seq}`，git 强制独占 |
-| dev server 端口 | `PORT=3000+seq, API_PORT=4000+seq`，写入该 worktree 的 `.claude/.sdlc-config` |
-| 配置 | 从主仓复制 `.claude/.sdlc-config*`（gitignored，不随 git worktree 带过去） |
+| dev server 端口 | `PORT=3000+seq, API_PORT=4000+seq`，写入该 worktree 的 `.agents/.sdlc-config` |
+| 配置 | 从主仓复制 `.agents/.sdlc-config*`（gitignored，不随 git worktree 带过去） |
 | 注册表 | `.worktrees/worktree-registry.json`（提交到 main，作为多 Agent 协调总线） |
 
 详见 [parallel-dev.md](sdlc-workflow/references/parallel-dev.md)，脚本见 [sdlc-worktree.sh](sdlc-workflow/scripts/sdlc-worktree.sh)。
@@ -392,6 +403,8 @@ sdlc-workflow/（repo 根）
 │   └──   每个含 SKILL.md（薄入口，指向 references/）
 ├── .claude-plugin/         # Claude Code 清单（marketplace.json + plugin.json，自动发现 skills/）
 ├── .codex-plugin/          # Codex 清单（plugin.json，skills: ./skills/）
+├── agents/                 # → 指向 sdlc-workflow/agents/ 的软链接（Claude Code 插件）
+├── tests/                  # 仓库测试：bash tests/run-all.sh
 └── sdlc-workflow/          # 核心 Skill 内容（被 skills/sdlc-workflow 引用）
 ```
 
@@ -420,15 +433,21 @@ sdlc-workflow/              # 核心 Skill
 │   ├── 11-git-committer.md     # 本地 commit + Conventional Commits 规范
 │   ├── 12-pr-creator.md        # push + PR
 │   └── micro-change-mode.md
-├── scripts/                # 初始化与并行开发脚本
+├── agents/                 # 角色子 agent（sdlc-backend/frontend/test-dev），随 npx 安装分发
+├── scripts/                # init / update / 同步 / 状态 / 并行开发脚本
 │   ├── init-project.sh
-│   ├── update-project.sh         # 同步最新脚手架到已初始化项目
+│   ├── update-project.sh         # 同步最新脚手架，迁移旧的 .claude/ 布局
+│   ├── sdlc-sync-agents.sh       # 由 .agents/ 生成各平台文件（--check / --check-paths）
+│   ├── sdlc-migrate-lib.sh       # 导入已有平台配置（init / update 共用）
+│   ├── sdlc-status.sh            # phase 状态机
 │   ├── sdlc-worktree.sh
 │   └── update-workflow-config.sh
 └── templates/              # 项目模板
-    ├── CLAUDE.md.tpl
+    ├── AGENTS.md.tpl          # → .agents/AGENTS.md
+    ├── config.json.tpl        # → .agents/config.json
+    ├── hooks/                 # → .agents/hooks/（sdlc 托管）
     ├── workflow-rules.md.tpl
-    ├── sdlc-config.tpl        # → 生成 .claude/.sdlc-config
+    ├── sdlc-config.tpl        # → 生成 .agents/.sdlc-config
     ├── ARCHITECTURE.md.tpl
     ├── SECURITY.md.tpl
     └── CODING_GUIDELINES.md.tpl
@@ -436,35 +455,62 @@ sdlc-workflow/              # 核心 Skill
 
 ### 目标项目结构（init 后生成）
 
+`.agents/` 是唯一事实来源；各平台目录只放平台差异，由 `sdlc-sync-agents.sh` 生成或软链接。
+
 ```
 your-project/
-├── .claude/                    # Claude 上下文（统一放置）
-│   ├── CLAUDE.md
-│   ├── ARCHITECTURE.md
-│   ├── SECURITY.md
-│   ├── CODING_GUIDELINES.md
-│   ├── PROJECT_BASELINE.md     # existing project
-│   ├── EXISTING_STRUCTURE.md
-│   ├── TEST_BASELINE.md
-│   ├── .sdlc-config            # 配置（gitignored）
-│   └── rules/workflow-rules.md
+├── AGENTS.md -> .agents/AGENTS.md      # 提交的软链接（Codex、Cursor、Gemini CLI 等读 AGENTS.md）
+├── CLAUDE.md -> .agents/AGENTS.md      # 提交的软链接（Claude Code）
+├── skills-lock.json                    # 仅 npx skills 安装，提交
+├── .agents/                            # 提交
+│   ├── AGENTS.md                       # 项目总入口
+│   ├── ARCHITECTURE.md / SECURITY.md / CODING_GUIDELINES.md
+│   ├── PROJECT_BASELINE.md / EXISTING_STRUCTURE.md / TEST_BASELINE.md   # existing 项目
+│   ├── rules/workflow-rules.md
+│   ├── config.json                     # MCP 服务器 + 平台设置（单一来源）
+│   ├── hooks/                          # sdlc 托管的 hook 脚本（不要手改）
+│   ├── skills/                         # sdlc 本身（npx 安装）+ 项目自定义 skill
+│   ├── .sdlc-config                    # 运行配置（gitignore，每人一份）
+│   └── .sdlc-active-iteration          # gitignore
+├── .claude/
+│   ├── skills/<name> -> ../../.agents/skills/<name>   # 提交的软链接
+│   ├── agents/sdlc-*-dev.md -> ../../.agents/skills/sdlc-workflow/agents/…   # 仅 npx 安装，提交
+│   └── settings.json                   # 生成，gitignore
+├── .codex/config.toml、.codex/hooks.json   # 生成，gitignore
+├── .mcp.json、.cursor/mcp.json         # 生成，gitignore
+├── web/AGENTS.md + web/CLAUDE.md -> AGENTS.md   # 子目录规则（可选），都提交
 ├── docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/
-│   ├── requirements.md
-│   ├── design.md
-│   ├── tasks.md
-│   └── status.json             # phase: pending_review → approved → applied → qa_passed（或 qa_failed → applied）→ accepted → pr_created
-├── tests/
-│   ├── unit/                   # 单元测试（apply 生成）
-│   ├── e2e/                    # Playwright 脚本（qa 生成）
-│   └── reports/                # 测试与验收报告
-└── .worktrees/                 # worktree 注册表（启用并行后生成）
+│   ├── requirements.md / design.md / tasks.md
+│   └── status.json             # phase：pending_review → approved → applied → qa_passed（或 qa_failed → applied）→ accepted → pr_created
+├── tests/（unit/、e2e/、reports/）
+└── .worktrees/                 # worktree 注册表（启用并行后）
 ```
+
+### 提交什么、生成什么
+
+原则：**clone 下来、还没执行任何命令时就必须存在的，提交；能由 `.agents/` 重新生成的，忽略。**
+
+| 提交 | 生成并 gitignore |
+|------|------------------|
+| `AGENTS.md`、`CLAUDE.md` 及子目录 `CLAUDE.md` 软链接 | `.claude/settings.json`（由 `config.claude.settings` + sdlc hooks 生成） |
+| `.agents/`（规则、`config.json`、`hooks/`、`skills/`） | `.mcp.json`、`.cursor/mcp.json`、`.codex/config.toml`、`.codex/hooks.json` |
+| `.claude/skills/*`、`.claude/agents/*` 软链接、`skills-lock.json` | `.agents/.sdlc-config*`、`.agents/.sdlc-active-iteration`、`.agents/.backup/` |
+
+忽略条目写在 `.gitignore` 的 `# >>> sdlc generated >>>` 与 `# <<< sdlc generated <<<` 之间，每次同步整块重写，自己的规则请写在块外。要改 MCP 服务器或平台设置，改 `.agents/config.json`——生成文件每次整份重写。`sdlc-init`、`sdlc-update`、`sdlc-worktree create` 会执行同步；其余命令先执行 `--check`，不一致时自动同步。软链接位置上已有实体文件（比如你自己写的 `web/CLAUDE.md`）时绝不覆盖，`--check` 报告为冲突。
+
+**Windows**：Git 默认可能把软链接检出成文本文件。clone 前开启开发者模式并执行 `git config core.symlinks true`（已 clone 的重新检出）。同步检查发现软链接变成文本文件时会明确提示。
+
+**Codex hooks**：Codex 只有在你信任项目 hooks 后才会运行——首次在 Codex 里打开 `/hooks`，信任本项目的 `.codex/hooks.json`。Codex 上只注册编辑后检查；多 agent 越界守卫只在 Claude Code 上生效，因为 Codex 的 hook 输入里没有子 agent 身份。
+
+### 从 `.claude/` 布局迁移
+
+旧版初始化的项目把规则放在 `.claude/CLAUDE.md`、`.claude/ARCHITECTURE.md` 等处。执行 `sdlc-update` 即可：先把旧文件备份到 `.agents/.backup/<时间戳>/`，再移动到 `.agents/`（`.claude/skills/` 下的自定义 skill 一并移动），改写其中的 `.claude/…` 路径；根目录已有实体 `AGENTS.md` / `CLAUDE.md` 时，内容并入 `.agents/AGENTS.md` 的「迁移自 …」小节，需要你事后整理；`.claude/settings.json`、`.mcp.json`、`.cursor/mcp.json`、`.codex/config.toml` 导入 `.agents/config.json`，然后重新生成。这些平台文件如果原本已提交，按迁移报告执行 `git rm --cached <文件>`。其他命令遇到旧布局会停下，提示先执行 `sdlc-update`。
 
 ---
 
 ## 配置项
 
-统一放在 `.claude/.sdlc-config`（`KEY=VALUE` 格式，`sdlc-init` 自动生成并加入 `.gitignore`）。全局默认可放 `~/.claude/.sdlc-config`，项目级覆盖全局：
+运行配置统一放在 `.agents/.sdlc-config`（`KEY=VALUE` 格式，`sdlc-init` 自动生成并 gitignore）。全局默认可放 `~/.agents/.sdlc-config`（旧位置 `~/.claude/.sdlc-config` 仍会读取），项目级覆盖全局。MCP 服务器与各平台设置统一放 `.agents/config.json`（见「提交什么、生成什么」）：
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
@@ -502,10 +548,10 @@ your-project/
 > 下个 session 读 `docs/iterations/` 和 `status.json` 的 phase 即可续跑，所有中间产物已持久化。
 
 **Q: 全局规范和项目规范冲突怎么办？**
-> 项目级 `.claude/` 覆盖全局 `~/.claude/`，命令运行时参数（`--review`/`--qa`）优先级最高。
+> 项目级 `.agents/` 覆盖全局 `~/.agents/`（以及旧的 `~/.claude/`），命令运行时参数（`--review`/`--qa`）优先级最高。
 
 **Q: 多个需求要并行开发怎么办？**
-> 用 `worktree create` 给每个需求开独立工作区，分支、端口、`.claude/.sdlc-config` 自动隔离，多个会话互不干扰，合并后 `worktree gc` 清理。
+> 用 `worktree create` 给每个需求开独立工作区，分支、端口、`.agents/.sdlc-config` 自动隔离，多个会话互不干扰，合并后 `worktree gc` 清理。
 
 ---
 
