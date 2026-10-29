@@ -3,7 +3,7 @@
 # 04/05 必须引用它，08 三份 Codex 指令与 workflow-rules.md.tpl 的内联副本必须与它一致。
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-SKILL_DIR="$(cd "$HERE/../.." && pwd)"
+REPO_DIR="$(cd "$HERE/.." && pwd)"; SKILL_DIR="$REPO_DIR/sdlc-workflow"
 python3 - "$SKILL_DIR" <<'PY'
 import json, re, sys, pathlib
 root = pathlib.Path(sys.argv[1])

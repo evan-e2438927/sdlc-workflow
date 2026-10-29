@@ -2,8 +2,7 @@
 # 双模式（单/多 agent）相关 markdown 规范的结构断言。各任务在 "# ── END ──" 前追加自己的断言段。
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-SKILL_DIR="$(cd "$HERE/../.." && pwd)"
-REPO_DIR="$(cd "$SKILL_DIR/.." && pwd)"
+REPO_DIR="$(cd "$HERE/.." && pwd)"; SKILL_DIR="$REPO_DIR/sdlc-workflow"
 R="$SKILL_DIR/references"
 fail=0
 has()    { grep -qF -- "$2" "$1" 2>/dev/null || { echo "FAIL: $1 缺少: $2"; fail=1; }; }

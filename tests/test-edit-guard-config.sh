@@ -1,7 +1,7 @@
 #!/bin/bash
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-SKILL_DIR="$(cd "$HERE/../.." && pwd)"
+REPO_DIR="$(cd "$HERE/.." && pwd)"; SKILL_DIR="$REPO_DIR/sdlc-workflow"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 fail=0
 

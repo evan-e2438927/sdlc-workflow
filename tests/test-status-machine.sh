@@ -2,7 +2,7 @@
 # sdlc-status.sh 行为测试：phase 迁移校验、history、旧格式兼容、标记文件清理、find-latest。
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-SKILL_DIR="$(cd "$HERE/../.." && pwd)"
+REPO_DIR="$(cd "$HERE/.." && pwd)"; SKILL_DIR="$REPO_DIR/sdlc-workflow"
 SCRIPT="$SKILL_DIR/scripts/sdlc-status.sh"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 fail=0
