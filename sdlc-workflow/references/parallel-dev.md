@@ -19,7 +19,7 @@
 main-repo/                    ← 主工作树（bare 或正常均可），作为协调中枢
 ├── .git/                     ← 唯一的 Git 对象库
 │   └── worktrees/            ← 自动管理的 worktree 元数据
-├── .claude/                  ← 共享配置（通过 main 分支）
+├── .agents/                  ← 共享配置（通过 main 分支）
 ├── docs/iterations/          ← 所有迭代记录的汇总（合并后）
 │
 ├── .worktrees/               ← worktree 注册表 (worktree-registry.json)
@@ -68,7 +68,7 @@ wt-<seq>-<slug>-<type>/
 1. 从 `main` 生成分支名和 slug
 2. `git worktree add ../wt-<seq>-<slug>-<type> -b <branch>`
 3. 在新 worktree 内初始化迭代目录
-4. 复制主仓库 `.claude/.sdlc-config*` 到新 worktree（不受 git 追踪），并覆写其中的 `PORT`/`API_PORT` 实现端口隔离
+4. 复制主仓库 `.agents/.sdlc-config*` 到新 worktree（不受 git 追踪），并覆写其中的 `PORT`/`API_PORT` 实现端口隔离
 5. 注册到 `.worktrees/worktree-registry.json`
 6. 输出：worktree 路径 + 分支名
 
@@ -249,7 +249,7 @@ Terminal 3 (Agent C):
 | 代码文件 | 各 worktree 独立副本 |
 | 迭代目录 | 各 worktree 独立（分支内） |
 | Port（dev server） | 需手动分配不同端口 |
-| `.claude/` 配置 | 各分支有自己的副本 |
+| `.agents/` 配置 | 各分支有自己的副本 |
 | `node_modules/` | 各 worktree 独立安装 |
 
 ### 7.3 端口分配规则
@@ -264,7 +264,7 @@ Worktree 003: PORT=3003, API_PORT=4003
 公式: PORT = 3000 + seq, API_PORT = 4000 + seq
 ```
 
-在 worktree 的 `.claude/.sdlc-config` 中自动设置：
+在 worktree 的 `.agents/.sdlc-config` 中自动设置：
 ```bash
 PORT=$((3000 + seq))
 API_PORT=$((4000 + seq))

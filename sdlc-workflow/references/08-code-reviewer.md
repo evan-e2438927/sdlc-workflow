@@ -3,8 +3,8 @@
 ## 输入
 
 1. `git diff`（代码变更）
-2. `.claude/CODING_GUIDELINES.md`
-3. `.claude/SECURITY.md`
+2. `.agents/CODING_GUIDELINES.md`
+3. `.agents/SECURITY.md`
 4. 当前 iteration 的 `tasks.md`
 
 ## 输出
@@ -49,10 +49,10 @@ $(git ls-files --others --exclude-standard | while read -r f; do echo "--- $f"; 
 $(cat "$(dirname "$TASKS_FILE")"/tracks/*.md 2>/dev/null)
 
 === CODING_GUIDELINES.md ===
-$(cat .claude/CODING_GUIDELINES.md)
+$(cat .agents/CODING_GUIDELINES.md)
 
 === SECURITY.md ===
-$(cat .claude/SECURITY.md)"
+$(cat .agents/SECURITY.md)"
 ```
 
 ### 2. 审查维度
@@ -288,10 +288,10 @@ $(cat "$(dirname "$TASKS_FILE")"/tracks/*.md 2>/dev/null)
 $(sed -n -e '/^## 3\. 接口契约/,/^## 4\. /p' -e '/^## 3\. API 接口设计/,/^## 4\. /p' "$(dirname "$TASKS_FILE")/design.md")
 
 === CODING_GUIDELINES.md ===
-$(cat .claude/CODING_GUIDELINES.md)
+$(cat .agents/CODING_GUIDELINES.md)
 
 === SECURITY.md ===
-$(cat .claude/SECURITY.md)
+$(cat .agents/SECURITY.md)
 EOF
 )"
 
@@ -332,8 +332,8 @@ done
 
 - 输入：
   - git diff
-  - .claude/CODING_GUIDELINES.md
-  - .claude/SECURITY.md
+  - .agents/CODING_GUIDELINES.md
+  - .agents/SECURITY.md
 - 输出：审查结果（PASS/FAIL）
 - 参考：
   - references/09-test-pipeline.md（下一步：测试执行）

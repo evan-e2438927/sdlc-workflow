@@ -18,7 +18,7 @@ review
 | `accept` | 总结变更 → 更新文档 → 本地 commit | 不写业务代码、不做功能测试、不 push、不建 PR | accepted |
 | `pr` | push 当前分支 → gh pr create | 不写代码、不改文档（唯一远程动作） | pr_created |
 
-所有命令在执行前经**统一上下文加载入口**（全局 `~/.claude/` → 项目 `.claude/`，项目覆盖），
+所有命令在执行前经**统一上下文加载入口**（全局 `~/.claude/` → 项目 `.agents/`，项目覆盖），
 见 `references/context-loader.md`。
 
 `doit` = 上述五步全自动串联（`--qa` 时含 qa）；`mini` = 轻量串联；`review` = 单独跑 Codex Gate。
@@ -162,14 +162,14 @@ graph TD
 | ⓪ | 初始化 + 模式识别 | — | 项目目录 | 初始化结构 + existing baseline | init-project.sh + existing-project-intake | proposal/doit |
 | ① | requirements-ingestion | Router + Tool Wrapper | 文本/file/URL | requirements.md | Read + Playwright MCP | proposal/doit |
 | ② | requirements-clarifier | Evaluator | requirements.md | requirements.md (标注版) | Claude Code 内置 | proposal/doit |
-| ③ | design-generator | Generator | requirements.md + .claude/ARCHITECTURE.md + .claude/SECURITY.md + 历史 | design.md | Claude Code | proposal/doit |
+| ③ | design-generator | Generator | requirements.md + .agents/ARCHITECTURE.md + .agents/SECURITY.md + 历史 | design.md | Claude Code | proposal/doit |
 | ④ | task-generator | Generator | design.md | tasks.md | Claude Code | proposal/doit |
 | [⑤] | design-reviewer | Evaluator-Optimizer | design.md + tasks.md | PASS/FAIL | Codex CLI | proposal --review |
 | [⑤.1] | 增量文档同步 | Tool Wrapper | design.md 修订 diff | 更新后的 ARCHITECTURE/SECURITY | Claude Code | proposal --review |
 | — | **status.json 写入** | — | proposal 摘要 | status.json (pending_review) | — | **仅 proposal** |
 | ⑥ | 开发 | Orchestrator-Workers | tasks.md + design.md 接口契约（按 Track 打包工作包） | 代码变更 + tracks/*.md | 主 agent 打地基 + backend / frontend 角色（单 / 多 agent） | apply/doit |
 | ⑦ | 查漏 | Evaluator | requirements.md AC 清单 + 开发角色单测 | tests/unit/ + coverage.md | test 角色 | apply/doit |
-| [⑧] | code-reviewer | Evaluator-Optimizer | git diff + .claude/CODING_GUIDELINES.md + .claude/SECURITY.md | PASS/FAIL | Codex CLI | apply --review |
+| [⑧] | code-reviewer | Evaluator-Optimizer | git diff + .agents/CODING_GUIDELINES.md + .agents/SECURITY.md | PASS/FAIL | Codex CLI | apply --review |
 | ⑨ | test-pipeline | Pipeline | tests/unit/ | tests/reports/ | Lint → Unit（两阶段） | apply/doit |
 | ⑨.1 | 测试修复文档同步 | Tool Wrapper | design.md/tasks.md 修复 diff | 更新后的 ARCHITECTURE/SECURITY | Claude Code | apply/doit |
 | ⑩ | qa（浏览器功能验收） | Generator + Tool Wrapper | tasks.md（qa track） | tests/e2e/ + tests/reports/<slug>-e2e-report.md | Playwright（脚本 + MCP） | qa / doit --qa |
@@ -221,15 +221,15 @@ git diff (代码变更)   ──────→  🔍 Gate 2: code-reviewer
 │  │   ├── flow-qa.md        ← 浏览器功能验收流程          │
 │  │   ├── flow-accept.md    ← 验收提交流程（本地）        │
 │  │   └── 00..12-*.md       ← 各步骤规范（含 12-pr-creator）│
-│  ├── templates/        ← 6 个项目初始化模板               │
-│  └── scripts/          ← init-project.sh                │
+│  ├── templates/        ← 项目初始化模板（.agents/ 布局）   │
+│  └── scripts/          ← init / update / 同步 / 状态脚本  │
 └──────────────────────┬──────────────────────────────────┘
                        │ 首次运行 /sdlc-workflow 时自动生成 ↓
 ┌──────────────────────▼──────────────────────────────────┐
 │  项目级（每个项目独立，从模板生成）                          │
 │  your-project/                                          │
-│  ├── .claude/                                           │
-│  │   ├── CLAUDE.md                                      │
+│  ├── .agents/                                           │
+│  │   ├── AGENTS.md                                      │
 │  │   ├── ARCHITECTURE.md                                │
 │  │   ├── SECURITY.md                                    │
 │  │   ├── CODING_GUIDELINES.md                           │
@@ -265,7 +265,7 @@ git diff (代码变更)   ──────→  🔍 Gate 2: code-reviewer
 │  │   ├── unit/packages/                                 │
 │  │   ├── e2e/                                           │
 │  │   └── reports/playwright/                                │
-│  └── (配置见 .claude/.sdlc-config)                       │
+│  └── (配置见 .agents/.sdlc-config)                       │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -274,9 +274,9 @@ git diff (代码变更)   ──────→  🔍 Gate 2: code-reviewer
 ### 7.0 Existing Project Intake
 - existing project 不能被当成 fresh project 直接套模板
 - existing project mode 必须先产出：
-  - `.claude/PROJECT_BASELINE.md`
-  - `.claude/EXISTING_STRUCTURE.md`
-  - `.claude/TEST_BASELINE.md`
+  - `.agents/PROJECT_BASELINE.md`
+  - `.agents/EXISTING_STRUCTURE.md`
+  - `.agents/TEST_BASELINE.md`
 - 后续 requirements / design / tasks 必须基于 intake 结论，而不是模型猜测
 - 只有在 `design.md` 明确批准时，才允许调整既有技术架构
 
@@ -291,7 +291,7 @@ git diff (代码变更)   ──────→  🔍 Gate 2: code-reviewer
 - v7 改为 `YYYY-MM-DD/<slug>-<type>/` 支持同日多需求并行
 - v8 再补 `<seq>`，形成 `YYYY-MM-DD/<seq>-<slug>-<type>/`，显式记录同日执行顺序
 
-### 7.3 CLAUDE.md 引入 iterations
+### 7.3 AGENTS.md 引入 iterations
 - 使 Claude 在后续交互中可自动读取历史迭代上下文
 - 避免重复设计和冲突方案
 
@@ -305,9 +305,9 @@ git diff (代码变更)   ──────→  🔍 Gate 2: code-reviewer
   其中 `pr` 是唯一与远程 / GitHub 交互的动作
 
 ### 7.8 统一上下文加载
-- 规范来源（全局 `~/.claude/` + 项目 `<project>/.claude/`）与合并优先级（项目覆盖全局）
+- 规范来源（全局 `~/.claude/` + 项目 `<project>/.agents/`）与合并优先级（项目覆盖全局）
   只在 `references/context-loader.md` 定义一次
-- 所有命令在步骤 ① 前经此单一入口加载，命令与各 reference 不再各自罗列 `.claude/*` 清单
+- 所有命令在步骤 ① 前经此单一入口加载，命令与各 reference 不再各自罗列 `.agents/*` 清单
 
 ### 7.5 全栈目录约束
 - 默认遵循 Better-T-Stack 风格 monorepo：`apps/web`、`apps/server`、`packages/*`
@@ -325,13 +325,13 @@ git diff (代码变更)   ──────→  🔍 Gate 2: code-reviewer
 - `doit` 保留为全自动模式（内部自动完成 proposal + apply）
 
 ### 7.7 文档放置
-- ARCHITECTURE.md、SECURITY.md、CODING_GUIDELINES.md 与 CLAUDE.md 统一放在 `.claude/` 目录
+- ARCHITECTURE.md、SECURITY.md、CODING_GUIDELINES.md 与 AGENTS.md 统一放在 `.agents/` 目录
 - `docs/` 目录仅保留迭代产物和 existing project baseline
 - 减少文件分散，使 Claude 上下文加载更集中
 
 ## 8. 配置
 
-所有配置统一放在 `.claude/.sdlc-config`（KEY=VALUE，gitignored；全局默认可放
+所有配置统一放在 `.agents/.sdlc-config`（KEY=VALUE，gitignored；全局默认可放
 `~/.claude/.sdlc-config`，项目级覆盖全局）。由统一上下文加载入口读取，见
 `references/context-loader.md`。
 

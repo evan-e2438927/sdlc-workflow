@@ -62,7 +62,7 @@
 ## 开发前置：复用可用 skills
 
 改任何代码前，先查**统一上下文加载**得到的自定义 skill 索引 `CTX.skills`（来源 `~/.claude/skills/`
-与 `<project>/.claude/skills/`）：与本次改动相关的 skill **优先调用（先 skill、后自造）**。
+与 `<project>/.agents/skills/`）：与本次改动相关的 skill **优先调用（先 skill、后自造）**。
 mini 流程务必先经 `LOAD_CONTEXT`（见 `references/context-loader.md`）加载该索引——Codex 无 harness
 自动发现 skills，漏了这步开发就看不到用户扩展的 skills。
 

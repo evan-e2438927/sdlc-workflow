@@ -17,7 +17,7 @@
 1. 项目必须已完成 `/sdlc-workflow init`
 2. 若缺少 baseline 文档且项目为 existing project，先回退执行 `init`
 3. 判断是否满足 mini 条件；不满足立即升级到 `/sdlc-workflow doit`
-4. **统一上下文加载**（`LOAD_CONTEXT`，见 `references/context-loader.md`）：加载全局 + 项目 `.claude/` 规范
+4. **统一上下文加载**（`LOAD_CONTEXT`，见 `references/context-loader.md`）：加载全局 + 项目 `.agents/` 规范
    **以及自定义 skill 索引 `CTX.skills`**。此步不可跳过——尤其 Codex 无 harness 自动发现 skills，
    不加载 = 后续开发看不到用户扩展的 skills。
 5. **执行模式固定 single**：mini 不拆角色子 agent（忽略 `AGENT_MODE` 与 `--agents`），由主 agent 直接完成开发与单测。

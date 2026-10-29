@@ -73,12 +73,20 @@ fi
 | 文档 | 何时更新 |
 |------|----------|
 | `README.md` | 新增对用户可见的功能 |
-| `.claude/ARCHITECTURE.md` | 架构层面的新增/调整 |
-| `.claude/SECURITY.md` | 安全相关变更 |
-| `.claude/CODING_GUIDELINES.md` | 引入新模式/约定 |
-| `.claude/CLAUDE.md` | 在 iterations 引用列表追加本次迭代 |
+| `.agents/ARCHITECTURE.md` | 架构层面的新增/调整 |
+| `.agents/SECURITY.md` | 安全相关变更 |
+| `.agents/CODING_GUIDELINES.md` | 引入新模式/约定 |
+| `.agents/AGENTS.md` | 在 iterations 引用列表追加本次迭代 |
 
 详见 references/10-docs-updater.md。
+
+文档更新后检查各级 `AGENTS.md` 引用的仓库内路径是否仍然存在（`SDLC_CORE` 见核心 SKILL.md「核心目录（SDLC_CORE）」）：
+
+```bash
+bash "$SDLC_CORE/scripts/sdlc-sync-agents.sh" --check-paths .
+```
+
+列出的失效路径（本次改名、删除导致的 Markdown 链接或反引号路径失效）作为**提示**写进 accept 输出，建议顺手修正；**不阻断** accept，也不影响 commit。
 
 ### 3. ⑫ git-committer — 本地提交（不 push、不建 PR）
 

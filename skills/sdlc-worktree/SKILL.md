@@ -18,7 +18,7 @@ description: >-
 1. 从 `main` 建分支 `{type-prefix}/{slug}-{date}-wt{seq}`。
 2. `git worktree add ../wt-<seq>-<slug>-<type> -b <branch>`。
 3. 新 worktree 初始化迭代目录。
-4. 分配端口 `PORT=3000+seq`、`API_PORT=4000+seq`（写入该 worktree 的 `.claude/.sdlc-config`）。
+4. 分配端口 `PORT=3000+seq`、`API_PORT=4000+seq`（写入该 worktree 的 `.agents/.sdlc-config`）。
 5. 注册到 `.worktrees/worktree-registry.json`。
 
 ## 其他

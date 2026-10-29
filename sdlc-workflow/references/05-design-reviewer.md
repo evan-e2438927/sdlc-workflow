@@ -4,8 +4,8 @@
 
 1. `docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/design.md`
 2. `docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/tasks.md`
-3. `.claude/ARCHITECTURE.md`
-4. `.claude/SECURITY.md`
+3. `.agents/ARCHITECTURE.md`
+4. `.agents/SECURITY.md`
 
 ## 输出
 
@@ -55,10 +55,10 @@ $(cat docs/iterations/$DATE/$SEQ-$SLUG-$TYPE/design.md)
 $(cat docs/iterations/$DATE/$SEQ-$SLUG-$TYPE/tasks.md)
 
 === ARCHITECTURE.md ===
-$(cat .claude/ARCHITECTURE.md)
+$(cat .agents/ARCHITECTURE.md)
 
 === SECURITY.md ===
-$(cat .claude/SECURITY.md)"
+$(cat .agents/SECURITY.md)"
 ```
 
 ### 2. 审查维度
@@ -127,7 +127,7 @@ Gate 1 必须验证每个任务都声明了 Track 字段、Track 与目标文件
 ```
 TRACK_CONSISTENCY_CHECK:
   TRACK_PATH_RULES = references/track-paths.md 的 tracks 字段
-  # 形如 {"backend": ["apps/server/", ...], ...}；existing project 以 .claude/EXISTING_STRUCTURE.md 映射替换默认前缀
+  # 形如 {"backend": ["apps/server/", ...], ...}；existing project 以 .agents/EXISTING_STRUCTURE.md 映射替换默认前缀
 
   1. 字段存在性:
      FOR EACH task IN tasks.md:
@@ -285,8 +285,8 @@ ITER_DIR="docs/iterations/$DATE/$SEQ-$SLUG-$TYPE"
 REQ_FILE="$ITER_DIR/requirements.md"
 DESIGN_FILE="$ITER_DIR/design.md"
 TASKS_FILE="$ITER_DIR/tasks.md"
-ARCH_FILE=".claude/ARCHITECTURE.md"
-SEC_FILE=".claude/SECURITY.md"
+ARCH_FILE=".agents/ARCHITECTURE.md"
+SEC_FILE=".agents/SECURITY.md"
 
 # 见 SKILL.md「修复轮数（唯一定义）」：最多自动修复 N 轮，N=0 表示失败即停
 N=${REVIEW_MAX_ROUNDS:-1}
@@ -371,7 +371,7 @@ done
 |----------|----------|
 | Codex CLI 调用失败 | 记录原始 stderr，立即中止 Pipeline，通知人工介入 |
 | 审查超时 | 重试最多 3 次，仍失败则中止 |
-| .claude/.sdlc-config 未设置 | 使用默认 REVIEW_MAX_ROUNDS=1（最多自动修复 1 轮） |
+| .agents/.sdlc-config 未设置 | 使用默认 REVIEW_MAX_ROUNDS=1（最多自动修复 1 轮） |
 | 设计文档不存在 | 回退到步骤③ |
 | 目录结构偏离默认约定 | FAIL，回退到步骤③补充目录影响声明 |
 
@@ -389,10 +389,10 @@ fixes ≥ 1（即 Gate 1 不是首轮直接通过）
 
 | 修订内容 | 同步目标 |
 |----------|----------|
-| 技术选型/架构决策变更 | `.claude/ARCHITECTURE.md` 对应章节 |
-| 安全设计变更（认证/授权/加密方案） | `.claude/SECURITY.md` 对应章节 |
-| 目录结构/模块落位调整 | `.claude/EXISTING_STRUCTURE.md`（existing project） |
-| 新增编码约定 | `.claude/CODING_GUIDELINES.md` |
+| 技术选型/架构决策变更 | `.agents/ARCHITECTURE.md` 对应章节 |
+| 安全设计变更（认证/授权/加密方案） | `.agents/SECURITY.md` 对应章节 |
+| 目录结构/模块落位调整 | `.agents/EXISTING_STRUCTURE.md`（existing project） |
+| 新增编码约定 | `.agents/CODING_GUIDELINES.md` |
 
 ### 行为规则
 
@@ -406,8 +406,8 @@ fixes ≥ 1（即 Gate 1 不是首轮直接通过）
 - 输入：
   - design.md
   - tasks.md
-  - .claude/ARCHITECTURE.md
-  - .claude/SECURITY.md
+  - .agents/ARCHITECTURE.md
+  - .agents/SECURITY.md
 - 输出：审查结果（PASS/FAIL）+ 增量文档同步
 - 参考：
   - SKILL.md Part 4（下一步：步骤⑥ Claude Code 开发）

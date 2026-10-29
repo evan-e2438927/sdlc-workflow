@@ -245,17 +245,17 @@ SKILL_BASE="<当前 skill 所在目录>"; SDLC_CORE="$SKILL_BASE/../sdlc-workflo
 1. 先判断当前项目是 fresh project 还是 existing project：
    - 若已存在 `apps/`、`packages/`、`src/`、`package.json`、`pnpm-workspace.yaml`、`turbo.json`、`.git/` 等业务/工程结构 → existing project
    - 若目录基本为空，仅准备首次接入 workflow → fresh project
-2. 检测 `.claude/CLAUDE.md` 和 `.claude/ARCHITECTURE.md` 是否存在
+2. 检测 `.agents/AGENTS.md` 和 `.agents/ARCHITECTURE.md` 是否存在；若发现旧布局（`.claude/CLAUDE.md` 是实体文件）→ 提示先执行 update 迁移（init 不处理旧布局）
 3. 若两者都存在 → 项目已初始化，跳过，直接进入 Part 2
 4. 若任一不存在 → 执行初始化：
    - 运行初始化脚本 `bash "$SDLC_CORE/scripts/init-project.sh" .`（`SDLC_CORE` 见「核心目录（SDLC_CORE）」）。
-   - 生成项目结构（.claude/, docs/, tests/）+ 配置文件 `.claude/.sdlc-config`
-   - 提醒用户：按需编辑 `.claude/.sdlc-config`（已自动加入 .gitignore）
+   - 生成项目结构（.agents/, docs/, tests/）+ 配置文件 `.agents/.sdlc-config` + 平台配置单一来源 `.agents/config.json`，并执行同步（生成根目录 `AGENTS.md` / `CLAUDE.md` 软链接、`.claude/skills/*` 软链接与各平台文件）
+   - 提醒用户：按需编辑 `.agents/.sdlc-config`（已自动加入 .gitignore）；提交软链接与 `.agents/`；Codex 用户首次需在 `/hooks` 中信任项目 hooks
 5. 若判定为 existing project，则初始化后必须先执行 `references/00-existing-project-intake.md`：
-   - 生成 `.claude/PROJECT_BASELINE.md`
-   - 生成 `.claude/EXISTING_STRUCTURE.md`
-   - 生成 `.claude/TEST_BASELINE.md`
-   - **基于真实代码填实** `.claude/ARCHITECTURE.md` 与 `.claude/SECURITY.md`（覆盖 init 拷贝的模板占位），并对齐 `CODING_GUIDELINES.md` / `CLAUDE.md`——非 monorepo 项目不得保留模板里的 `apps/web`/`apps/server`/`packages/*` 默认约定
+   - 生成 `.agents/PROJECT_BASELINE.md`
+   - 生成 `.agents/EXISTING_STRUCTURE.md`
+   - 生成 `.agents/TEST_BASELINE.md`
+   - **基于真实代码填实** `.agents/ARCHITECTURE.md` 与 `.agents/SECURITY.md`（覆盖 init 拷贝的模板占位），并对齐 `CODING_GUIDELINES.md` / `AGENTS.md`——非 monorepo 项目不得保留模板里的 `apps/web`/`apps/server`/`packages/*` 默认约定
    - 在基线完成前，不得直接进入 requirements/design/tasks
 
 ## 上下文加载（统一入口）
@@ -264,23 +264,29 @@ SKILL_BASE="<当前 skill 所在目录>"; SDLC_CORE="$SKILL_BASE/../sdlc-workflo
 
 加载层级（**后者覆盖前者**，项目级 > 全局级）：
 
-1. **全局级** `~/.claude/` — 用户跨项目通用规范
-2. **项目级** `<project>/.claude/` — 当前项目专属规范，覆盖全局同名约定
+| 层级 | 路径 |
+|------|------|
+| 1. 全局（旧） | `~/.claude/` |
+| 2. 全局 | `~/.agents/` |
+| 3. 项目 | `<project>/.agents/` |
 
-每层加载清单：`CLAUDE.md` / `ARCHITECTURE.md` / `SECURITY.md` / `CODING_GUIDELINES.md` /
+每层加载清单：`AGENTS.md`（全局旧层为 `CLAUDE.md`）/ `ARCHITECTURE.md` / `SECURITY.md` / `CODING_GUIDELINES.md` /
 `rules/*.md`；existing project 额外加载项目级 `PROJECT_BASELINE.md` / `EXISTING_STRUCTURE.md`
-/ `TEST_BASELINE.md`。运行时配置 `<project>/.claude/.sdlc-config`（缺省回退全局 `~/.claude/.sdlc-config` → 内置默认）。
+/ `TEST_BASELINE.md`。项目自定义 skill 从 `<project>/.agents/skills/` 发现（排除 sdlc 自身的 skill）。
+运行时配置 `<project>/.agents/.sdlc-config`（缺省回退全局 `~/.agents/.sdlc-config` → `~/.claude/.sdlc-config` → 内置默认）。
 命令运行时参数（`--review` / `--qa`）优先级最高。
 
-调用时机：步骤 ⓪ 之后、步骤 ① 之前统一调用一次；`/compact` 后重新进入 pipeline 须重新加载；
-worktree 内 `<project>` 指向该 worktree 根目录，全局级仍为 `~/.claude/`。
+加载完上下文后执行同步检查：`bash "$SDLC_CORE/scripts/sdlc-sync-agents.sh" --check .`，不一致时自动同步并说明改了什么（详见 context-loader「同步检查」）。
 
-> 完整规则见 `references/context-loader.md`。各步骤 reference 中出现的 `.claude/*` 仅表示该步骤
+调用时机：步骤 ⓪ 之后、步骤 ① 之前统一调用一次；`/compact` 后重新进入 pipeline 须重新加载；
+worktree 内 `<project>` 指向该 worktree 根目录，全局级不变。
+
+> 完整规则见 `references/context-loader.md`。各步骤 reference 中出现的 `.agents/*` 仅表示该步骤
 > **消费**哪些上下文，实际加载一律由本入口完成。
 
 ## 配置读取
 
-由上下文加载入口统一从 `<project>/.claude/.sdlc-config`（回退全局 `~/.claude/.sdlc-config`）读取。未设置的变量使用默认值：
+由上下文加载入口统一从 `<project>/.agents/.sdlc-config`（回退全局 `~/.agents/.sdlc-config` → `~/.claude/.sdlc-config`）读取。未设置的变量使用默认值：
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
@@ -350,7 +356,7 @@ accepted 之前任意 phase ──用户放弃──▶ rejected
 
 | 步骤 | 名称 | 说明 | 命令归属 |
 |------|------|------|----------|
-| ⓪ | 初始化 + 模式识别 | fresh/existing 分流 → init-project.sh → existing intake → 统一上下文加载（.claude/.sdlc-config）→ 迭代目录 | proposal/doit |
+| ⓪ | 初始化 + 模式识别 | fresh/existing 分流 → init-project.sh → existing intake → 统一上下文加载（.agents/.sdlc-config）→ 迭代目录 | proposal/doit |
 | ① | requirements-ingestion | 识别输入类型 → 提取/读取/解析 → requirements.md | proposal/doit |
 | ② | requirements-clarifier | 逐条分析置信度，标注确认/假设/提问 | proposal/doit |
 | ③ | design-generator | 生成 design.md（引用历史 iterations） | proposal/doit |
@@ -363,7 +369,7 @@ accepted 之前任意 phase ──用户放弃──▶ rejected
 | ⑨ | test-pipeline | lint → unit（两阶段，不含浏览器 E2E） | apply/doit |
 | — | **apply 完成点** | 更新 status.json → phase: applied（不提交、不推 PR） | **仅 apply** |
 | ⑩ | qa | 编写并执行 qa track 的 Playwright 浏览器功能验收 → phase: qa_passed | qa / doit --qa |
-| ⑪ | docs-updater | 总结变更 → 更新文档 + CLAUDE.md iterations 引用 | accept/doit |
+| ⑪ | docs-updater | 总结变更 → 更新文档 + AGENTS.md iterations 引用 | accept/doit |
 | ⑫ | git-committer | branch → commit（**本地，不 push、不建 PR**）→ phase: accepted | accept/doit |
 | ⑬ | pr-creator | push → gh pr create → phase: pr_created | pr / doit |
 
@@ -373,19 +379,21 @@ accepted 之前任意 phase ──用户放弃──▶ rejected
 ```
 MODE=$(detect_project_mode)  # fresh | existing
 
-IF NOT (.claude/CLAUDE.md AND .claude/ARCHITECTURE.md):
-  RUN init-project.sh
+IF .claude/CLAUDE.md 是实体文件（旧布局）:
+  STOP，提示先执行 update 迁移到 .agents/
+IF NOT (.agents/AGENTS.md AND .agents/ARCHITECTURE.md):
+  RUN bash "$SDLC_CORE/scripts/init-project.sh" .
 
 IF MODE == existing:
   RUN existing-project-intake
-  REQUIRE .claude/PROJECT_BASELINE.md
-  REQUIRE .claude/EXISTING_STRUCTURE.md
-  REQUIRE .claude/TEST_BASELINE.md
+  REQUIRE .agents/PROJECT_BASELINE.md
+  REQUIRE .agents/EXISTING_STRUCTURE.md
+  REQUIRE .agents/TEST_BASELINE.md
 
 # 统一上下文加载（见 references/context-loader.md）：
-#   先 ~/.claude/ 再 <project>/.claude/（项目覆盖全局）
-#   读取 .claude/.sdlc-config（缺则由 init 从模板生成）
-LOAD_CONTEXT()   # 加载规范 + .claude/.sdlc-config
+#   ~/.claude/ → ~/.agents/ → <project>/.agents/（后者覆盖前者）
+#   读取 .agents/.sdlc-config（缺则由 init 从模板生成）
+LOAD_CONTEXT()   # 加载规范 + .agents/.sdlc-config，并执行同步检查（--check，不一致则自动同步）
 
 SLUG=$(generate_slug_from_requirements "$INPUT")  # 优先语义化英文 slug，失败则 req-<hash8>
 TYPE=$(infer_type "$INPUT")  # feature|fix|refactor|docs|test|chore
@@ -421,9 +429,9 @@ MKDIR -p "$ITER_DIR"
 
 #### ③ design-generator
 - **前置门禁**：先复核澄清 Gate——交互模式下若存在 never-asked 的设计影响项，停止并回到 ② 澄清，严禁凭未澄清假设直接做设计决策
-- 读取：requirements.md（含假设记录）+ .claude/ARCHITECTURE.md + .claude/SECURITY.md + docs/iterations/（历史）
+- 读取：requirements.md（含假设记录）+ .agents/ARCHITECTURE.md + .agents/SECURITY.md + docs/iterations/（历史）
 - 被假设驱动的设计决策须登记到 design.md 的「设计假设」小节（关联 ASM-ID + 理由 + 假设错误影响）
-- 若为 existing project，额外读取：`.claude/PROJECT_BASELINE.md` + `.claude/EXISTING_STRUCTURE.md` + `.claude/TEST_BASELINE.md`
+- 若为 existing project，额外读取：`.agents/PROJECT_BASELINE.md` + `.agents/EXISTING_STRUCTURE.md` + `.agents/TEST_BASELINE.md`
 - 设计必须声明代码落位：默认遵循 Better-T-Stack 风格 `apps/web` / `apps/server` / 条件启用的 `packages/*`
 - 若为 existing project，必须明确说明"沿用既有结构"还是"本轮经批准的结构调整"
 - 输出：docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/design.md
@@ -466,17 +474,17 @@ IF Gate 1 审查经过修订（已修轮数 ≥ 1）:
   IF DIFF 涉及需求范围变更:
     同步更新 requirements.md 中的 [⚠️ 假设] 标注
   IF DIFF 涉及架构决策变更:
-    同步更新 .claude/ARCHITECTURE.md 对应章节
+    同步更新 .agents/ARCHITECTURE.md 对应章节
   IF DIFF 涉及安全设计变更:
-    同步更新 .claude/SECURITY.md 对应章节
+    同步更新 .agents/SECURITY.md 对应章节
   IF DIFF 涉及目录结构调整:
-    同步更新 .claude/EXISTING_STRUCTURE.md（existing project）
+    同步更新 .agents/EXISTING_STRUCTURE.md（existing project）
   IF DIFF 涉及任务拆分/验收标准变更:
     确认 tasks.md 与修订后的 design.md 一致
   LOG "📄 Gate 1 修订已同步到基线文档"
 ```
 
-**原则**：只更新被修订影响的章节，不做全量重写。确保 ⑥ 开发阶段读取到的 .claude/ARCHITECTURE.md 与 design.md 决策一致。
+**原则**：只更新被修订影响的章节，不做全量重写。确保 ⑥ 开发阶段读取到的 .agents/ARCHITECTURE.md 与 design.md 决策一致。
 
 #### ⑤.2 Proposal 暂停（仅 proposal 命令）
 
@@ -511,7 +519,7 @@ IF 当前为 doit / mini 模式:
 IF context_usage > 80%:
   确认 requirements.md / design.md / tasks.md / status.json 已持久化到迭代目录
   执行 /compact
-  重新加载: $ITER_DIR/{requirements,design,tasks}.md + .claude/{ARCHITECTURE,SECURITY}.md
+  重新加载: $ITER_DIR/{requirements,design,tasks}.md + .agents/{ARCHITECTURE,SECURITY}.md
 ```
 
 #### ⑥ Apply 入口检查（仅 apply 命令）
@@ -632,7 +640,7 @@ STAGE 2: npx $TEST_FRAMEWORK     # unit tests
 
   # ⑨.1 测试修复后增量文档同步
   IF 修复过程中修改了 design.md 或 tasks.md:
-    同步 .claude/ARCHITECTURE.md / .claude/SECURITY.md 受影响章节
+    同步 .agents/ARCHITECTURE.md / .agents/SECURITY.md 受影响章节
 
   # ⑨.2 上下文检查点
   IF context_usage > 80%:
@@ -643,7 +651,7 @@ STAGE 2: npx $TEST_FRAMEWORK     # unit tests
 LOG "✅ 测试通过: <通过数>/<总数>"
 ```
 
-> **规则**：测试修复阶段如果涉及 design.md 或 tasks.md 变更，必须在 retry 前同步更新 .claude/ARCHITECTURE.md / .claude/SECURITY.md 中受影响的章节。
+> **规则**：测试修复阶段如果涉及 design.md 或 tasks.md 变更，必须在 retry 前同步更新 .agents/ARCHITECTURE.md / .agents/SECURITY.md 中受影响的章节。
 
 #### ⑨.3 Apply 完成（仅 apply / doit）
 ```
@@ -677,10 +685,10 @@ ELSE: 按根因分流——
 #### ⑪ docs-updater（accept 命令 / doit）
 先基于 git diff + tasks.md 完成状态总结本次变更，再按变更更新：
 - README.md — 新增功能说明
-- .claude/ARCHITECTURE.md — 架构层面变更
-- .claude/SECURITY.md — 安全相关变更
-- .claude/CODING_GUIDELINES.md — 新模式/约定
-- .claude/CLAUDE.md — **更新 iterations 引用列表**
+- .agents/ARCHITECTURE.md — 架构层面变更
+- .agents/SECURITY.md — 安全相关变更
+- .agents/CODING_GUIDELINES.md — 新模式/约定
+- .agents/AGENTS.md — **更新 iterations 引用列表**
 
 #### ⑫ git-committer（accept 命令 / doit）— 本地提交，不 push、不建 PR
 ```bash
@@ -769,10 +777,10 @@ LOG "✅ PR: <url> | 分支: $CURRENT_BRANCH"
 12. **迭代可追溯**：docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/
 13. **审查门禁不可降级**：Codex CLI 不可用时若指定 `--review` 必须中止，不能自动跳过 Gate
 14. **全栈目录约束**：默认采用 Better-T-Stack 风格 monorepo，业务代码不应随意落到根目录级 `web/`/`api/`/`server/`
-15. **文档统一放置**：ARCHITECTURE.md、SECURITY.md、CODING_GUIDELINES.md 与 CLAUDE.md 统一放在 `.claude/` 目录
+15. **文档统一放置**：ARCHITECTURE.md、SECURITY.md、CODING_GUIDELINES.md 与 AGENTS.md 统一放在 `.agents/` 目录
 16. **状态管理**：phase 迁移只经 `bash "$SDLC_STATUS"`（见「迭代状态（phase）」），不手写 `.phase`；各命令启动前先校验当前 phase
-17. **上下文管理**：Pipeline 步骤间检测上下文占用，超过 80% 时执行 `/compact`。关键检查点：开发前（④→⑥）、测试前（⑦→⑨）、测试修复 retry 前（⑨ 内）。compact 前必须确保当前步骤产物已写入文件，compact 后须经统一上下文加载入口重新加载迭代目录产物 + 全局/项目 `.claude/` 规范
-17.1 **统一上下文加载**：所有命令在步骤 ① 前经唯一入口加载规范——先全局 `~/.claude/` 再项目 `<project>/.claude/`（项目覆盖全局）；加载清单与优先级只在 `references/context-loader.md` 定义一次，命令与 reference 不得各自罗列 `.claude/*` 清单
+17. **上下文管理**：Pipeline 步骤间检测上下文占用，超过 80% 时执行 `/compact`。关键检查点：开发前（④→⑥）、测试前（⑦→⑨）、测试修复 retry 前（⑨ 内）。compact 前必须确保当前步骤产物已写入文件，compact 后须经统一上下文加载入口重新加载迭代目录产物 + 全局/项目 `.agents/` 规范
+17.1 **统一上下文加载**：所有命令在步骤 ① 前经唯一入口加载规范——先全局 `~/.claude/` 再项目 `<project>/.agents/`（项目覆盖全局）；加载清单与优先级只在 `references/context-loader.md` 定义一次，命令与 reference 不得各自罗列 `.agents/*` 清单
 18. **角色分工**：⑥.1 主 agent 打地基（infra / shared / 契约 / 依赖）；⑥.2 backend 与 frontend 角色开发（多 agent 模式下并行）；⑦ test 角色查漏；⑨ test-pipeline 串行（lint → unit）
 19. **Worktree 并行开发**：通过 `worktree create` 创建隔离工作区，每个 worktree 独立运行 pipeline；详见 `references/parallel-dev.md`
 20. **Worktree 端口隔离**：并行工作区的 dev server 端口按 `PORT=3000+seq, API_PORT=4000+seq` 分配，避免冲突

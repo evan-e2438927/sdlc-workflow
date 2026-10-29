@@ -14,7 +14,7 @@ description: >-
 
 ## 步骤
 
-0. **统一上下文加载**（`LOAD_CONTEXT`，见 `references/context-loader.md`）：加载 `.claude/` 规范 + 自定义 skill 索引 `CTX.skills`。**不可跳过**——Codex 无 harness 自动发现，不加载则开发看不到用户扩展的 skills。
+0. **统一上下文加载**（`LOAD_CONTEXT`，见 `references/context-loader.md`）：加载 `.agents/` 规范 + 自定义 skill 索引 `CTX.skills`。**不可跳过**——Codex 无 harness 自动发现，不加载则开发看不到用户扩展的 skills。
 1. 初始化迭代目录 `docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/`。
 2. 精简需求拆解（精简版 ①②③④，提取核心 AC）。
 3. [mini Gate 1] 仅 `--review`：Codex 轻量设计审查。

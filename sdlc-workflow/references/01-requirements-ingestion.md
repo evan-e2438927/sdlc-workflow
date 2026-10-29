@@ -270,7 +270,7 @@ mkdir -p "$ITER_DIR"
 # 检测 URL/文件引用
 if echo "$CONTENT" | grep -qE "(https?://|file://)"; then
   # 提取并拉取外部文档
-  # 更新 .claude/ARCHITECTURE.md / SECURITY.md / CODING_GUIDELINES.md
+  # 更新 .agents/ARCHITECTURE.md / SECURITY.md / CODING_GUIDELINES.md
 fi
 ```
 

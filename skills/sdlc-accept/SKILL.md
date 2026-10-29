@@ -15,7 +15,7 @@ description: >-
 ## 步骤
 
 1. **变更总结**：基于 git diff + tasks.md 完成状态，归纳涉及的 track、关键文件、实现的 AC-ID（若已 qa，附 e2e 报告结论），作为文档更新与 commit message 输入。
-2. **⑪ docs-updater**：按变更更新受影响文档 —— `README.md`、`.claude/ARCHITECTURE.md`、`.claude/SECURITY.md`、`.claude/CODING_GUIDELINES.md`、`.claude/CLAUDE.md`（更新 iterations 引用列表）。
+2. **⑪ docs-updater**：按变更更新受影响文档 —— `README.md`、`.agents/ARCHITECTURE.md`、`.agents/SECURITY.md`、`.agents/CODING_GUIDELINES.md`、`.agents/AGENTS.md`（更新 iterations 引用列表）。
 3. **⑫ git-committer（本地）**：检测是否在 worktree（是 → 复用已 checkout 分支；否 → `git checkout -b <prefix><slug>-date`）→ `git add -A` → `commit`。Commit 格式遵循 Conventional Commits `<type>(scope): <摘要>`。
 
 完成后经状态脚本迁移到 `accepted`，提示运行 `pr`。若 QA 曾失败、修复后还没重新通过 qa，提交前先问用户是否跳过 qa；phase 为 `qa_failed` 时拒绝，提示先 `apply` 修复。

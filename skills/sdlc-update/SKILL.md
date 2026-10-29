@@ -12,11 +12,11 @@ description: >-
 
 > 核心目录 `SDLC_CORE`：按核心 skill 的 SKILL.md「核心目录（SDLC_CORE）」解析——核心 SKILL.md 在本 skill 同级的 `../sdlc-workflow/SKILL.md`，其次 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/SKILL.md`；两处都不存在 → 报错「缺少核心 skill sdlc-workflow，请执行 `npx skills add evan-e2438927/sdlc-workflow --skill sdlc-workflow`」并停止。
 
-前置：项目已 init（存在 `.claude/CLAUDE.md`）。不改业务代码、不触发开发流程。
+前置：项目已 init（存在 `.agents/AGENTS.md`）。不改业务代码、不触发开发流程。
 
 ## 阶段一 —— 机械同步（幂等，非交互）
 
-运行 `bash "$SDLC_CORE/scripts/update-project.sh" .`：补目录结构、迁移 `.claude/.sdlc-config`（保留用户值/补新键/删废弃键）、刷新 `workflow-rules.md`、缺失用户文档才补、`.gitignore` 兜底。汇报变更摘要。
+运行 `bash "$SDLC_CORE/scripts/update-project.sh" .`：补目录结构、迁移 `.agents/.sdlc-config`（保留用户值/补新键/删废弃键）、刷新 `workflow-rules.md`、缺失用户文档才补、`.gitignore` 兜底。汇报变更摘要。
 
 ## 阶段二 —— 增量 intake（读真实代码，漂移感知）
 

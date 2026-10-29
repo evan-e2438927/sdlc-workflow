@@ -26,7 +26,7 @@
 
 ```
 ⓪ 初始化检查
-   IF NOT (.claude/CLAUDE.md AND .claude/ARCHITECTURE.md):
+   IF NOT (.agents/AGENTS.md AND .agents/ARCHITECTURE.md):
      RUN init-project.sh
    IF MODE == existing:
      RUN existing-project-intake (若 baseline 不存在)
@@ -49,7 +49,7 @@
    循环审查，最大 REVIEW_MAX_ROUNDS 轮
 
 [⑤.1 增量文档同步              ← 仅 --review 且经修订]
-   同步影响到的 .claude/ARCHITECTURE.md / .claude/SECURITY.md 等
+   同步影响到的 .agents/ARCHITECTURE.md / .agents/SECURITY.md 等
 
 ⑥ 写入 phase（经状态脚本，见 SKILL.md「迭代状态（phase）」）
    bash "$SDLC_STATUS" transition "$ITER_DIR" pending_review --by proposal

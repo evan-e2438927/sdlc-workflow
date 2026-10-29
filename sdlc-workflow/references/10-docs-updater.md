@@ -20,7 +20,7 @@ graph TD
     ANALYZE -->|架构变更| UPDATE_ARCH["更新 ARCHITECTURE.md"]
     ANALYZE -->|安全变更| UPDATE_SEC["更新 SECURITY.md"]
     ANALYZE -->|新约定| UPDATE_CODING["更新 CODING_GUIDELINES.md"]
-    ANALYZE -->|上下文变更| UPDATE_CLAUDE["更新 CLAUDE.md + iterations 引用"]
+    ANALYZE -->|上下文变更| UPDATE_CLAUDE["更新 AGENTS.md + iterations 引用"]
 
     UPDATE_README --> FINAL
     UPDATE_ARCH --> FINAL
@@ -58,11 +58,11 @@ fi
 
 ```bash
 # 检测架构文件变更
-ARCH_CHANGES=$(git diff .claude/ARCHITECTURE.md)
+ARCH_CHANGES=$(git diff .agents/ARCHITECTURE.md)
 
 if [ -n "$ARCH_CHANGES" ]; then
   # 添加架构变更记录
-  cat >> .claude/ARCHITECTURE.md << 'EOF'
+  cat >> .agents/ARCHITECTURE.md << 'EOF'
 
 ## 架构变更记录
 
@@ -91,7 +91,7 @@ fi
 SEC_CHANGES=$(git diff --name-only | grep -E "(auth|security|token|encrypt)" || echo "")
 
 if [ -n "$SEC_CHANGES" ]; then
-  cat >> .claude/SECURITY.md << 'EOF'
+  cat >> .agents/SECURITY.md << 'EOF'
 
 ## 安全更新记录
 
@@ -117,7 +117,7 @@ fi
 NEW_PATTERNS=$(git diff --name-only | grep -E "(pattern|strategy|convention)" || echo "")
 
 if [ -n "$NEW_PATTERNS" ]; then
-  cat >> .claude/CODING_GUIDELINES.md << 'EOF'
+  cat >> .agents/CODING_GUIDELINES.md << 'EOF'
 
 ## 编码约定更新
 
@@ -134,19 +134,19 @@ EOF
 fi
 ```
 
-### 6. CLAUDE.md 更新（含 iterations 引用）
+### 6. AGENTS.md 更新（含 iterations 引用）
 
 **关键**：更新 iterations 引用列表，使 Claude 可读取历史上下文：
 
 ```bash
-# 更新 CLAUDE.md 的 iterations 引用章节
+# 更新 AGENTS.md 的 iterations 引用章节
 ITER_DATE=$(date +%Y-%m-%d)
 ITER_DIR="docs/iterations/$ITER_DATE/${SEQ}-${SLUG}-${TYPE}/"
 
 # 检查是否已有 iterations 章节
-if ! grep -q "## 迭代历史" .claude/CLAUDE.md; then
+if ! grep -q "## 迭代历史" .agents/AGENTS.md; then
   # 添加 iterations 章节
-  cat >> .claude/CLAUDE.md << 'EOF'
+  cat >> .agents/AGENTS.md << 'EOF'
 
 ## 迭代历史
 
@@ -156,7 +156,7 @@ EOF
 fi
 
 # 更新 iterations 引用（添加到最前面）
-sed -i '' "s|## 迭代历史|## 迭代历史\n\n- [$ITER_DATE] $SLUG ($TYPE): $(head -c 50 requirements.md)...\n|" .claude/CLAUDE.md
+sed -i '' "s|## 迭代历史|## 迭代历史\n\n- [$ITER_DATE] $SLUG ($TYPE): $(head -c 50 requirements.md)...\n|" .agents/AGENTS.md
 ```
 
 ### 7. 完整更新流程
@@ -190,7 +190,7 @@ if git diff --name-only | grep -qE "(pattern|strategy)"; then
   update_coding_guidelines
 fi
 
-# 6. 更新 CLAUDE.md（iterations 引用）
+# 6. 更新 AGENTS.md（iterations 引用）
 update_claude_md
 
 echo "✅ 文档更新完成"
@@ -198,7 +198,7 @@ echo "✅ 文档更新完成"
 
 ### 8. 目录结构同步
 
-若本次迭代改动了 workspace 边界，应同步更新 `.claude/ARCHITECTURE.md`：
+若本次迭代改动了 workspace 边界，应同步更新 `.agents/ARCHITECTURE.md`：
 
 - 新增或移除了 `apps/*`
 - 新增了 `packages/*`
@@ -240,23 +240,23 @@ if git diff --name-only | grep -qE "pattern"; then
   append_coding_conventions
 fi
 
-# 5. CLAUDE.md iterations 引用更新
+# 5. AGENTS.md iterations 引用更新
 update_iterations_reference() {
   local iter_link="- [$ITER_DATE] $SLUG ($TYPE): $(head -c 50 $ITER_DIR/requirements.md)..."
 
   # 插入到 ## 迭代历史 章节下
-  if grep -q "## 迭代历史" .claude/CLAUDE.md; then
+  if grep -q "## 迭代历史" .agents/AGENTS.md; then
     # 在迭代历史章节添加新条目（最新在前）
-    sed -i "/## 迭代历史/a\\$iter_link" .claude/CLAUDE.md
+    sed -i "/## 迭代历史/a\\$iter_link" .agents/AGENTS.md
   else
-    echo "⚠️ CLAUDE.md 缺少 ## 迭代历史 章节"
+    echo "⚠️ AGENTS.md 缺少 ## 迭代历史 章节"
   fi
 }
 update_iterations_reference
 
 echo "✅ 文档更新完成"
 
-echo "✅ 文档已更新: README.md, ARCHITECTURE.md, SECURITY.md, CODING_GUIDELINES.md, CLAUDE.md"
+echo "✅ 文档已更新: README.md, ARCHITECTURE.md, SECURITY.md, CODING_GUIDELINES.md, AGENTS.md"
 ```
 
 ## 错误处理
@@ -264,7 +264,7 @@ echo "✅ 文档已更新: README.md, ARCHITECTURE.md, SECURITY.md, CODING_GUIDE
 | 错误场景 | 处理方式 |
 |----------|----------|
 | README.md 不存在 | 跳过，或创建基础版本 |
-| CLAUDE.md 缺少章节 | 自动添加 iterations 章节 |
+| AGENTS.md 缺少章节 | 自动添加 iterations 章节 |
 | 文档合并冲突 | 保留双方内容，标记待人工解决 |
 
 ## 相关文件

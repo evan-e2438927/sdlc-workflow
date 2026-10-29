@@ -77,7 +77,7 @@ done
 ### 3. 初始化检查
 
 ```bash
-if [ ! -f ".claude/CLAUDE.md" ] || [ ! -f ".claude/ARCHITECTURE.md" ]; then
+if [ ! -f ".agents/AGENTS.md" ] || [ ! -f ".agents/ARCHITECTURE.md" ]; then
   echo "❌ 项目未初始化，请先运行 /sdlc-workflow init"
   exit 1
 fi
@@ -87,8 +87,8 @@ fi
 
 apply 通常在**独立会话**里跑（与 proposal 分开），必须重新经统一入口加载上下文：
 
-`LOAD_CONTEXT`（见 `references/context-loader.md`）——加载全局 + 项目 `.claude/` 规范
-**及自定义 skill 索引 `CTX.skills`**（来源 `~/.claude/skills/` 与 `<project>/.claude/skills/`）。
+`LOAD_CONTEXT`（见 `references/context-loader.md`）——加载全局 + 项目 `.agents/` 规范
+**及自定义 skill 索引 `CTX.skills`**（来源 `~/.claude/skills/` 与 `<project>/.agents/skills/`）。
 不加载则 ⑥ 开发看不到用户扩展的 skills；Codex 无 harness 自动发现，尤其依赖此步。
 
 ## 执行步骤
@@ -109,7 +109,7 @@ apply 通常在**独立会话**里跑（与 proposal 分开），必须重新经
           WP = 角色说明全文（references/roles/<track>.md）+ 该 Track 任务（依赖顺序、目标文件、
                适用规范、AC）+ design.md「## 3. 接口契约」+ 规范上下文（LOAD_CONTEXT 摘录）
         生成允许清单（仅 multi，规则见「越界守卫」）：为 backend / frontend / test 各写
-          $ITER_DIR/tracks/.allow-<role>，并写标记文件 .claude/.sdlc-active-iteration（内容为 $ITER_DIR）
+          $ITER_DIR/tracks/.allow-<role>，并写标记文件 .agents/.sdlc-active-iteration（内容为 $ITER_DIR）
         所有角色在每个任务**执行前**，先读该任务的「适用规范」字段，对照命中的项目 skill
         （必要时才加载其正文；先 skill、后自造，见 context-loader.md「skills 优先级规则」）。
         规范检查是逐任务的，不是开发前一次性的——避免长会话注意力漂移。
@@ -136,7 +136,7 @@ apply 通常在**独立会话**里跑（与 proposal 分开），必须重新经
    status.json: pipeline_stage=test-audit，tracks.test 随进度更新
 ⑦.1 汇总（主 agent）：读 tracks/test.md → 越界检测 → 回写 unit-test 任务
      → 对 unit-test 任务重跑一次 ⑥.5 式勾选属实自检 → status.json: pipeline_stage=merge（显式再写一次，标记本轮汇总完成）
-     → 删除 .claude/.sdlc-active-iteration（multi；中止 / 转人工介入前也要删除）
+     → 删除 .agents/.sdlc-active-iteration（multi；中止 / 转人工介入前也要删除）
 
 [⑧ code-reviewer (Gate 2)   ← 仅 --review 模式]
    Codex CLI 审查代码（含契约一致性与越界检查）
@@ -246,7 +246,7 @@ FOR 每条「公共文件修改请求」: 主 agent 评估后执行（如安装�
 
 ## 越界守卫
 
-multi 模式下，⑥.0 由主 agent 为每个角色生成允许清单，PreToolUse hook（`.claude/hooks/sdlc-pre-edit-guard.sh`，
+multi 模式下，⑥.0 由主 agent 为每个角色生成允许清单，PreToolUse hook（`.agents/hooks/sdlc-pre-edit-guard.sh`，
 `EDIT_GUARD=on` 时生效）在角色子 agent 写文件**之前**对照清单，清单外的写入直接拒绝。single 模式由主 agent 执行，
 hook 输入没有 `agent_type`，守卫不生效，照旧靠角色自觉 + 汇总越界检测。
 
@@ -270,7 +270,7 @@ test:
       ∪ { tests/unit/**, tests/reports/<slug>-coverage.md, $ITER_DIR/tracks/test.md }
   WRITE $ITER_DIR/tracks/.allow-test
 
-WRITE .claude/.sdlc-active-iteration = $ITER_DIR     # ⑦.1 结束时删除
+WRITE .agents/.sdlc-active-iteration = $ITER_DIR     # ⑦.1 结束时删除
 ```
 
 - 清单格式：每行一个相对项目根的路径或 glob（只有 `*` 是通配符且可跨 `/`，`[`、`]`、`?` 按字面匹配，便于 `[slug]` 这类动态路由文件名），`#` 开头为注释；清单随迭代目录保留，accept 时一并提交。

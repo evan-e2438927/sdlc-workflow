@@ -184,7 +184,7 @@ has   "$SKILL_DIR/templates/sdlc-config.tpl" '优先使用离被改文件最近�
 # ── 越界守卫：flow / SKILL / roles / README ──
 has   "$F" '## 越界守卫'
 has   "$F" 'tracks/.allow-<role>'
-has   "$F" '.claude/.sdlc-active-iteration'
+has   "$F" '.agents/.sdlc-active-iteration'
 has   "$F" '允许清单: <'
 has   "$F" '被越界守卫拒绝写入'
 has   "$F" '只有 `*` 是通配符'
