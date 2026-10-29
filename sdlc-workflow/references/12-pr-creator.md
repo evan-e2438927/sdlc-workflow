@@ -9,7 +9,7 @@
 /sdlc-workflow pr [<迭代目录>]
 ```
 
-若不指定路径，用 `"$SDLC_STATUS" find-latest accepted` 自动定位已本地提交的迭代（`SDLC_STATUS` 见 SKILL.md「迭代状态（phase）」）。
+若不指定路径，用 `bash "$SDLC_STATUS" find-latest accepted` 自动定位已本地提交的迭代（`SDLC_STATUS` 见 SKILL.md「迭代状态（phase）」）。
 
 ## 前置条件
 
@@ -140,7 +140,7 @@ echo "🔗 PR: $PR_URL"
 ### 3. 更新 status.json
 
 ```bash
-"$SDLC_STATUS" transition "$ITER_DIR" pr_created --by pr
+bash "$SDLC_STATUS" transition "$ITER_DIR" pr_created --by pr
 # pr_url 是进度字段，直接写
 jq --arg u "$PR_URL" '.pr_url = $u' "$STATUS_FILE" > "$STATUS_FILE.tmp" && mv "$STATUS_FILE.tmp" "$STATUS_FILE"
 

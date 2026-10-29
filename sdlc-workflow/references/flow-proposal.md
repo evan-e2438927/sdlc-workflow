@@ -52,7 +52,7 @@
    同步影响到的 .claude/ARCHITECTURE.md / .claude/SECURITY.md 等
 
 ⑥ 写入 phase（经状态脚本，见 SKILL.md「迭代状态（phase）」）
-   "$SDLC_STATUS" transition "$ITER_DIR" pending_review --by proposal
+   bash "$SDLC_STATUS" transition "$ITER_DIR" pending_review --by proposal
    随后用 jq 补 summary（进度字段）
 
 ⑦ 控制台输出: 需求拆解完成，等待人工审核
@@ -89,7 +89,7 @@ Proposal 完成后由状态脚本创建 `status.json`（`phase` / `proposal_at` 
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| phase | string | 取值与迁移见 SKILL.md「迭代状态（phase）」；只能经 `"$SDLC_STATUS" transition` 写入 |
+| phase | string | 取值与迁移见 SKILL.md「迭代状态（phase）」；只能经 `bash "$SDLC_STATUS" transition` 写入 |
 | mode | string | `proposal` / `doit` / `mini`，创建时写入 |
 | flags | object | 仅 doit / mini：`review` / `qa` / `agents`，供中断后续跑 |
 | history | array | 迁移记录 `{at, from, to, by, note?}`，只追加 |
@@ -136,7 +136,7 @@ TOTAL_HOURS=$(grep -oP '预估工时: \K[0-9]+' "$ITER_DIR/tasks.md" | awk '{s+=
 
 phase 为 `pending_review` 时，用户在对话里提出修改意见（如「去掉手机号登录；锁定改成 5 次」），不需要任何命令：
 
-1. 定位迭代：本会话刚产出的迭代；新会话里用 `"$SDLC_STATUS" find-latest pending_review`，有多个候选时先问用户。
+1. 定位迭代：本会话刚产出的迭代；新会话里用 `bash "$SDLC_STATUS" find-latest pending_review`，有多个候选时先问用户。
 2. 在同一迭代目录原地修改，**三份文档联动**：
    - 改需求 → 同步 requirements.md 的 AC，以及 design.md / tasks.md 中引用这些 AC-ID 的设计与任务
    - 改设计 → 同步 tasks.md 的 Track、目标文件、依赖与「接口契约」引用

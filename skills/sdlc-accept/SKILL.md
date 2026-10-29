@@ -8,6 +8,8 @@ description: >-
 
 # SDLC · accept（验收定稿，本地提交）
 
+> 核心目录 `SDLC_CORE`：按核心 skill 的 SKILL.md「核心目录（SDLC_CORE）」解析——核心 SKILL.md 在本 skill 同级的 `../sdlc-workflow/SKILL.md`，其次 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/SKILL.md`；两处都不存在 → 报错「缺少核心 skill sdlc-workflow，请执行 `npx skills add evan-e2438927/sdlc-workflow --skill sdlc-workflow`」并停止。
+
 主线第 4 步（⑪⑫）。前置 phase `qa_passed`（或 `applied` 跳过 qa）；产出 phase `accepted`。**不 push、不建 PR。**
 
 ## 步骤

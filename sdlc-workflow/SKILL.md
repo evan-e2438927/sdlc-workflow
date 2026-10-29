@@ -83,7 +83,7 @@ sdlc-apply docs/iterations/2026-04-16/001-user-login-feature/
 sdlc-apply --review docs/iterations/2026-04-16/001-user-login-feature/
 ```
 
-若不指定路径，用 `"$SDLC_STATUS" find-latest pending_review approved qa_failed` 自动定位。
+若不指定路径，用 `bash "$SDLC_STATUS" find-latest pending_review approved qa_failed` 自动定位。
 
 前置检查：
 - status.json 存在且 `phase` 为 `pending_review`（视为审核通过）或 `approved`
@@ -223,7 +223,20 @@ sdlc-worktree.sh remove 001
 ```
 
 详细规范见 `references/parallel-dev.md`。
-脚本位置：`scripts/sdlc-worktree.sh`。
+脚本：`bash "$SDLC_CORE/scripts/sdlc-worktree.sh" <create|list|status|remove|gc>`（`SDLC_CORE` 见「核心目录（SDLC_CORE）」）。
+
+## 核心目录（SDLC_CORE）
+
+所有脚本都在核心 skill `sdlc-workflow` 的 `scripts/` 下，**一律以 `bash "$SDLC_CORE/scripts/<脚本>"` 调用**（不依赖可执行位）。
+`SDLC_CORE` 只在这里定义：先找**当前 skill 的同级目录** `../sdlc-workflow`（npx 安装与插件安装都成立——插件里是 `skills/sdlc-workflow` 软链接；同级优先保证用的是同一次安装、版本一致），再找 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow`（兜底）；两处都没有就报错停止：
+
+```bash
+SKILL_BASE="<当前 skill 所在目录>"; SDLC_CORE="$SKILL_BASE/../sdlc-workflow"; [ -f "$SDLC_CORE/scripts/sdlc-sync-agents.sh" ] || SDLC_CORE="${CLAUDE_PLUGIN_ROOT:-/nonexistent}/sdlc-workflow"; [ -f "$SDLC_CORE/scripts/sdlc-sync-agents.sh" ] || { echo '缺少核心 skill sdlc-workflow，请执行 `npx skills add evan-e2438927/sdlc-workflow --skill sdlc-workflow`' >&2; false; }
+```
+
+- `<当前 skill 所在目录>`：被调用的那个 skill（如 `sdlc-apply`）的 SKILL.md 所在目录（Claude Code 在加载 skill 时给出 "Base directory"，Codex 给出 skill 路径）。
+- shell 变量不跨 Bash 调用保留：每次调用脚本都在同一条命令里先执行上面这行，或直接写解析出的绝对路径。
+- 常用脚本：`bash "$SDLC_CORE/scripts/init-project.sh" .`、`bash "$SDLC_CORE/scripts/update-project.sh" .`、`bash "$SDLC_CORE/scripts/sdlc-sync-agents.sh" [--check] [--check-paths] .`、`bash "$SDLC_CORE/scripts/sdlc-worktree.sh" <子命令>`、状态脚本 `SDLC_STATUS`（见「迭代状态」）。
 
 ## 项目初始化
 
@@ -235,8 +248,7 @@ sdlc-worktree.sh remove 001
 2. 检测 `.claude/CLAUDE.md` 和 `.claude/ARCHITECTURE.md` 是否存在
 3. 若两者都存在 → 项目已初始化，跳过，直接进入 Part 2
 4. 若任一不存在 → 执行初始化：
-   - 运行本 skill 目录内的初始化脚本 `scripts/init-project.sh .`（相对 SKILL.md 所在目录）。
-     运行时路径按运行环境取：Claude Code 为 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/scripts/init-project.sh`（变量由 Claude Code 注入）；Codex / 手动安装为该 skill 目录内的 `scripts/init-project.sh`
+   - 运行初始化脚本 `bash "$SDLC_CORE/scripts/init-project.sh" .`（`SDLC_CORE` 见「核心目录（SDLC_CORE）」）。
    - 生成项目结构（.claude/, docs/, tests/）+ 配置文件 `.claude/.sdlc-config`
    - 提醒用户：按需编辑 `.claude/.sdlc-config`（已自动加入 .gitignore）
 5. 若判定为 existing project，则初始化后必须先执行 `references/00-existing-project-intake.md`：
@@ -319,11 +331,11 @@ accepted 之前任意 phase ──用户放弃──▶ rejected
 
 - **唯一写入口**：`phase`、`*_at` 时间戳、`history`、`mode`、`flags` 只能经状态脚本写入，非法迁移由脚本拒绝并列出允许的下一步。
   其余进度字段（`tracks`、`agent_mode`、`summary`、`pipeline_stage`、`pr_url`）照旧直接写。
-- **脚本路径** `SDLC_STATUS`：Claude Code 为 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/scripts/sdlc-status.sh`；Codex / 手动安装为本 skill 目录内 `scripts/sdlc-status.sh`。迁移表单源：同目录 `state-machine.json`。
-  shell 变量不跨 Bash 调用保留：每次调用都在同一条命令里先赋值（`SDLC_STATUS="<上面的路径>"; "$SDLC_STATUS" transition …`），或直接写完整路径。
+- **脚本路径** `SDLC_STATUS="$SDLC_CORE/scripts/sdlc-status.sh"`（`SDLC_CORE` 见「核心目录（SDLC_CORE）」），以 `bash "$SDLC_STATUS" …` 调用。迁移表单源：同目录 `state-machine.json`。
+  shell 变量不跨 Bash 调用保留：每次调用都在同一条命令里先赋值（先执行 `SDLC_CORE` 定义行，再 `SDLC_STATUS="$SDLC_CORE/scripts/sdlc-status.sh"; bash "$SDLC_STATUS" transition …`），或直接写完整路径。
   脚本按 `$CLAUDE_PROJECT_DIR` → git 仓库根 → 当前目录定位项目根，迭代目录参数相对项目根。
-  - `"$SDLC_STATUS" transition "$ITER_DIR" <目标phase> --by <命令> [--note <说明>] [--flags '<json>']`
-  - `"$SDLC_STATUS" find-latest <phase>...` → 最近一个处于这些 phase 的迭代目录
+  - `bash "$SDLC_STATUS" transition "$ITER_DIR" <目标phase> --by <命令> [--note <说明>] [--flags '<json>']`
+  - `bash "$SDLC_STATUS" find-latest <phase>...` → 最近一个处于这些 phase 的迭代目录
 - **创建**：首次迁移（到 `pending_review`）时写入 `mode`（proposal / doit / mini）；doit / mini 同时用 `--flags` 记录 `review` / `qa` / `agents`。
 - **审核期间修改**：`pending_review` 时用户在对话里提修改意见，原地修改、phase 不变（规则见 `references/flow-proposal.md`「审核期间的修改（对话）」）。
 - **放弃**：用户表示放弃某个迭代时，`transition … rejected --by user`；工作区代码不回滚。
@@ -476,7 +488,7 @@ IF 当前为 proposal 模式:
   TOTAL_HOURS=$(从 tasks.md 提取总工时)
 
   # 写入 phase（脚本），再补 summary（进度字段，直接写）
-  "$SDLC_STATUS" transition "$ITER_DIR" pending_review --by proposal
+  bash "$SDLC_STATUS" transition "$ITER_DIR" pending_review --by proposal
   jq --argjson r $REQ_COUNT --argjson t $TASK_COUNT --argjson h $TOTAL_HOURS \
     '.summary = {requirement_count:$r, task_count:$t, estimated_hours:$h}' status.json > 临时文件 && mv
 
@@ -489,8 +501,8 @@ IF 当前为 proposal 模式:
 
 IF 当前为 doit / mini 模式:
   # 与 proposal 走同一条主线，只是不停顿；mode=doit 与 flags 供中断后续跑
-  "$SDLC_STATUS" transition "$ITER_DIR" pending_review --by doit --flags '{"review":<bool>,"qa":<bool>,"agents":"<auto|single|multi>"}'
-  "$SDLC_STATUS" transition "$ITER_DIR" approved --by doit       # mini 同理，--by mini
+  bash "$SDLC_STATUS" transition "$ITER_DIR" pending_review --by doit --flags '{"review":<bool>,"qa":<bool>,"agents":"<auto|single|multi>"}'
+  bash "$SDLC_STATUS" transition "$ITER_DIR" approved --by doit       # mini 同理，--by mini
   # 直接继续步骤 ⑥
 ```
 
@@ -516,7 +528,7 @@ IF 当前为 apply 模式:
 
   IF PHASE == "pending_review":
     # 用户直接 apply 视为审核通过
-    "$SDLC_STATUS" transition "$ITER_DIR" approved --by apply
+    bash "$SDLC_STATUS" transition "$ITER_DIR" approved --by apply
     LOG "🚀 Proposal 审核通过，开始开发"
 
   ELSE IF PHASE == "approved":
@@ -636,7 +648,7 @@ LOG "✅ 测试通过: <通过数>/<总数>"
 #### ⑨.3 Apply 完成（仅 apply / doit）
 ```
 # test-pipeline 通过即为 apply 终点——不提交、不推 PR
-"$SDLC_STATUS" transition "$ITER_DIR" applied --by apply     # 修复模式：--note qa-fix
+bash "$SDLC_STATUS" transition "$ITER_DIR" applied --by apply     # 修复模式：--note qa-fix
 LOG "✅ 开发完成: N 个任务 | 测试: lint + unit 全部通过"
 LOG "👉 浏览器验收: sdlc-qa   👉 提交: sdlc-accept"
 ```
@@ -655,10 +667,10 @@ FOR EACH qa 场景:
   失败时：同样 mv 诊断图到 tests/reports/<slug>/screenshots/
 执行完毕 teardown 后台 dev server（释放端口）
 生成 tests/reports/<slug>-e2e-report.md
-IF 全部 PASS: "$SDLC_STATUS" transition "$ITER_DIR" qa_passed --by qa
+IF 全部 PASS: bash "$SDLC_STATUS" transition "$ITER_DIR" qa_passed --by qa
 ELSE: 按根因分流——
   脚本/选择器问题 → qa 内就地修复重跑（按「修复轮数（唯一定义）」），phase 保持 applied
-  代码缺陷 → 写 $ITER_DIR/qa-failures.md → "$SDLC_STATUS" transition "$ITER_DIR" qa_failed --by qa
+  代码缺陷 → 写 $ITER_DIR/qa-failures.md → bash "$SDLC_STATUS" transition "$ITER_DIR" qa_failed --by qa
             → 提示运行 sdlc-apply（自动进入修复模式）；doit --qa 时自动修复后重跑 qa（按修复轮数计数）
 ```
 
@@ -690,7 +702,7 @@ ELSE:
 #### ⑫.1 Accept 状态更新（accept 命令 / doit）
 
 ```
-"$SDLC_STATUS" transition "$ITER_DIR" accepted --by accept
+bash "$SDLC_STATUS" transition "$ITER_DIR" accepted --by accept
 LOG "✅ 已本地提交 | 变更: N files"
 LOG "👉 推送并创建 PR: sdlc-pr"
 ```
@@ -708,7 +720,7 @@ PR_URL=$(gh pr view --json url --jq .url)
 #### ⑬.1 PR 状态更新与完成输出
 
 ```
-"$SDLC_STATUS" transition "$ITER_DIR" pr_created --by pr
+bash "$SDLC_STATUS" transition "$ITER_DIR" pr_created --by pr
 jq '.pr_url = "<url>"' 写入 status.json（进度字段，直接写）
 LOG "✅ PR: <url> | 分支: $CURRENT_BRANCH"
 ```
@@ -758,7 +770,7 @@ LOG "✅ PR: <url> | 分支: $CURRENT_BRANCH"
 13. **审查门禁不可降级**：Codex CLI 不可用时若指定 `--review` 必须中止，不能自动跳过 Gate
 14. **全栈目录约束**：默认采用 Better-T-Stack 风格 monorepo，业务代码不应随意落到根目录级 `web/`/`api/`/`server/`
 15. **文档统一放置**：ARCHITECTURE.md、SECURITY.md、CODING_GUIDELINES.md 与 CLAUDE.md 统一放在 `.claude/` 目录
-16. **状态管理**：phase 迁移只经 `"$SDLC_STATUS"`（见「迭代状态（phase）」），不手写 `.phase`；各命令启动前先校验当前 phase
+16. **状态管理**：phase 迁移只经 `bash "$SDLC_STATUS"`（见「迭代状态（phase）」），不手写 `.phase`；各命令启动前先校验当前 phase
 17. **上下文管理**：Pipeline 步骤间检测上下文占用，超过 80% 时执行 `/compact`。关键检查点：开发前（④→⑥）、测试前（⑦→⑨）、测试修复 retry 前（⑨ 内）。compact 前必须确保当前步骤产物已写入文件，compact 后须经统一上下文加载入口重新加载迭代目录产物 + 全局/项目 `.claude/` 规范
 17.1 **统一上下文加载**：所有命令在步骤 ① 前经唯一入口加载规范——先全局 `~/.claude/` 再项目 `<project>/.claude/`（项目覆盖全局）；加载清单与优先级只在 `references/context-loader.md` 定义一次，命令与 reference 不得各自罗列 `.claude/*` 清单
 18. **角色分工**：⑥.1 主 agent 打地基（infra / shared / 契约 / 依赖）；⑥.2 backend 与 frontend 角色开发（多 agent 模式下并行）；⑦ test 角色查漏；⑨ test-pipeline 串行（lint → unit）

@@ -9,13 +9,15 @@ description: >-
 
 # SDLC · init
 
+> 核心目录 `SDLC_CORE`：按核心 skill 的 SKILL.md「核心目录（SDLC_CORE）」解析——核心 SKILL.md 在本 skill 同级的 `../sdlc-workflow/SKILL.md`，其次 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/SKILL.md`；两处都不存在 → 报错「缺少核心 skill sdlc-workflow，请执行 `npx skills add evan-e2438927/sdlc-workflow --skill sdlc-workflow`」并停止。
+
 把项目初始化或接入 SDLC 工作流。产出 phase 前置步骤 ⓪。
 
 ## 步骤
 
 1. 判断项目类型：目录基本为空 → **fresh**；已有 `apps/`/`packages/`/`src/`/`package.json`/`.git/` → **existing**。
 2. 检测 `.claude/CLAUDE.md` + `.claude/ARCHITECTURE.md`；不存在则运行初始化脚本
-   `scripts/init-project.sh .`（相对 skill 目录；Claude Code 下为 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/scripts/init-project.sh`）。
+   `bash "$SDLC_CORE/scripts/init-project.sh" .`。
    生成 `.claude/`（CLAUDE/ARCHITECTURE/SECURITY/CODING_GUIDELINES）、`docs/`、`tests/`、`.claude/.sdlc-config`（自动 gitignore）。
 3. **existing project** → 必须先做基线采集（见 `references/00-existing-project-intake.md`）：
    生成 `PROJECT_BASELINE/EXISTING_STRUCTURE/TEST_BASELINE`，并**基于真实代码填实** ARCHITECTURE/SECURITY（覆盖模板占位）。基线完成前不得进入 requirements/design/tasks。

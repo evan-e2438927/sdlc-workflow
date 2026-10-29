@@ -24,7 +24,7 @@ lint + unit 自检，产物停在 `phase == "applied"`。
 /sdlc-workflow apply --agents multi  docs/iterations/2026-04-13/001-user-login-feature/   # 强制多 agent
 ```
 
-若不指定路径，用 `"$SDLC_STATUS" find-latest pending_review approved qa_failed` 自动定位（`SDLC_STATUS` 见 SKILL.md「迭代状态（phase）」）。
+若不指定路径，用 `bash "$SDLC_STATUS" find-latest pending_review approved qa_failed` 自动定位（`SDLC_STATUS` 见 SKILL.md「迭代状态（phase）」）。
 
 ## 前置检查
 
@@ -43,7 +43,7 @@ PHASE=$(jq -r '.phase' "$STATUS_FILE")
 case "$PHASE" in
   "pending_review")
     # 用户直接 apply 视为审核通过
-    "$SDLC_STATUS" transition "$ITER_DIR" approved --by apply || exit 1
+    bash "$SDLC_STATUS" transition "$ITER_DIR" approved --by apply || exit 1
     ;;
   "approved")
     echo "✅ Proposal 已通过审核，开始开发（已有 tracks 时按「断点续跑」继续）"
@@ -304,7 +304,7 @@ qa 发现代码缺陷时写 `$ITER_DIR/qa-failures.md` 并把 phase 迁移到 `q
 3. **用户已手动修过的条目**：先核对现状，已满足期望则不再改动，在修复记录里注明「用户已修复，已核对」。
 4. **回归单测**：能用单元测试复现的缺陷，补一条回归用例，命名引用 AC-ID，如 `it('AC-005 (regression): 锁定后拒绝登录')`；单测复现不了的，在修复记录注明「仅 e2e 可验」。
 5. **收尾**：⑥.5 勾选属实自检 → [⑧ Gate 2，`--review` 或 status.json `flags.review` 为 true 时] → ⑨ lint + unit（均按 SKILL.md「修复轮数（唯一定义）」计数）。
-6. **完成**：`"$SDLC_STATUS" transition "$ITER_DIR" applied --by apply --note qa-fix`；在 `qa-failures.md` 首行插入 `> 已修复：<ISO 时间>`；提示重跑 `sdlc-qa`（会执行全部场景）。doit `--qa` 时自动重跑 qa。
+6. **完成**：`bash "$SDLC_STATUS" transition "$ITER_DIR" applied --by apply --note qa-fix`；在 `qa-failures.md` 首行插入 `> 已修复：<ISO 时间>`；提示重跑 `sdlc-qa`（会执行全部场景）。doit `--qa` 时自动重跑 qa。
 
 ## 修复回合
 
@@ -328,7 +328,7 @@ Gate 2（⑧，`--review` 模式）或 ⑨ test-pipeline 失败后需要修复�
 
 ```bash
 if [ -z "$ITER_DIR" ]; then
-  ITER_DIR=$("$SDLC_STATUS" find-latest pending_review approved qa_failed)
+  ITER_DIR=$(bash "$SDLC_STATUS" find-latest pending_review approved qa_failed)
   if [ -z "$ITER_DIR" ]; then
     echo "❌ 未找到待处理的 proposal"
     echo "   请先运行 /sdlc-workflow proposal <需求>"
@@ -398,7 +398,7 @@ fi
 ### Apply 完成时
 
 ```bash
-"$SDLC_STATUS" transition "$ITER_DIR" applied --by apply     # 修复模式：追加 --note qa-fix
+bash "$SDLC_STATUS" transition "$ITER_DIR" applied --by apply     # 修复模式：追加 --note qa-fix
 ```
 
 ## 流程中的位置

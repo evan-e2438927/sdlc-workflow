@@ -13,7 +13,7 @@ exists() { [ -f "$1" ] || { echo "FAIL: 缺少文件 $1"; fail=1; }; }
 has   "$SKILL_DIR/SKILL.md" 'bins: ["codex", "gh", "jq"]'
 has   "$SKILL_DIR/SKILL.md" '## 迭代状态（phase）'
 has   "$SKILL_DIR/SKILL.md" 'phase 取值：pending_review | approved | applied | qa_failed | qa_passed | accepted | pr_created | rejected'
-has   "$SKILL_DIR/SKILL.md" '${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/scripts/sdlc-status.sh'
+has   "$SKILL_DIR/SKILL.md" 'SDLC_STATUS="$SDLC_CORE/scripts/sdlc-status.sh"'
 has   "$SKILL_DIR/SKILL.md" '### 修复轮数（唯一定义）'
 has   "$SKILL_DIR/SKILL.md" '已修轮数 == N → 停下，phase 不变，输出失败项，转人工'
 has   "$SKILL_DIR/SKILL.md" '"$SDLC_STATUS" transition "$ITER_DIR" pending_review --by doit --flags'

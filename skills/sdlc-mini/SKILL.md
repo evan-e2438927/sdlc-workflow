@@ -8,6 +8,8 @@ description: >-
 
 # SDLC · mini（小任务轻量流程）
 
+> 核心目录 `SDLC_CORE`：按核心 skill 的 SKILL.md「核心目录（SDLC_CORE）」解析——核心 SKILL.md 在本 skill 同级的 `../sdlc-workflow/SKILL.md`，其次 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/SKILL.md`；两处都不存在 → 报错「缺少核心 skill sdlc-workflow，请执行 `npx skills add evan-e2438927/sdlc-workflow --skill sdlc-workflow`」并停止。
+
 轻量但不跳过：仍生成 iteration 产物（requirements/design/tasks）、仍做验证。`--review` 启用 mini Gate 1/2；`--qa` 含浏览器验收。
 
 ## 步骤

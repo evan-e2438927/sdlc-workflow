@@ -8,6 +8,8 @@ description: >-
 
 # SDLC · qa（浏览器功能验收）
 
+> 核心目录 `SDLC_CORE`：按核心 skill 的 SKILL.md「核心目录（SDLC_CORE）」解析——核心 SKILL.md 在本 skill 同级的 `../sdlc-workflow/SKILL.md`，其次 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/SKILL.md`；两处都不存在 → 报错「缺少核心 skill sdlc-workflow，请执行 `npx skills add evan-e2438927/sdlc-workflow --skill sdlc-workflow`」并停止。
+
 主线第 3 步（⑩）。前置 phase `applied`，Playwright MCP 可用；全部通过 → phase `qa_passed`。
 
 ## 步骤

@@ -17,7 +17,7 @@
 /sdlc-workflow accept docs/iterations/2026-04-16/001-user-login-feature/
 ```
 
-若不指定路径，用 `"$SDLC_STATUS" find-latest qa_passed applied` 自动定位
+若不指定路径，用 `bash "$SDLC_STATUS" find-latest qa_passed applied` 自动定位
 （`SDLC_STATUS` 见 SKILL.md「迭代状态（phase）」）。
 
 ## 前置条件
@@ -95,7 +95,7 @@ Commit message 采用 Conventional Commits：<type>(scope): <摘要>，正文引
 
 ```bash
 # 本地提交成功
-"$SDLC_STATUS" transition "$ITER_DIR" accepted --by accept
+bash "$SDLC_STATUS" transition "$ITER_DIR" accepted --by accept
 
 echo "✅ 已本地提交 | 变更: N files"
 echo "👉 推送并创建 PR: /sdlc-workflow:pr"
@@ -113,7 +113,7 @@ echo "👉 推送并创建 PR: /sdlc-workflow:pr"
 
 ```bash
 if [ -z "$ITER_DIR" ]; then
-  ITER_DIR=$("$SDLC_STATUS" find-latest qa_passed applied)
+  ITER_DIR=$(bash "$SDLC_STATUS" find-latest qa_passed applied)
   if [ -z "$ITER_DIR" ]; then
     echo "❌ 未找到已完成 apply 的迭代目录"
     exit 1

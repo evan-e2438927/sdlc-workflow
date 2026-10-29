@@ -16,7 +16,7 @@ Playwright 脚本，并通过 Playwright MCP 在真实浏览器中执行功能�
 /sdlc-workflow qa docs/iterations/2026-04-16/001-user-login-feature/
 ```
 
-若不指定路径，用 `"$SDLC_STATUS" find-latest applied` 自动定位（`SDLC_STATUS` 见 SKILL.md「迭代状态（phase）」）。
+若不指定路径，用 `bash "$SDLC_STATUS" find-latest applied` 自动定位（`SDLC_STATUS` 见 SKILL.md「迭代状态（phase）」）。
 
 每次运行都**执行全部场景**（不只是上次失败的场景），兼作修复后的回归。
 
@@ -88,7 +88,7 @@ dev server 启动：读 package.json scripts（dev > start > serve），后台�
 
 ## 结果
 
-**全部通过** → `"$SDLC_STATUS" transition "$ITER_DIR" qa_passed --by qa`，输出：
+**全部通过** → `bash "$SDLC_STATUS" transition "$ITER_DIR" qa_passed --by qa`，输出：
 ```
 ✅ QA 通过: N/N 场景 | 覆盖 AC: N 个
 👉 确认无误后提交: /sdlc-workflow:accept
@@ -105,7 +105,7 @@ A) 脚本/选择器问题（选择器写错、等待时机、断言过严等，�
 
 B) 确属代码缺陷（功能/行为不符合 AC）
    → 写 $ITER_DIR/qa-failures.md（格式见下）
-   → "$SDLC_STATUS" transition "$ITER_DIR" qa_failed --by qa
+   → bash "$SDLC_STATUS" transition "$ITER_DIR" qa_failed --by qa
    → teardown dev server，提示运行 sdlc-apply（自动进入修复模式，见 flow-apply.md「修复模式（phase = qa_failed）」）
    → doit --qa：自动执行修复模式后重跑 qa，按「修复轮数（唯一定义）」计数，超限停在 qa_failed
 ```

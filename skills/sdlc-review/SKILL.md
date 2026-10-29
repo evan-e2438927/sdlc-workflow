@@ -8,6 +8,8 @@ description: >-
 
 # SDLC · review（独立 Codex 审查）
 
+> 核心目录 `SDLC_CORE`：按核心 skill 的 SKILL.md「核心目录（SDLC_CORE）」解析——核心 SKILL.md 在本 skill 同级的 `../sdlc-workflow/SKILL.md`，其次 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/SKILL.md`；两处都不存在 → 报错「缺少核心 skill sdlc-workflow，请执行 `npx skills add evan-e2438927/sdlc-workflow --skill sdlc-workflow`」并停止。
+
 在 proposal / apply 之外单独触发 Codex CLI 审查，不影响其他步骤。参数：`review <proposal|code> <迭代目录>`。
 
 ## Gate 1 — 设计审查（`review proposal <迭代目录>`）

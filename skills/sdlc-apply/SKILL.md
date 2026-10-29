@@ -10,6 +10,8 @@ description: >-
 
 # SDLC · apply（开发）
 
+> 核心目录 `SDLC_CORE`：按核心 skill 的 SKILL.md「核心目录（SDLC_CORE）」解析——核心 SKILL.md 在本 skill 同级的 `../sdlc-workflow/SKILL.md`，其次 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/SKILL.md`；两处都不存在 → 报错「缺少核心 skill sdlc-workflow，请执行 `npx skills add evan-e2438927/sdlc-workflow --skill sdlc-workflow`」并停止。
+
 主线第 2 步。前置 phase `pending_review`(视为审核通过)或 `approved`；产出 phase `applied`。**不提交、不推 PR**。
 
 前置 phase 为 `qa_failed`（qa 发现代码缺陷）时自动进入**修复模式**：跳过开发与查漏，主 agent 对照 `qa-failures.md` 修复、补回归单测，再跑 ⑨，回到 `applied`（见 `flow-apply.md`「修复模式（phase = qa_failed）」）。
