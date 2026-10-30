@@ -469,6 +469,7 @@ your-project/
 │   ├── rules/workflow-rules.md
 │   ├── config.json                     # MCP servers + platform settings (single source)
 │   ├── hooks/                          # sdlc-managed hook scripts (do not edit)
+│   ├── bin/sdlc-sync                   # sync entry point for the terminal (sdlc-managed)
 │   ├── skills/                         # sdlc itself (npx install) + your project skills
 │   ├── .sdlc-config                    # runtime config (gitignored, per person)
 │   └── .sdlc-active-iteration          # gitignored
@@ -493,10 +494,19 @@ Rule: **whatever must exist right after a clone, before any command runs, is com
 | Committed | Generated and gitignored |
 |-----------|--------------------------|
 | `AGENTS.md`, `CLAUDE.md` and subdirectory `CLAUDE.md` symlinks | `.claude/settings.json` (from `config.claude.settings` + sdlc hooks) |
-| `.agents/` (rules, `config.json`, `hooks/`, `skills/`) | `.mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`, `.codex/hooks.json` |
+| `.agents/` (rules, `config.json`, `hooks/`, `bin/`, `skills/`) | `.mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`, `.codex/hooks.json` |
 | `.claude/skills/*`, `.claude/agents/*` symlinks, `skills-lock.json` | `.agents/.sdlc-config*`, `.agents/.sdlc-active-iteration`, `.agents/.backup/` |
 
-The ignore entries live between `# >>> sdlc generated >>>` and `# <<< sdlc generated <<<` in `.gitignore`; that block is rewritten on every sync, so put your own rules outside it. To change MCP servers or tool settings, edit `.agents/config.json` — generated files are rewritten whole. `sdlc-init`, `sdlc-update` and `sdlc-worktree create` run the sync; every other command runs `--check` first and re-syncs if needed. A real file sitting where a symlink belongs (for example your own `web/CLAUDE.md`) is never overwritten; `--check` reports it as a conflict.
+The ignore entries live between `# >>> sdlc generated >>>` and `# <<< sdlc generated <<<` in `.gitignore`; that block is rewritten on every sync, so put your own rules outside it. To change MCP servers or tool settings, edit `.agents/config.json` — generated files are rewritten whole. `sdlc-init`, `sdlc-update` and `sdlc-worktree create` run the sync; every other command runs `--check` first and re-syncs if needed. **Syncing by hand**: after editing `.agents/config.json` (for example adding an MCP server), run this in a terminal before restarting your IDE / tools — the same command in every project, whatever the stack or install method:
+
+```bash
+.agents/bin/sdlc-sync            # regenerate platform files
+.agents/bin/sdlc-sync --check    # only report drift
+```
+
+It finds the sdlc core on its own (the `SDLC_CORE` env var, then the in-project npx install, `~/.claude/skills/`, then the Claude Code plugin cache) and always syncs the project it lives in, wherever you run it from.
+
+A real file sitting where a symlink belongs (for example your own `web/CLAUDE.md`) is never overwritten; `--check` reports it as a conflict.
 
 **Windows**: Git may check symlinks out as plain text files. Enable Developer Mode and run `git config core.symlinks true` before cloning (or re-checkout afterwards). The sync check spots a symlink that became a text file and tells you so.
 

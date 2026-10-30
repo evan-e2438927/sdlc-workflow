@@ -15,7 +15,7 @@ snapshot() { (cd "$P" && find . -path ./.git -prune -o \( -type f -o -type l \) 
 P="$TMP/fresh"; mkdir -p "$P"; git -C "$P" init -q
 bash "$INIT" "$P" >"$TMP/out" 2>&1; ck "$?" 0 "I0 init 退出码"
 for f in AGENTS.md ARCHITECTURE.md SECURITY.md CODING_GUIDELINES.md rules/workflow-rules.md config.json .sdlc-config \
-         hooks/sdlc-hook-lib.sh hooks/sdlc-pre-edit-guard.sh hooks/sdlc-post-edit-check.sh; do
+         hooks/sdlc-hook-lib.sh hooks/sdlc-pre-edit-guard.sh hooks/sdlc-post-edit-check.sh bin/sdlc-sync; do
   [ -f "$P/.agents/$f" ] || { echo "FAIL I1 缺少 .agents/$f"; fail=1; }
 done
 link_is "$P/AGENTS.md" ".agents/AGENTS.md" "I2 根 AGENTS.md"
@@ -50,6 +50,7 @@ link_is "$P/CLAUDE.md" ".agents/AGENTS.md" "I6 根 CLAUDE.md 变为软链接"
 grep -qx 'MY RULES' "$P/.agents/AGENTS.md" || { echo "FAIL I6 原 CLAUDE.md 内容未并入"; fail=1; }
 ls "$P"/.agents/.backup/*/CLAUDE.md >/dev/null 2>&1 || { echo "FAIL I6 原 CLAUDE.md 未备份"; fail=1; }
 grep -q '/hooks' "$TMP/out" || { echo "FAIL I6 init 输出应提示 Codex /hooks 信任"; fail=1; }
+grep -q '重启工具前执行 .agents/bin/sdlc-sync' "$TMP/out" || { echo "FAIL I6 init 输出应提示改配置后执行 .agents/bin/sdlc-sync"; fail=1; }
 
 # I7：旧布局 → 提示 update，不创建 .agents/
 P="$TMP/legacy"; mkdir -p "$P/.claude"; printf '# old\n' > "$P/.claude/CLAUDE.md"

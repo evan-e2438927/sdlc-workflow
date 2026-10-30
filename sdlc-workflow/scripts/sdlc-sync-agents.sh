@@ -11,7 +11,7 @@
 #   软链接  AGENTS.md / CLAUDE.md → .agents/AGENTS.md；X/CLAUDE.md → AGENTS.md（子目录）
 #           .claude/skills/<n> → ../../.agents/skills/<n>
 #           .claude/agents/sdlc-*-dev.md → 项目内核心的 agents/（仅 npx 安装在项目里时）
-#   文件    .agents/hooks/*（核心 templates/hooks/ 的副本）
+#   文件    .agents/hooks/*、.agents/bin/sdlc-sync（核心 templates/ 的副本，sdlc 托管）
 #           .claude/settings.json、.mcp.json、.cursor/mcp.json、.codex/config.toml、.codex/hooks.json
 #   .gitignore 中 "# >>> sdlc generated >>>" … "# <<< sdlc generated <<<" 托管块（整块重写）
 # 冲突规则：目标位置是实体文件或目录时绝不覆盖，只告警（计为漂移）。
@@ -76,7 +76,12 @@ want_link() {
 want_file() {
   local rel="$1" src="$2" p="$ROOT/$1"
   if [ -d "$p" ] && [ ! -L "$p" ]; then conflict "$rel"; return 0; fi
-  if [ -f "$p" ] && [ ! -L "$p" ] && cmp -s "$src" "$p"; then return 0; fi
+  if [ -f "$p" ] && [ ! -L "$p" ] && cmp -s "$src" "$p"; then
+    [ "${3:-}" = exec ] && [ ! -x "$p" ] || return 0
+    if [ "$MODE" = check ]; then drift "$rel" "not-executable（缺少可执行位）"; return 0; fi
+    if chmod +x "$p"; then changed "${rel}（恢复可执行位）"; else write_failed "$rel" "设置可执行位"; fi
+    return 0
+  fi
   if [ "$MODE" = check ]; then
     if [ -e "$p" ] || [ -L "$p" ]; then drift "$rel" "differs（生成文件被改动或已过期）"; else drift "$rel" "missing"; fi
     return 0
@@ -136,6 +141,9 @@ for f in "$CORE"/templates/hooks/*.sh; do
   [ -f "$f" ] || continue
   want_file ".agents/hooks/$(basename "$f")" "$f" exec
 done
+
+# ── 4.1 项目内同步入口 .agents/bin/sdlc-sync（sdlc 托管，提交）──
+want_file .agents/bin/sdlc-sync "$CORE/templates/bin/sdlc-sync" exec
 
 # ── 5. 平台配置：由 .agents/config.json 整份生成（用户要改就改 config.json）──
 CFG="$ROOT/.agents/config.json"

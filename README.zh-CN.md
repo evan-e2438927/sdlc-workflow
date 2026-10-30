@@ -469,6 +469,7 @@ your-project/
 │   ├── rules/workflow-rules.md
 │   ├── config.json                     # MCP 服务器 + 平台设置（单一来源）
 │   ├── hooks/                          # sdlc 托管的 hook 脚本（不要手改）
+│   ├── bin/sdlc-sync                   # 终端里用的同步入口（sdlc 托管）
 │   ├── skills/                         # sdlc 本身（npx 安装）+ 项目自定义 skill
 │   ├── .sdlc-config                    # 运行配置（gitignore，每人一份）
 │   └── .sdlc-active-iteration          # gitignore
@@ -493,10 +494,19 @@ your-project/
 | 提交 | 生成并 gitignore |
 |------|------------------|
 | `AGENTS.md`、`CLAUDE.md` 及子目录 `CLAUDE.md` 软链接 | `.claude/settings.json`（由 `config.claude.settings` + sdlc hooks 生成） |
-| `.agents/`（规则、`config.json`、`hooks/`、`skills/`） | `.mcp.json`、`.cursor/mcp.json`、`.codex/config.toml`、`.codex/hooks.json` |
+| `.agents/`（规则、`config.json`、`hooks/`、`bin/`、`skills/`） | `.mcp.json`、`.cursor/mcp.json`、`.codex/config.toml`、`.codex/hooks.json` |
 | `.claude/skills/*`、`.claude/agents/*` 软链接、`skills-lock.json` | `.agents/.sdlc-config*`、`.agents/.sdlc-active-iteration`、`.agents/.backup/` |
 
-忽略条目写在 `.gitignore` 的 `# >>> sdlc generated >>>` 与 `# <<< sdlc generated <<<` 之间，每次同步整块重写，自己的规则请写在块外。要改 MCP 服务器或平台设置，改 `.agents/config.json`——生成文件每次整份重写。`sdlc-init`、`sdlc-update`、`sdlc-worktree create` 会执行同步；其余命令先执行 `--check`，不一致时自动同步。软链接位置上已有实体文件（比如你自己写的 `web/CLAUDE.md`）时绝不覆盖，`--check` 报告为冲突。
+忽略条目写在 `.gitignore` 的 `# >>> sdlc generated >>>` 与 `# <<< sdlc generated <<<` 之间，每次同步整块重写，自己的规则请写在块外。要改 MCP 服务器或平台设置，改 `.agents/config.json`——生成文件每次整份重写。`sdlc-init`、`sdlc-update`、`sdlc-worktree create` 会执行同步；其余命令先执行 `--check`，不一致时自动同步。**手动同步**：改了 `.agents/config.json`（比如加了 MCP 服务器）之后，重启 IDE / 工具前在终端执行——不管什么项目、什么安装方式，都是同一条命令：
+
+```bash
+.agents/bin/sdlc-sync            # 重新生成平台文件
+.agents/bin/sdlc-sync --check    # 只检查不写入
+```
+
+它会自己找 sdlc 核心（环境变量 `SDLC_CORE` → 项目内 npx 安装 → `~/.claude/skills/` → Claude Code 插件缓存），并且总是同步它所在的项目，与在哪个目录执行无关。
+
+软链接位置上已有实体文件（比如你自己写的 `web/CLAUDE.md`）时绝不覆盖，`--check` 报告为冲突。
 
 **Windows**：Git 默认可能把软链接检出成文本文件。clone 前开启开发者模式并执行 `git config core.symlinks true`（已 clone 的重新检出）。同步检查发现软链接变成文本文件时会明确提示。
 

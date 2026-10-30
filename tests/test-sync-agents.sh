@@ -204,5 +204,17 @@ rc="$(run "$P")"; chmod 755 "$P/.claude/skills"
 grep -q '同步完成：\|已是最新' "$TMP/out" && ! grep -q '✗\|❌\|⚠' "$TMP/out" && { echo "FAIL L1 不应报告同步成功"; fail=1; }
 has_out ".claude/skills/alpha" "L1 指出失败的链接"
 
+# ── 项目内同步入口 .agents/bin/sdlc-sync ──
+mk entry
+ck "$(run "$P")" 0 "B1 写模式"
+cmp -s "$P/.agents/bin/sdlc-sync" "$SKILL_DIR/templates/bin/sdlc-sync" || { echo "FAIL B1 .agents/bin/sdlc-sync 未生成或与模板不一致"; fail=1; }
+[ -x "$P/.agents/bin/sdlc-sync" ] || { echo "FAIL B1 .agents/bin/sdlc-sync 应可执行"; fail=1; }
+git -C "$P" check-ignore -q .agents/bin/sdlc-sync && { echo "FAIL B1 .agents/bin/sdlc-sync 不应被 gitignore"; fail=1; }
+chmod -x "$P/.agents/bin/sdlc-sync"
+ck "$(run --check "$P")" 1 "B2 丢失可执行位应报漂移"
+has_out ".agents/bin/sdlc-sync" "B2 列出入口脚本"
+ck "$(run "$P")" 0 "B2 写模式修复"
+[ -x "$P/.agents/bin/sdlc-sync" ] || { echo "FAIL B2 写模式应恢复可执行位"; fail=1; }
+
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1

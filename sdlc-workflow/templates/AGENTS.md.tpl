@@ -62,5 +62,5 @@ docs/iterations/
 
 ## 目录约定（.agents/ 是唯一事实来源）
 - 规则、配置（`.agents/config.json`）、项目 skill、hooks 都放在 `.agents/`；根目录 `AGENTS.md`、`CLAUDE.md` 是指向本文件的软链接。
-- `.claude/settings.json`、`.mcp.json`、`.codex/`、`.cursor/mcp.json` 由 sdlc 同步脚本生成并已 gitignore，不要手改；要改 MCP 或平台设置，改 `.agents/config.json`。
+- `.claude/settings.json`、`.mcp.json`、`.codex/`、`.cursor/mcp.json` 由 sdlc 同步脚本生成并已 gitignore，不要手改；要改 MCP 或平台设置，改 `.agents/config.json`，然后在重启工具前执行 `.agents/bin/sdlc-sync`（任意 sdlc 命令开头也会自动同步）。
 - 子目录可放自己的 `AGENTS.md`，同步时会在旁边生成 `CLAUDE.md` 软链接。

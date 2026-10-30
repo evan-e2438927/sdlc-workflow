@@ -252,6 +252,7 @@ esac
 echo "✅ 同步完成。用户编辑的 ARCHITECTURE.md / SECURITY.md / CODING_GUIDELINES.md 未被改动；"
 echo "   AGENTS.md 仅在缺少「自定义 Skills」小节时追加（不改动既有内容，旧版见 AGENTS.md.bak）。"
 echo "   如 workflow-rules.md / .sdlc-config 有自定义内容，请对照 .bak 备份回并。"
+echo "📌 改了 .agents/config.json（如 MCP 服务器）后，重启工具前执行 .agents/bin/sdlc-sync（加 --check 只检查不写入）"
 if [ "$LEGACY" = 1 ]; then
   echo ""
   echo "📋 迁移报告"

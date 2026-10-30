@@ -100,6 +100,8 @@ bash "$SDLC_CORE/scripts/sdlc-sync-agents.sh" --check .
 `.agents/hooks/*`、由 `.agents/config.json` 生成的 `.claude/settings.json` / `.mcp.json` / `.cursor/mcp.json` /
 `.codex/config.toml` / `.codex/hooks.json`，以及 `.gitignore` 中的 sdlc 托管块。用户要改 MCP 或平台设置，改 `.agents/config.json`。
 
+项目内同步入口 `.agents/bin/sdlc-sync`（同步脚本生成并提交）供用户在终端里、重启工具之前手动同步（例如改了 MCP 配置）；参数与退出码同同步脚本，自动按 `SDLC_CORE` 环境变量 → 项目内安装 → `~/.claude/skills/` → Claude Code 插件缓存 的顺序找核心。agent 在会话里同步时仍直接调用 `bash "$SDLC_CORE/scripts/sdlc-sync-agents.sh" .`。
+
 **插件与项目内安装并存**：项目里存在 `.agents/skills/sdlc-workflow`，而当前解析出的 `SDLC_CORE` 不在该目录下（说明正在运行插件里的 skill）时，
 提示「本项目已在项目内安装 sdlc，建议在此项目停用插件，避免命令重复、版本不一致」。只提示，不阻断。
 

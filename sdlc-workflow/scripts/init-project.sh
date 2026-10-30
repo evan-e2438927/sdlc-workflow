@@ -99,3 +99,4 @@ echo "📝 请编辑 .agents/AGENTS.md 填写项目信息；运行配置在 .age
 echo "📝 MCP 与平台设置统一改 .agents/config.json（.claude/settings.json、.mcp.json、.codex/ 等由同步生成，不要手改）"
 echo "📌 请提交：AGENTS.md、CLAUDE.md（软链接）、.agents/（除 gitignore 项）、.claude/skills/ 与 .claude/agents/ 下的软链接"
 echo "📌 Codex 用户：首次使用需在 Codex 的 /hooks 中信任本项目的 hooks（.codex/hooks.json），编辑后检查才会运行"
+echo "📌 改了 .agents/config.json（如 MCP 服务器）后，重启工具前执行 .agents/bin/sdlc-sync（加 --check 只检查不写入）"

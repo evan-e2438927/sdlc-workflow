@@ -12,7 +12,7 @@ has()   { grep -qF -- "$2" "$1" 2>/dev/null || { echo "FAIL: ${1#"$REPO_DIR"/} �
 SCOPE="$SKILL_DIR/SKILL.md $R $SKILL_DIR/templates $(ls "$REPO_DIR"/skills/sdlc-*/SKILL.md | grep -v '/skills/sdlc-workflow/')"
 # shellcheck disable=SC2086
 bad="$(grep -rn '\.claude/' $SCOPE \
-  | sed -E 's#~/\.claude/##g; s#\.claude/(skills|agents|settings\.json|settings\.local\.json)##g' \
+  | sed -E 's#~/\.claude/##g; s#\.claude/(skills|agents|plugins|settings\.json|settings\.local\.json)##g' \
   | grep '\.claude/' | grep -vE '旧布局|迁移|legacy')"
 [ -z "$bad" ] || { echo "FAIL D1 仍有旧 .claude/ 项目路径："; echo "$bad" | sed "s#$REPO_DIR/#    #" | head -20; fail=1; }
 
@@ -43,7 +43,10 @@ for f in "$REPO_DIR/README.md" "$REPO_DIR/README.zh-CN.md"; do
   has "$f" '/hooks'
   has "$f" 'npx skills update'
   has "$f" 'git rm --cached'
+  has "$f" '.agents/bin/sdlc-sync'
 done
+has "$R/context-loader.md" '.agents/bin/sdlc-sync'
+has "$SKILL_DIR/templates/AGENTS.md.tpl" '.agents/bin/sdlc-sync'
 
 # D5：文档中的 .claude/CLAUDE.md 只出现在迁移说明小节（最近的上级标题含「迁移」或 Migrat）
 for f in README.md README.zh-CN.md docs/workflow-overview.md DESIGN-PROMO.md DESIGN-PROMO.zh-CN.md examples/30-second-demo.md docs/git-worktree-guide.md; do

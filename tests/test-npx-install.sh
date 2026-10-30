@@ -62,4 +62,13 @@ for r in backend frontend test; do
   grep -q "^name: sdlc-$r-dev" "$REPO_DIR/agents/sdlc-$r-dev.md" || { echo "FAIL N5 仓库 agents/sdlc-$r-dev.md 不可读"; fail=1; }
 done
 
+# N6：项目内同步入口（任意子目录可执行；改 config.json 后重新生成平台文件）
+mkdir -p "$P/src/a"
+(cd "$P/src/a" && "$P/.agents/bin/sdlc-sync" --check) >"$TMP/entry" 2>&1; ck "$?" 0 "N6 子目录执行 .agents/bin/sdlc-sync --check"
+jq '.mcpServers.extra = {transport: "stdio", command: "extra-mcp"}' "$P/.agents/config.json" > "$TMP/c.json" && mv "$TMP/c.json" "$P/.agents/config.json"
+(cd "$P/src/a" && "$P/.agents/bin/sdlc-sync") >"$TMP/entry" 2>&1; ck "$?" 0 "N6 同步"
+ck "$(jq -r '.mcpServers.extra.command' "$P/.mcp.json")" extra-mcp "N6 新 MCP 出现在 .mcp.json"
+grep -qx '\[mcp_servers.extra\]' "$P/.codex/config.toml" || { echo "FAIL N6 新 MCP 不在 .codex/config.toml"; fail=1; }
+git -C "$P" check-ignore -q .agents/bin/sdlc-sync && { echo "FAIL N6 入口脚本不应被 gitignore"; fail=1; }
+
 [ "$fail" = "0" ] && echo PASS || exit 1
