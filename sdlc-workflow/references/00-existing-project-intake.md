@@ -22,12 +22,12 @@ intake 的目标不是生成新架构，而是确认：
 
 必须先生成 / 填实以下文档，再进入步骤①：
 
-1. `.claude/PROJECT_BASELINE.md`
-2. `.claude/EXISTING_STRUCTURE.md`
-3. `.claude/TEST_BASELINE.md`
-4. `.claude/ARCHITECTURE.md` — **必须基于真实代码填实，覆盖 init 拷贝的模板占位**
-5. `.claude/SECURITY.md` — **必须基于真实代码填实，覆盖模板占位**
-6. `.claude/CODING_GUIDELINES.md` / `.claude/CLAUDE.md` — **必须与真实结构对齐**
+1. `.agents/PROJECT_BASELINE.md`
+2. `.agents/EXISTING_STRUCTURE.md`
+3. `.agents/TEST_BASELINE.md`
+4. `.agents/ARCHITECTURE.md` — **必须基于真实代码填实，覆盖 init 拷贝的模板占位**
+5. `.agents/SECURITY.md` — **必须基于真实代码填实，覆盖模板占位**
+6. `.agents/CODING_GUIDELINES.md` / `.agents/AGENTS.md` — **必须与真实结构对齐**
 
 > ⚠️ init-project.sh 只会把模板原样拷过去（含 `<!-- 请描述 -->` 占位与默认的
 > Better-T-Stack monorepo 假设）。intake 的职责之一就是把这些**模板内容替换为项目实际情况**——
@@ -43,7 +43,7 @@ intake 的目标不是生成新架构，而是确认：
 2. 项目根目录已存在构建或包管理配置，如 `package.json`、`pnpm-workspace.yaml`、`turbo.json`
 3. 项目根目录已存在 `.git/` 且已有业务文件
 
-若仅缺少 `.claude/` 或 `.claude/ARCHITECTURE.md`，但业务代码已经存在，也仍然属于 existing project mode。
+若仅缺少 `.agents/` 或 `.agents/ARCHITECTURE.md`，但业务代码已经存在，也仍然属于 existing project mode。
 
 ### 2. 基线分析范围
 
@@ -91,7 +91,7 @@ intake 至少要分析以下 6 类内容：
 
 #### 3.4 ARCHITECTURE.md（填实，不留模板）
 
-读取真实代码后**重写** `.claude/ARCHITECTURE.md`，删除所有 `<!-- 请描述 -->` 占位，至少包含：
+读取真实代码后**重写** `.agents/ARCHITECTURE.md`，删除所有 `<!-- 请描述 -->` 占位，至少包含：
 
 - **系统概要**：项目类型与定位（如「单包 Next.js 15 App Router 应用」），不要套用 monorepo 模板
 - **技术栈**：从 `package.json` / 配置文件读取的真实框架与版本
@@ -102,14 +102,14 @@ intake 至少要分析以下 6 类内容：
 
 #### 3.5 SECURITY.md（填实，不留模板）
 
-基于真实代码重写 `.claude/SECURITY.md`：认证/授权机制、敏感数据处理、密钥/Token 管理方式、
+基于真实代码重写 `.agents/SECURITY.md`：认证/授权机制、敏感数据处理、密钥/Token 管理方式、
 已知安全约束。无法确认的项标注为「待确认」，不要留空模板占位。
 
-#### 3.6 CODING_GUIDELINES.md / CLAUDE.md 对齐
+#### 3.6 CODING_GUIDELINES.md / AGENTS.md 对齐
 
 - `CODING_GUIDELINES.md`：把「Monorepo 落位规则」替换/补充为项目真实的落位约定
   （例如 Next.js 单包项目：页面进 `src/app/**`，组件进 `src/components/**`），不能保留与实际不符的 monorepo 规则
-- `CLAUDE.md`：项目概述、技术栈、目录结构填实，并链接三份 baseline
+- `AGENTS.md`：项目概述、技术栈、目录结构填实，并链接三份 baseline
 
 ### 4. 结构保护规则
 
@@ -126,12 +126,12 @@ intake 至少要分析以下 6 类内容：
 
 只有当以下条件全部满足时，才能进入步骤①：
 
-1. `.claude/PROJECT_BASELINE.md` 存在
-2. `.claude/EXISTING_STRUCTURE.md` 存在
-3. `.claude/TEST_BASELINE.md` 存在
-4. `.claude/ARCHITECTURE.md` 与 `.claude/SECURITY.md` **已填实**——不含 `<!-- 请描述 -->` 等模板占位，
+1. `.agents/PROJECT_BASELINE.md` 存在
+2. `.agents/EXISTING_STRUCTURE.md` 存在
+3. `.agents/TEST_BASELINE.md` 存在
+4. `.agents/ARCHITECTURE.md` 与 `.agents/SECURITY.md` **已填实**——不含 `<!-- 请描述 -->` 等模板占位，
    且 ARCHITECTURE.md 的目录约定与真实结构一致（非 monorepo 项目不得保留 monorepo 默认约定）
-5. `.claude/CODING_GUIDELINES.md` 的落位规则与真实结构一致
+5. `.agents/CODING_GUIDELINES.md` 的落位规则与真实结构一致
 6. 设计模型已明确现有结构的保护边界
 7. 不存在“先写需求，后补基线”的倒序行为
 
@@ -150,7 +150,7 @@ echo "   context:  ARCHITECTURE / SECURITY / CODING_GUIDELINES / CLAUDE 已按�
 
 ### 触发与前提
 
-- 仅在项目已 init（存在 `.claude/CLAUDE.md`）且阶段一机械同步已完成后运行。
+- 仅在项目已 init（存在 `.agents/AGENTS.md`）且阶段一机械同步已完成后运行。
 - 复用本文件「2. 基线分析范围」「3. 输出文档要求」「5. 完成条件」作为生成标准与刷新后的校验标准。
 
 ### 漂移扫描（产出报告，先不改文件）
@@ -158,10 +158,10 @@ echo "   context:  ARCHITECTURE / SECURITY / CODING_GUIDELINES / CLAUDE 已按�
 读取真实文件树 + 根级配置（`package.json`、`pnpm-workspace.yaml`、`turbo.json`、`docker-compose.yml` 等），
 与已记录状态比对，产出**漂移报告**，至少覆盖三类：
 
-1. **配置漂移**：`.claude/.sdlc-config` 的 `TEST_FRAMEWORK` / `LINT_TOOL` / 结构假设 vs 真实仓库。
+1. **配置漂移**：`.agents/.sdlc-config` 的 `TEST_FRAMEWORK` / `LINT_TOOL` / 结构假设 vs 真实仓库。
 2. **基线过时**：三份 baseline 缺失，或与当前 workspace / 依赖 / 脚本 / 测试套件不符。
 3. **文档过时**：`ARCHITECTURE.md` / `SECURITY.md` 仍含 `<!-- 请描述 -->` 占位，或所述结构与真实代码不符；
-   `CLAUDE.md` / `CODING_GUIDELINES.md` 的落位约定与真实结构不符。
+   `AGENTS.md` / `CODING_GUIDELINES.md` 的落位约定与真实结构不符。
 
 报告对每一项给出：文档名 / 漂移点 / 拟刷新的要点。无漂移的项明确标注「无漂移」。
 
@@ -169,14 +169,14 @@ echo "   context:  ARCHITECTURE / SECURITY / CODING_GUIDELINES / CLAUDE 已按�
 
 - **基线文档**（`PROJECT_BASELINE.md` / `EXISTING_STRUCTURE.md` / `TEST_BASELINE.md`）——派生事实，
   **自动**按真实代码重生成；重写前把旧版备份为同名 `.bak`；仅在报告中汇报，不逐项征求确认。
-- **用户文档**（`ARCHITECTURE.md` / `SECURITY.md` / `CLAUDE.md` / `CODING_GUIDELINES.md`）——含用户手写内容，
+- **用户文档**（`ARCHITECTURE.md` / `SECURITY.md` / `AGENTS.md` / `CODING_GUIDELINES.md`）——含用户手写内容，
   **逐项征求确认**：展示该文档的漂移点与拟刷新内容，用户明确同意后才重写，重写前备份 `.bak`；
   未确认的文档保持原样。这是 update「绝不盲目覆盖用户内容」原则的延续。
 
 ### 配置漂移修正
 
 对扫描出的配置漂移逐项**提议 + 确认**（如「仓库用 vitest，但 `.sdlc-config` 写 jest——是否修正？」），
-确认后才改写 `.claude/.sdlc-config` 对应键。
+确认后才改写 `.agents/.sdlc-config` 对应键。
 
 ### 完成条件
 

@@ -17,7 +17,7 @@
 1. 项目必须已完成 `/sdlc-workflow init`
 2. 若缺少 baseline 文档且项目为 existing project，先回退执行 `init`
 3. 判断是否满足 mini 条件；不满足立即升级到 `/sdlc-workflow doit`
-4. **统一上下文加载**（`LOAD_CONTEXT`，见 `references/context-loader.md`）：加载全局 + 项目 `.claude/` 规范
+4. **统一上下文加载**（`LOAD_CONTEXT`，见 `references/context-loader.md`）：加载全局 + 项目 `.agents/` 规范
    **以及自定义 skill 索引 `CTX.skills`**。此步不可跳过——尤其 Codex 无 harness 自动发现 skills，
    不加载 = 后续开发看不到用户扩展的 skills。
 5. **执行模式固定 single**：mini 不拆角色子 agent（忽略 `AGENT_MODE` 与 `--agents`），由主 agent 直接完成开发与单测。
@@ -70,6 +70,22 @@ docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/
 4. 是否目标文件范围足够小
 
 若失败：立即中止或升级到 `/sdlc-workflow doit`
+
+### Step 5.5. 写入 phase
+
+Gate 1 通过（或跳过）后再写入，与 SKILL.md ⑤.2 一致：mini 与 proposal 走同一条主线，只是不停顿（见 SKILL.md「迭代状态（phase）」）：
+
+```bash
+bash "$SDLC_STATUS" transition "$ITER_DIR" pending_review --by mini --flags '{"review":<bool>,"qa":<bool>,"agents":"single"}'
+bash "$SDLC_STATUS" transition "$ITER_DIR" approved --by mini
+```
+
+Step 9 通过后 `transition … applied --by apply`；`--qa` 时 Step 9.5 按 flow-qa.md 迁移到 `qa_passed` / `qa_failed`；
+Step 10 之后的 accept / pr 按各自 flow 迁移到 `accepted` / `pr_created`。
+
+**升级到 doit 时的状态处理**：
+- Step 5.5 之前升级（含 Gate 1 判定不属于 mini）：此时还没有 status.json，doit 直接接管同一迭代目录，从 ① 补齐产物后按 doit 写入 `--by doit`。
+- Step 5.5 之后升级（实现中发现超出 mini 范围）：`bash "$SDLC_STATUS" transition "$ITER_DIR" rejected --by mini --note upgraded-to-doit`，再由 doit 新建迭代；已改的代码保留在工作区，由新迭代接着做。
 
 ### Step 6. Implement
 
@@ -134,4 +150,4 @@ Gate 1 通过（或跳过）后，开始修改业务代码。
 1. 不得在 Step 1-4 之前直接编辑业务代码
 2. `--review` 时不得跳过 Gate 1 / Gate 2
 3. 不得跳过 validation capability detection
-4. **Token 耗尽保护**：context_usage > 70% 时先 /compact 再继续；token 不足时写入 `status.json: pipeline_stage="mini-incomplete"` + ABORT，禁止静默标记完成
+4. **Token 耗尽保护**：context_usage > 80% 时先 /compact 再继续；token 不足时停在当前 phase 直接中止，禁止静默标记完成；之后用户要求继续时，按 `mode=mini` 与 `flags` 续跑（见 SKILL.md「迭代状态（phase）」）

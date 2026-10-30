@@ -26,7 +26,7 @@
 
 ```
 ⓪ 初始化检查
-   IF NOT (.claude/CLAUDE.md AND .claude/ARCHITECTURE.md):
+   IF NOT (.agents/AGENTS.md AND .agents/ARCHITECTURE.md):
      RUN init-project.sh
    IF MODE == existing:
      RUN existing-project-intake (若 baseline 不存在)
@@ -49,10 +49,11 @@
    循环审查，最大 REVIEW_MAX_ROUNDS 轮
 
 [⑤.1 增量文档同步              ← 仅 --review 且经修订]
-   同步影响到的 .claude/ARCHITECTURE.md / .claude/SECURITY.md 等
+   同步影响到的 .agents/ARCHITECTURE.md / .agents/SECURITY.md 等
 
-⑥ 写入 status.json
-   → phase: "pending_review"
+⑥ 写入 phase（经状态脚本，见 SKILL.md「迭代状态（phase）」）
+   bash "$SDLC_STATUS" transition "$ITER_DIR" pending_review --by proposal
+   随后用 jq 补 summary（进度字段）
 
 ⑦ 控制台输出: 需求拆解完成，等待人工审核
 
@@ -61,7 +62,8 @@
 
 ## status.json 写入规范
 
-Proposal 完成后在迭代目录下写入 `status.json`：
+Proposal 完成后由状态脚本创建 `status.json`（`phase` / `proposal_at` / `mode` / `iter_dir` / `history`），
+再由 agent 用 jq 补 `summary`。结果形如：
 
 ```json
 {
@@ -70,7 +72,11 @@ Proposal 完成后在迭代目录下写入 `status.json`：
   "reviewed_at": null,
   "applied_at": null,
   "reviewer": null,
-  "iter_dir": "docs/iterations/2026-04-13/001-user-login-feature/",
+  "iter_dir": "docs/iterations/2026-04-13/001-user-login-feature",
+  "mode": "proposal",
+  "history": [
+    { "at": "2026-04-13T14:00:00+08:00", "from": null, "to": "pending_review", "by": "proposal" }
+  ],
   "summary": {
     "requirement_count": 3,
     "task_count": 7,
@@ -83,7 +89,10 @@ Proposal 完成后在迭代目录下写入 `status.json`：
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| phase | string | `pending_review` → `approved` → `applied`，另有 `rejected` |
+| phase | string | 取值与迁移见 SKILL.md「迭代状态（phase）」；只能经 `bash "$SDLC_STATUS" transition` 写入 |
+| mode | string | `proposal` / `doit` / `mini`，创建时写入 |
+| flags | object | 仅 doit / mini：`review` / `qa` / `agents`，供中断后续跑 |
+| history | array | 迁移记录 `{at, from, to, by, note?}`，只追加 |
 | proposal_at | ISO8601 | proposal 完成时间 |
 | reviewed_at | ISO8601 \| null | 人工审核时间 |
 | applied_at | ISO8601 \| null | apply 执行时间 |
@@ -123,6 +132,21 @@ TOTAL_HOURS=$(grep -oP '预估工时: \K[0-9]+' "$ITER_DIR/tasks.md" | awk '{s+=
 👉 审阅后请运行: /sdlc-workflow apply <迭代目录>
 ```
 
+## 审核期间的修改（对话）
+
+phase 为 `pending_review` 时，用户在对话里提出修改意见（如「去掉手机号登录；锁定改成 5 次」），不需要任何命令：
+
+1. 定位迭代：本会话刚产出的迭代；新会话里用 `bash "$SDLC_STATUS" find-latest pending_review`，有多个候选时先问用户。
+2. 在同一迭代目录原地修改，**三份文档联动**：
+   - 改需求 → 同步 requirements.md 的 AC，以及 design.md / tasks.md 中引用这些 AC-ID 的设计与任务
+   - 改设计 → 同步 tasks.md 的 Track、目标文件、依赖与「接口契约」引用
+   - 不得只改其中一份；新增 / 删除的 AC-ID 在 tasks.md 中的引用必须随之增删
+3. 涉及设计决策的新疑点，按 ② requirements-clarifier 的澄清 Gate 先问再改。
+4. 带 `--review` 跑过 Gate 1 的迭代，修改后重跑 Gate 1（按「修复轮数（唯一定义）」）。
+5. phase 保持 `pending_review`，重新输出产物摘要并再次停下，等用户确认或 apply。
+
+`approved` 之后不再原地修改设计：需要改时，经用户同意 `transition … rejected --by user` 后重新 proposal。
+
 ## 错误处理
 
 | 错误场景 | 处理方式 |
@@ -130,7 +154,7 @@ TOTAL_HOURS=$(grep -oP '预估工时: \K[0-9]+' "$ITER_DIR/tasks.md" | awk '{s+=
 | 项目未初始化 | 自动执行 init-project.sh |
 | 需求采集失败 | 中止，控制台输出错误 |
 | Gate 1 超限（--review 时） | 中止，提示人工介入 |
-| status.json 写入失败 | LOG warning，不阻塞（产物已生成） |
+| status.json 写入失败 | 中止并输出脚本报错（状态脚本是唯一写入方，失败即状态不可信） |
 
 ## 流程中的位置
 

@@ -54,9 +54,9 @@
 
 ### 取值来源
 
-- type：`.claude/.sdlc-config` 的 `COMMIT_TYPE`；留空则按迭代目录 `<type>` 映射
+- type：`.agents/.sdlc-config` 的 `COMMIT_TYPE`；留空则按迭代目录 `<type>` 映射
   （feature→feat, fix→fix, refactor→refactor, docs→docs, test→test, chore→chore）
-- scope：`.claude/.sdlc-config` 的 `COMMIT_SCOPE`；留空则取本次变更最多的顶层目录
+- scope：`.agents/.sdlc-config` 的 `COMMIT_SCOPE`；留空则取本次变更最多的顶层目录
 
 ### 示例
 
@@ -111,7 +111,7 @@ git status --short
 TYPE_MAP="feature:feat fix:fix refactor:refactor docs:docs test:test chore:chore"
 COMMIT_TYPE=$(echo "$TYPE_MAP" | grep "^${TYPE}:*" | cut -d: -f2)
 
-# 确定 scope（.claude/.sdlc-config 中 COMMIT_SCOPE 优先，否则取变更最多的目录）
+# 确定 scope（.agents/.sdlc-config 中 COMMIT_SCOPE 优先，否则取变更最多的目录）
 COMMIT_SCOPE=${COMMIT_SCOPE:-}
 if [ -z "$COMMIT_SCOPE" ]; then
   COMMIT_SCOPE=$(git diff --name-only --staged | \

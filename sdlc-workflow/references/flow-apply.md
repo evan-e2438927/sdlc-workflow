@@ -24,7 +24,7 @@ lint + unit 自检，产物停在 `phase == "applied"`。
 /sdlc-workflow apply --agents multi  docs/iterations/2026-04-13/001-user-login-feature/   # 强制多 agent
 ```
 
-若不指定路径，自动查找最近一个 `phase == "pending_review"` 或 `phase == "approved"` 的迭代目录。
+若不指定路径，用 `bash "$SDLC_STATUS" find-latest pending_review approved qa_failed` 自动定位（`SDLC_STATUS` 见 SKILL.md「迭代状态（phase）」）。
 
 ## 前置检查
 
@@ -42,28 +42,21 @@ PHASE=$(jq -r '.phase' "$STATUS_FILE")
 
 case "$PHASE" in
   "pending_review")
-    # 交互确认：用户直接 apply 视为审核通过
-    echo "📋 该 proposal 尚处于 pending_review 状态"
-    echo "   运行 apply 将视为审核通过并开始开发"
-    # 更新状态为 approved
-    jq '.phase = "approved" | .reviewed_at = now | .reviewer = "cli-apply"' \
-      "$STATUS_FILE" > tmp.json && mv tmp.json "$STATUS_FILE"
+    # 用户直接 apply 视为审核通过
+    bash "$SDLC_STATUS" transition "$ITER_DIR" approved --by apply || exit 1
     ;;
   "approved")
-    echo "✅ Proposal 已通过审核，开始开发"
+    echo "✅ Proposal 已通过审核，开始开发（已有 tracks 时按「断点续跑」继续）"
+    ;;
+  "qa_failed")
+    echo "🔧 QA 发现代码缺陷，进入修复模式"   # 见下文「修复模式（phase = qa_failed）」
     ;;
   "applied")
-    echo "⚠️ 该 proposal 已执行过 apply"
-    echo "   如需重新执行，请手动将 status.json 中 phase 改为 approved"
-    exit 1
-    ;;
-  "rejected")
-    echo "❌ 该 proposal 已被拒绝"
-    echo "   请修改后重新运行 /sdlc-workflow proposal"
+    echo "⚠️ 该迭代已完成 apply；手改代码后可直接让 agent 重跑 lint + unit（phase 保持 applied）"
     exit 1
     ;;
   *)
-    echo "❌ 未知状态: $PHASE"
+    echo "❌ 当前 phase=$PHASE，不能执行 apply（合法迁移见 SKILL.md「迭代状态（phase）」）"
     exit 1
     ;;
 esac
@@ -84,7 +77,7 @@ done
 ### 3. 初始化检查
 
 ```bash
-if [ ! -f ".claude/CLAUDE.md" ] || [ ! -f ".claude/ARCHITECTURE.md" ]; then
+if [ ! -f ".agents/AGENTS.md" ] || [ ! -f ".agents/ARCHITECTURE.md" ]; then
   echo "❌ 项目未初始化，请先运行 /sdlc-workflow init"
   exit 1
 fi
@@ -94,8 +87,8 @@ fi
 
 apply 通常在**独立会话**里跑（与 proposal 分开），必须重新经统一入口加载上下文：
 
-`LOAD_CONTEXT`（见 `references/context-loader.md`）——加载全局 + 项目 `.claude/` 规范
-**及自定义 skill 索引 `CTX.skills`**（来源 `~/.claude/skills/` 与 `<project>/.claude/skills/`）。
+`LOAD_CONTEXT`（见 `references/context-loader.md`）——加载全局 + 项目 `.agents/` 规范
+**及自定义 skill 索引 `CTX.skills`**（来源 `~/.claude/skills/` 与 `<project>/.agents/skills/`）。
 不加载则 ⑥ 开发看不到用户扩展的 skills；Codex 无 harness 自动发现，尤其依赖此步。
 
 ## 执行步骤
@@ -116,7 +109,7 @@ apply 通常在**独立会话**里跑（与 proposal 分开），必须重新经
           WP = 角色说明全文（references/roles/<track>.md）+ 该 Track 任务（依赖顺序、目标文件、
                适用规范、AC）+ design.md「## 3. 接口契约」+ 规范上下文（LOAD_CONTEXT 摘录）
         生成允许清单（仅 multi，规则见「越界守卫」）：为 backend / frontend / test 各写
-          $ITER_DIR/tracks/.allow-<role>，并写标记文件 .claude/.sdlc-active-iteration（内容为 $ITER_DIR）
+          $ITER_DIR/tracks/.allow-<role>，并写标记文件 .agents/.sdlc-active-iteration（内容为 $ITER_DIR）
         所有角色在每个任务**执行前**，先读该任务的「适用规范」字段，对照命中的项目 skill
         （必要时才加载其正文；先 skill、后自造，见 context-loader.md「skills 优先级规则」）。
         规范检查是逐任务的，不是开发前一次性的——避免长会话注意力漂移。
@@ -143,7 +136,7 @@ apply 通常在**独立会话**里跑（与 proposal 分开），必须重新经
    status.json: pipeline_stage=test-audit，tracks.test 随进度更新
 ⑦.1 汇总（主 agent）：读 tracks/test.md → 越界检测 → 回写 unit-test 任务
      → 对 unit-test 任务重跑一次 ⑥.5 式勾选属实自检 → status.json: pipeline_stage=merge（显式再写一次，标记本轮汇总完成）
-     → 删除 .claude/.sdlc-active-iteration（multi；中止 / 转人工介入前也要删除）
+     → 删除 .agents/.sdlc-active-iteration（multi；中止 / 转人工介入前也要删除）
 
 [⑧ code-reviewer (Gate 2)   ← 仅 --review 模式]
    Codex CLI 审查代码（含契约一致性与越界检查）
@@ -253,7 +246,7 @@ FOR 每条「公共文件修改请求」: 主 agent 评估后执行（如安装�
 
 ## 越界守卫
 
-multi 模式下，⑥.0 由主 agent 为每个角色生成允许清单，PreToolUse hook（`.claude/hooks/sdlc-pre-edit-guard.sh`，
+multi 模式下，⑥.0 由主 agent 为每个角色生成允许清单，PreToolUse hook（`.agents/hooks/sdlc-pre-edit-guard.sh`，
 `EDIT_GUARD=on` 时生效）在角色子 agent 写文件**之前**对照清单，清单外的写入直接拒绝。single 模式由主 agent 执行，
 hook 输入没有 `agent_type`，守卫不生效，照旧靠角色自觉 + 汇总越界检测。
 
@@ -277,7 +270,7 @@ test:
       ∪ { tests/unit/**, tests/reports/<slug>-coverage.md, $ITER_DIR/tracks/test.md }
   WRITE $ITER_DIR/tracks/.allow-test
 
-WRITE .claude/.sdlc-active-iteration = $ITER_DIR     # ⑦.1 结束时删除
+WRITE .agents/.sdlc-active-iteration = $ITER_DIR     # ⑦.1 结束时删除
 ```
 
 - 清单格式：每行一个相对项目根的路径或 glob（只有 `*` 是通配符且可跨 `/`，`[`、`]`、`?` 按字面匹配，便于 `[slug]` 这类动态路由文件名），`#` 开头为注释；清单随迭代目录保留，accept 时一并提交。
@@ -300,6 +293,18 @@ WRITE .claude/.sdlc-active-iteration = $ITER_DIR     # ⑦.1 结束时删除
 - 无任务的 Track 在 ⑥.0 即记为 `skipped`；**`foundation` 例外**——只有同时满足"没有 infra / shared 任务"
   **且**"design.md「### 5.3 新增依赖」为空或写 `无`"两个条件才记 `skipped`；只要有一项不满足（哪怕只是要装依赖，没有
   infra/shared 任务），⑥.1 仍要跑一遍（至少完成依赖安装）。
+- 兼容旧迭代：旧版 qa 失败时会把 phase 退回 `approved` 并写 `qa_failed_at`，这类迭代按普通 `approved` 处理（照上面规则续跑）。
+
+## 修复模式（phase = qa_failed）
+
+qa 发现代码缺陷时写 `$ITER_DIR/qa-failures.md` 并把 phase 迁移到 `qa_failed`（见 flow-qa.md）。apply 读到 `qa_failed` 时自动进入修复模式，不需要任何参数：
+
+1. **跳过 ⑥.0–⑦**：不打包、不派子 agent、不写越界守卫标记文件；执行模式固定 single（`agent_mode_reason` 记 "qa 修复模式"）。
+2. **逐条修复**：主 agent 对照 `qa-failures.md` 逐条修，沿用下文「修复回合」规则——改动落在问题所属角色白名单内；改动文件与原因追加到 `tracks/<track>.md`「修复记录」。
+3. **用户已手动修过的条目**：先核对现状，已满足期望则不再改动，在修复记录里注明「用户已修复，已核对」。
+4. **回归单测**：能用单元测试复现的缺陷，补一条回归用例，命名引用 AC-ID，如 `it('AC-005 (regression): 锁定后拒绝登录')`；单测复现不了的，在修复记录注明「仅 e2e 可验」。
+5. **收尾**：⑥.5 勾选属实自检 → [⑧ Gate 2，`--review` 或 status.json `flags.review` 为 true 时] → ⑨ lint + unit（均按 SKILL.md「修复轮数（唯一定义）」计数）。
+6. **完成**：`bash "$SDLC_STATUS" transition "$ITER_DIR" applied --by apply --note qa-fix`；在 `qa-failures.md` 首行插入 `> 已修复：<ISO 时间>`；提示重跑 `sdlc-qa`（会执行全部场景）。doit `--qa` 时自动重跑 qa。
 
 ## 修复回合
 
@@ -322,21 +327,8 @@ Gate 2（⑧，`--review` 模式）或 ⑨ test-pipeline 失败后需要修复�
 当用户不指定迭代目录时，自动定位：
 
 ```bash
-find_latest_proposal() {
-  find docs/iterations/ -name "status.json" -type f \
-    | while read f; do
-        phase=$(jq -r '.phase' "$f")
-        if [ "$phase" = "pending_review" ] || [ "$phase" = "approved" ]; then
-          echo "$f"
-        fi
-      done \
-    | sort -r \
-    | head -1 \
-    | xargs dirname
-}
-
 if [ -z "$ITER_DIR" ]; then
-  ITER_DIR=$(find_latest_proposal)
+  ITER_DIR=$(bash "$SDLC_STATUS" find-latest pending_review approved qa_failed)
   if [ -z "$ITER_DIR" ]; then
     echo "❌ 未找到待处理的 proposal"
     echo "   请先运行 /sdlc-workflow proposal <需求>"
@@ -372,8 +364,9 @@ fi
 | 错误场景 | 处理方式 |
 |----------|----------|
 | status.json 不存在 | 中止，提示先运行 proposal |
-| phase 为 rejected | 中止，提示修改后重新 proposal |
-| phase 为 applied | 中止，提示已执行过（需手动重置） |
+| phase 为 applied | 中止，提示已完成 apply（手改代码后可直接重跑 lint + unit） |
+| phase 为 rejected / 其他 | 中止，提示合法迁移（见 SKILL.md「迭代状态（phase）」） |
+| phase 为 qa_failed | 进入修复模式 |
 | 产物文件缺失 | 中止，提示重新 proposal |
 | Gate 2 超限（--review 时） | 中止，控制台输出错误，提示人工介入 |
 | lint / unit 修复超限 | 中止，控制台输出错误，提示人工介入 |
@@ -386,7 +379,7 @@ fi
 {
   "phase": "approved",
   "reviewed_at": "2026-04-13T15:00:00+08:00",
-  "reviewer": "cli-apply",
+  "reviewer": "apply",
   "agent_mode": "multi",
   "agent_mode_reason": "auto: backend+frontend 均有任务",
   "pipeline_stage": "dev",
@@ -404,11 +397,8 @@ fi
 
 ### Apply 完成时
 
-```json
-{
-  "phase": "applied",
-  "applied_at": "2026-04-13T16:30:00+08:00"
-}
+```bash
+bash "$SDLC_STATUS" transition "$ITER_DIR" applied --by apply     # 修复模式：追加 --note qa-fix
 ```
 
 ## 流程中的位置

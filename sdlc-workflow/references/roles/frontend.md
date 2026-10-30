@@ -12,7 +12,7 @@
 ## 可改路径白名单
 - **multi 模式**：以工作包附带的允许清单 `$ITER_DIR/tracks/.allow-frontend` 为准（主 agent 从任务目标文件生成，已含对应测试文件与本汇报文件 `$ITER_DIR/tracks/frontend.md`）；清单外的 Edit/Write 会被越界守卫在写入前拒绝
 - **single 模式 / 清单缺失**：Track 范围见 `references/track-paths.md` 的 `tracks.frontend`，外加 `$ITER_DIR/tracks/frontend.md`
-- existing project：以 `.claude/EXISTING_STRUCTURE.md` 中前端对应的实际目录替换 Track 默认前缀
+- existing project：以 `.agents/EXISTING_STRUCTURE.md` 中前端对应的实际目录替换 Track 默认前缀
 
 ## 必读
 1. 工作包附带的规范上下文（ARCHITECTURE / SECURITY / CODING_GUIDELINES 摘录 + 自定义 skill 索引）

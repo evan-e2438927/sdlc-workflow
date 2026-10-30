@@ -8,6 +8,8 @@ description: >-
 
 # SDLC · qa（浏览器功能验收）
 
+> 核心目录 `SDLC_CORE`：按核心 skill 的 SKILL.md「核心目录（SDLC_CORE）」解析——核心 SKILL.md 在本 skill 同级的 `../sdlc-workflow/SKILL.md`，其次 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/SKILL.md`；两处都不存在 → 报错「缺少核心 skill sdlc-workflow，请执行 `npx skills add evan-e2438927/sdlc-workflow --skill sdlc-workflow`」并停止。
+
 主线第 3 步（⑩）。前置 phase `applied`，Playwright MCP 可用；全部通过 → phase `qa_passed`。
 
 ## 步骤
@@ -18,6 +20,6 @@ description: >-
 3. 后台启 dev server（读 package.json scripts，等 ready，提取 URL），通过 Playwright MCP 执行：navigate → snapshot → click/type → 断言 + console error → 失败截图。**跑完 teardown dev server，释放端口。**
 4. 产出 `tests/reports/<slug>-e2e-report.md`。
 
-**失败按根因分流**（不要笼统重跑 apply，phase==applied 时 apply 会中止）：脚本/选择器问题 → qa 内就地修复重跑（≤REVIEW_MAX_ROUNDS）；代码缺陷 → phase 退回 `approved`，提示修复后重跑 apply；超限 → 中止 + 截图 + 人工介入。
+**失败按根因分流**（qa 不改业务代码）：脚本/选择器问题 → qa 内就地修复重跑（按「修复轮数（唯一定义）」，超限停下转人工）；代码缺陷 → 写 `$ITER_DIR/qa-failures.md`，phase 迁移到 `qa_failed`，提示运行 `sdlc-apply`（自动进入修复模式）。每次运行都执行全部场景。
 
 > 完整规范见 `sdlc-workflow` skill 的 `references/flow-qa.md`。

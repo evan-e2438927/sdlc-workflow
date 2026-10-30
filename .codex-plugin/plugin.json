@@ -1,6 +1,6 @@
 {
   "name": "sdlc-workflow",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "AI-driven SDLC automation pipeline (proposal → apply → qa → accept → pr) with optional dual-model review gates and Playwright browser QA.",
   "author": {
     "name": "Evan",

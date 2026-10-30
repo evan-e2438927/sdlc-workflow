@@ -1,0 +1,13 @@
+{
+  "transitions": {
+    "":               ["pending_review"],
+    "pending_review": ["approved", "rejected"],
+    "approved":       ["applied", "rejected"],
+    "applied":        ["qa_passed", "qa_failed", "accepted", "rejected"],
+    "qa_failed":      ["applied", "rejected"],
+    "qa_passed":      ["accepted", "rejected"],
+    "accepted":       ["pr_created"],
+    "pr_created":     [],
+    "rejected":       []
+  }
+}

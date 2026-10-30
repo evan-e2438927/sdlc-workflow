@@ -4,8 +4,8 @@
 
 1. `docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/design.md`
 2. `docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/tasks.md`
-3. `.claude/ARCHITECTURE.md`
-4. `.claude/SECURITY.md`
+3. `.agents/ARCHITECTURE.md`
+4. `.agents/SECURITY.md`
 
 ## 输出
 
@@ -55,10 +55,10 @@ $(cat docs/iterations/$DATE/$SEQ-$SLUG-$TYPE/design.md)
 $(cat docs/iterations/$DATE/$SEQ-$SLUG-$TYPE/tasks.md)
 
 === ARCHITECTURE.md ===
-$(cat .claude/ARCHITECTURE.md)
+$(cat .agents/ARCHITECTURE.md)
 
 === SECURITY.md ===
-$(cat .claude/SECURITY.md)"
+$(cat .agents/SECURITY.md)"
 ```
 
 ### 2. 审查维度
@@ -127,7 +127,7 @@ Gate 1 必须验证每个任务都声明了 Track 字段、Track 与目标文件
 ```
 TRACK_CONSISTENCY_CHECK:
   TRACK_PATH_RULES = references/track-paths.md 的 tracks 字段
-  # 形如 {"backend": ["apps/server/", ...], ...}；existing project 以 .claude/EXISTING_STRUCTURE.md 映射替换默认前缀
+  # 形如 {"backend": ["apps/server/", ...], ...}；existing project 以 .agents/EXISTING_STRUCTURE.md 映射替换默认前缀
 
   1. 字段存在性:
      FOR EACH task IN tasks.md:
@@ -209,11 +209,12 @@ CONTRACT_CHECK:
 ### 3. 循环逻辑
 
 ```bash
-round=1
-max_rounds=${REVIEW_MAX_ROUNDS:-1}
+# 见 SKILL.md「修复轮数（唯一定义）」：最多自动修复 N 轮，N=0 表示失败即停
+N=${REVIEW_MAX_ROUNDS:-1}
+fixes=0
 
-while [ $round -le $max_rounds ]; do
-  echo "🔍 设计 Review 第 $round 轮..."
+while :; do
+  echo "🔍 设计 Review （已修 $fixes 轮）..."
 
   # 调用 Codex 审查
   if ! result=$(codex exec --full-auto "$PROMPT" 2> /tmp/design-review-codex.stderr); then
@@ -230,8 +231,8 @@ while [ $round -le $max_rounds ]; do
     # 提取问题列表
     issues=$(echo "$result" | grep -A 100 "问题列表" || echo "$result")
 
-    if [ $round -lt $max_rounds ]; then
-      echo "⚠️ 设计审查失败，第 $round 轮问题："
+    if [ "$fixes" -lt "$N" ]; then
+      echo "⚠️ 设计审查失败，（已修 $fixes 轮）问题："
       echo "$issues"
 
       # Claude Code 根据反馈修订
@@ -239,12 +240,12 @@ while [ $round -le $max_rounds ]; do
       # ... 修订逻辑 ...
 
     else
-      echo "❌ 设计审查超过 $max_rounds 轮，需人工介入"
+      echo "❌ 设计审查已自动修复 $N 轮仍未通过，需人工介入"
       exit 1
     fi
   fi
 
-  round=$((round + 1))
+  fixes=$((fixes + 1))
 done
 ```
 
@@ -284,14 +285,15 @@ ITER_DIR="docs/iterations/$DATE/$SEQ-$SLUG-$TYPE"
 REQ_FILE="$ITER_DIR/requirements.md"
 DESIGN_FILE="$ITER_DIR/design.md"
 TASKS_FILE="$ITER_DIR/tasks.md"
-ARCH_FILE=".claude/ARCHITECTURE.md"
-SEC_FILE=".claude/SECURITY.md"
+ARCH_FILE=".agents/ARCHITECTURE.md"
+SEC_FILE=".agents/SECURITY.md"
 
-round=1
-max_rounds=${REVIEW_MAX_ROUNDS:-1}
+# 见 SKILL.md「修复轮数（唯一定义）」：最多自动修复 N 轮，N=0 表示失败即停
+N=${REVIEW_MAX_ROUNDS:-1}
+fixes=0
 
-while [ $round -le $max_rounds ]; do
-  echo "🔍 设计 Review 第 $round 轮..."
+while :; do
+  echo "🔍 设计 Review （已修 $fixes 轮）..."
 
   PROMPT="$(cat <<EOF
 审查以下设计文档和任务分解。
@@ -351,15 +353,15 @@ EOF
     exit 0
   fi
 
-  if [ $round -eq $max_rounds ]; then
-    echo "❌ 设计审查超过 $max_rounds 轮，需人工介入"
+  if [ "$fixes" -ge "$N" ]; then
+    echo "❌ 设计审查已自动修复 $N 轮仍未通过，需人工介入"
     exit 1
   fi
 
   echo "⚠️ 设计审查失败，修订中..."
   # Claude 修订 design.md + tasks.md
 
-  round=$((round + 1))
+  fixes=$((fixes + 1))
 done
 ```
 
@@ -369,7 +371,7 @@ done
 |----------|----------|
 | Codex CLI 调用失败 | 记录原始 stderr，立即中止 Pipeline，通知人工介入 |
 | 审查超时 | 重试最多 3 次，仍失败则中止 |
-| .claude/.sdlc-config 未设置 | 使用默认 max_rounds=1 |
+| .agents/.sdlc-config 未设置 | 使用默认 REVIEW_MAX_ROUNDS=1（最多自动修复 1 轮） |
 | 设计文档不存在 | 回退到步骤③ |
 | 目录结构偏离默认约定 | FAIL，回退到步骤③补充目录影响声明 |
 
@@ -380,17 +382,17 @@ done
 ### 触发条件
 
 ```
-round > 1（即 Gate 1 不是首轮直接通过）
+fixes ≥ 1（即 Gate 1 不是首轮直接通过）
 ```
 
 ### 同步范围
 
 | 修订内容 | 同步目标 |
 |----------|----------|
-| 技术选型/架构决策变更 | `.claude/ARCHITECTURE.md` 对应章节 |
-| 安全设计变更（认证/授权/加密方案） | `.claude/SECURITY.md` 对应章节 |
-| 目录结构/模块落位调整 | `.claude/EXISTING_STRUCTURE.md`（existing project） |
-| 新增编码约定 | `.claude/CODING_GUIDELINES.md` |
+| 技术选型/架构决策变更 | `.agents/ARCHITECTURE.md` 对应章节 |
+| 安全设计变更（认证/授权/加密方案） | `.agents/SECURITY.md` 对应章节 |
+| 目录结构/模块落位调整 | `.agents/EXISTING_STRUCTURE.md`（existing project） |
+| 新增编码约定 | `.agents/CODING_GUIDELINES.md` |
 
 ### 行为规则
 
@@ -404,8 +406,8 @@ round > 1（即 Gate 1 不是首轮直接通过）
 - 输入：
   - design.md
   - tasks.md
-  - .claude/ARCHITECTURE.md
-  - .claude/SECURITY.md
+  - .agents/ARCHITECTURE.md
+  - .agents/SECURITY.md
 - 输出：审查结果（PASS/FAIL）+ 增量文档同步
 - 参考：
   - SKILL.md Part 4（下一步：步骤⑥ Claude Code 开发）

@@ -105,9 +105,9 @@ sdlc-mini 把首页背景改成黑色       # 小任务轻量流程
 ```
 检测到 package.json, .git/, src/ → 判定为 existing project
   ↓
-.claude/PROJECT_BASELINE.md     ← 锁定现有技术栈
-.claude/EXISTING_STRUCTURE.md   ← 锁定现有目录结构
-.claude/TEST_BASELINE.md        ← 盘点现有测试能力
+.agents/PROJECT_BASELINE.md     ← 锁定现有技术栈
+.agents/EXISTING_STRUCTURE.md   ← 锁定现有目录结构
+.agents/TEST_BASELINE.md        ← 盘点现有测试能力
   ↓
 后续所有 design 必须引用 baseline，不能自由发挥重构原项目
 ```
@@ -123,7 +123,7 @@ Claude Code → 生成代码和设计
 Codex CLI   → 独立审查（Gate 1 审设计，Gate 2 审代码）
 
 Gate 默认关闭，加 --review 时启用
-一旦启用：审查失败 → 修订 → 重新审查（最多 REVIEW_MAX_ROUNDS 轮）
+一旦启用：审查失败 → 修订 → 重新审查（最多自动修复 REVIEW_MAX_ROUNDS 轮）
           审查工具不可用 → 中止，❌ 不允许静默跳过
 ```
 
@@ -150,7 +150,7 @@ accept 把变更定稿到**本地**（更新文档 + commit），你可以先 re
 docs/iterations/2026-03-27/
   ├── 001-user-login-feature/
   │   ├── requirements.md / design.md / tasks.md
-  │   └── status.json   ← pending_review → applied → qa_passed → accepted → pr_created
+  │   └── status.json   ← pending_review → approved → applied → qa_passed（或 qa_failed → applied）→ accepted → pr_created
   └── 002-password-reset-fix/ ...
 ```
 
@@ -163,7 +163,7 @@ docs/iterations/2026-03-27/
 ```
 git worktree add ../wt-001-user-login-feature
   ├── 自动 seq/slug/分支命名（与 iteration 目录对齐）
-  ├── 自动复制主仓 .claude/.sdlc-config*（gitignored，不随 worktree 带过去）
+  ├── 自动复制主仓 .agents/.sdlc-config*（gitignored，不随 worktree 带过去）
   ├── 自动改写 PORT=3000+seq, API_PORT=4000+seq
   ├── 写入 .worktrees/worktree-registry.json（多 Agent 协调总线）
   └── 后续 proposal / apply / qa / accept / pr 在 worktree 内独立运行
@@ -208,7 +208,9 @@ flowchart TD
     %% ===== qa / accept / pr =====
     A_END --> QA[⑩ qa · Playwright + MCP 浏览器验收]
     QA -->|PASS| Q_END([qa_passed])
-    QA -->|FAIL · 代码缺陷| APPLY_START
+    QA -->|FAIL · 代码缺陷| QF([qa_failed · qa-failures.md])
+    QF --> REPAIR[apply 修复模式<br/>按清单修复 → lint + unit]
+    REPAIR --> A_END
     Q_END --> ACCEPT[⑪⑫ 总结 → 文档 → 本地 commit]
     ACCEPT --> AC_END([accepted])
     AC_END --> PR[⑬ push → gh pr create]
@@ -253,15 +255,15 @@ flowchart TD
 ┌───────────────────▼───────────────────────────────────┐
 │  Project Runtime Layer（每个项目独立）                   │
 │                                                       │
-│  .claude/CLAUDE.md         项目级 AI 指令               │
-│  .claude/ARCHITECTURE.md   架构基线                    │
-│  .claude/SECURITY.md       安全规范                    │
-│  .claude/CODING_GUIDELINES.md  编码规范                │
-│  .claude/PROJECT_BASELINE.md   existing 项目基线       │
-│  .claude/EXISTING_STRUCTURE.md existing 目录结构       │
-│  .claude/TEST_BASELINE.md      existing 测试基线       │
-│  .claude/.sdlc-config      运行时配置（gitignored）    │
-│  .claude/rules/            workflow 规则               │
+│  .agents/AGENTS.md         项目级 AI 指令               │
+│  .agents/ARCHITECTURE.md   架构基线                    │
+│  .agents/SECURITY.md       安全规范                    │
+│  .agents/CODING_GUIDELINES.md  编码规范                │
+│  .agents/PROJECT_BASELINE.md   existing 项目基线       │
+│  .agents/EXISTING_STRUCTURE.md existing 目录结构       │
+│  .agents/TEST_BASELINE.md      existing 测试基线       │
+│  .agents/.sdlc-config      运行时配置（gitignored）    │
+│  .agents/rules/            workflow 规则               │
 │  docs/iterations/          每轮迭代产物                 │
 │  tests/unit|e2e|reports/   测试产物                    │
 │  apps/web|server · packages/*  业务代码 / 共享模块     │
@@ -305,7 +307,7 @@ Stage 4   Playwright MCP               真实浏览器交互验收 ← 这才是
 
 ## 配置一览
 
-统一放在 `.claude/.sdlc-config`（`KEY=VALUE`，init 自动生成并 gitignore；全局默认可放 `~/.claude/.sdlc-config`，项目级覆盖全局）：
+统一放在 `.agents/.sdlc-config`（`KEY=VALUE`，init 自动生成并 gitignore；全局默认可放 `~/.agents/.sdlc-config`（旧位置 `~/.claude/.sdlc-config` 仍会读取），项目级覆盖全局）：
 
 ```bash
 # 均有默认值，按需覆盖
@@ -313,7 +315,7 @@ TEST_FRAMEWORK=jest          # jest | vitest | mocha
 LINT_TOOL=eslint             # eslint | biome
 E2E_FRAMEWORK=playwright     # 浏览器验收框架（qa 命令）
 TEST_BOOTSTRAP_POLICY=report # report | auto | never
-REVIEW_MAX_ROUNDS=1          # Gate/Test 最大循环轮数（--review 时生效）
+REVIEW_MAX_ROUNDS=1          # 失败后最多自动修复轮数（0 = 不自动修；Gate 仅 --review 时运行）
 GIT_BRANCH_PREFIX=feat/      # 分支前缀
 COMMIT_TYPE=                 # 留空按迭代 type 推断
 COMMIT_SCOPE=                # 留空自动推断
@@ -326,16 +328,16 @@ PR_TEMPLATE=                 # 自定义 PR body 模板路径
 
 ## 安装
 
-> 支持 **Claude Code** 与 **Codex** 两种运行时。
+> 支持 **Claude Code** 与 **Codex**（以及其他读取 `AGENTS.md` 的工具）。
+
+### npx skills 项目级安装（推荐）
 
 ```bash
-# Claude Code（plugin marketplace，推荐）
-/plugin marketplace add evan-e2438927/sdlc-workflow
-/plugin install sdlc-full@sdlc-workflow
-
-# Codex / 通用（skills CLI）
-npx skills add evan-e2438927/sdlc-workflow -y
+cd your-project
+npx skills add evan-e2438927/sdlc-workflow --skill '*' -a claude-code -a codex -y
 ```
+
+提交 `.agents/`、`.claude/skills/` 和 `skills-lock.json`，团队共用一个版本。个人使用可加 `-g` 全局安装，或用 Claude Code 插件（`/plugin marketplace add evan-e2438927/sdlc-workflow`，再 `/plugin install sdlc-full@sdlc-workflow`）。详见 [README · 安装](./README.zh-CN.md#安装)。
 
 验证：在任意项目目录执行 `sdlc-init`，看到 init 摘要输出即为安装成功。
 
@@ -368,9 +370,10 @@ npx skills add evan-e2438927/sdlc-workflow -y
 - [x] proposal 人工审核门 + 澄清 Gate（低置信度先澄清再设计）
 - [x] status.json 状态管理 + iteration 目录结构化
 - [x] qa：Playwright + MCP 浏览器功能验收作为最终通过标准
-- [x] 统一上下文加载（全局 + 项目覆盖）+ 配置收敛到 `.claude/.sdlc-config`
+- [x] 统一上下文加载（全局 + 项目覆盖）+ 配置收敛到 `.agents/.sdlc-config`
 - [x] Git Worktree 并行开发隔离（自动分支 / 端口 / 配置复制 / 注册表）
 - [x] 发布为可安装插件（Claude Code plugin + skills CLI）
+- [x] AGENTS.md 标准 + npx skills：`.agents/` 作为 Claude Code / Codex / Cursor 的唯一来源，同步只用一条命令 `.agents/bin/sdlc-sync`
 - [x] 增量 update：插件升级后漂移感知同步脚手架
 
 ### 路线图 🗺️

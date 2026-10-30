@@ -1,0 +1,34 @@
+#!/bin/bash
+# .agents/bin/sdlc-sync — 项目内的 sdlc 同步入口（sdlc 托管文件，由同步脚本刷新，不要手改）
+#
+# 用法：.agents/bin/sdlc-sync [--check] [--check-paths]
+#   改了 .agents/config.json（如 MCP 服务器）之后，在重启 IDE / 工具之前执行一次。
+#   参数与退出码同 sdlc-sync-agents.sh：0 = 正常；1 = 有漂移；2 = 出错。
+#   同步的永远是本脚本所在的项目，与当前目录无关。
+#
+# 找 sdlc 核心的顺序：
+#   1. 环境变量 SDLC_CORE
+#   2. 项目内 .agents/skills/sdlc-workflow（npx skills 项目级安装，版本与项目锁定一致）
+#   3. ~/.claude/skills/sdlc-workflow（手动全局安装）
+#   4. Claude Code 插件缓存 ~/.claude/plugins/cache/*/*/*/sdlc-workflow（多个版本取最近修改的）
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "$0")/../.." && pwd -P)" || { echo "❌ 无法定位项目根" >&2; exit 2; }
+
+CORE=""
+for c in "${SDLC_CORE:-}" "$ROOT/.agents/skills/sdlc-workflow" "${HOME:-}/.claude/skills/sdlc-workflow"; do
+  if [ -n "$c" ] && [ -f "$c/scripts/sdlc-sync-agents.sh" ]; then CORE="$c"; break; fi
+done
+if [ -z "$CORE" ] && [ -n "${HOME:-}" ]; then
+  # shellcheck disable=SC2012  # 按修改时间取最新版本，路径不含换行
+  newest="$(ls -t "$HOME"/.claude/plugins/cache/*/*/*/sdlc-workflow/scripts/sdlc-sync-agents.sh 2>/dev/null | head -1)"
+  [ -n "$newest" ] && CORE="$(dirname "$(dirname "$newest")")"
+fi
+if [ -z "$CORE" ]; then
+  echo "❌ 找不到 sdlc 核心（sdlc-workflow）。请在项目根执行：" >&2
+  echo "   npx skills add evan-e2438927/sdlc-workflow --skill sdlc-workflow" >&2
+  echo "   或设置环境变量 SDLC_CORE 指向 sdlc-workflow 目录" >&2
+  exit 2
+fi
+
+exec bash "$CORE/scripts/sdlc-sync-agents.sh" "$@" "$ROOT"

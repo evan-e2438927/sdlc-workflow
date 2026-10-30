@@ -1,12 +1,12 @@
 # ╔══════════════════════════════════════════════════════════════╗
 # ║              SDLC Workflow 配置文件                            ║
-# ║  位置: <project>/.claude/.sdlc-config                         ║
+# ║  位置: <project>/.agents/.sdlc-config                         ║
 # ║  格式: KEY=VALUE（shell 风格，# 开头为注释）                  ║
 # ║  由 /sdlc-workflow init 生成；按需编辑。无敏感信息。          ║
 # ╚══════════════════════════════════════════════════════════════╝
 #
 # 加载规则：统一上下文加载入口读取本文件（见 references/context-loader.md）。
-# 全局默认可放在 ~/.claude/.sdlc-config，项目级 <project>/.claude/.sdlc-config 覆盖之。
+# 全局默认可放在 ~/.agents/.sdlc-config（旧位置 ~/.claude/.sdlc-config 仍会读取），项目级 <project>/.agents/.sdlc-config 覆盖之。
 
 # ──────────────────────────────────────────────────────────────
 # 测试配置
@@ -47,9 +47,9 @@ TEST_BOOTSTRAP_POLICY=report
 # 审查配置
 # ──────────────────────────────────────────────────────────────
 
-# [可选] Review/Test 最大循环轮数   类型: 正整数(1-10)   默认: 1
-# Gate1(设计审查)、Gate2(代码审查)、测试修复 各环节的最大重试次数
-# 超过仍未通过 → 中止 Pipeline → 等待人工介入（仅 --review 时生效 Gate）
+# [可选] 最多自动修复轮数（0–10）   类型: 整数   默认: 1   0=不自动修复，失败即停
+# 适用于 Gate1 / Gate2（仅 --review 时运行）、⑨ lint+unit 修复、qa 脚本修复、doit --qa 的缺陷回流
+# 修满 N 轮仍未通过 → 停下，phase 不变，等待人工介入（规则见 SKILL.md「修复轮数（唯一定义）」）
 REVIEW_MAX_ROUNDS=1
 
 # ──────────────────────────────────────────────────────────────

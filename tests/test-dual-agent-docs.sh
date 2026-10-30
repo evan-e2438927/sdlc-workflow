@@ -2,8 +2,7 @@
 # 双模式（单/多 agent）相关 markdown 规范的结构断言。各任务在 "# ── END ──" 前追加自己的断言段。
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-SKILL_DIR="$(cd "$HERE/../.." && pwd)"
-REPO_DIR="$(cd "$SKILL_DIR/.." && pwd)"
+REPO_DIR="$(cd "$HERE/.." && pwd)"; SKILL_DIR="$REPO_DIR/sdlc-workflow"
 R="$SKILL_DIR/references"
 fail=0
 has()    { grep -qF -- "$2" "$1" 2>/dev/null || { echo "FAIL: $1 缺少: $2"; fail=1; }; }
@@ -185,7 +184,7 @@ has   "$SKILL_DIR/templates/sdlc-config.tpl" '优先使用离被改文件最近�
 # ── 越界守卫：flow / SKILL / roles / README ──
 has   "$F" '## 越界守卫'
 has   "$F" 'tracks/.allow-<role>'
-has   "$F" '.claude/.sdlc-active-iteration'
+has   "$F" '.agents/.sdlc-active-iteration'
 has   "$F" '允许清单: <'
 has   "$F" '被越界守卫拒绝写入'
 has   "$F" '只有 `*` 是通配符'

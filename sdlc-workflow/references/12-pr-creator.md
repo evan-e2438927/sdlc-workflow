@@ -9,7 +9,7 @@
 /sdlc-workflow pr [<迭代目录>]
 ```
 
-若不指定路径，自动查找最近一个 `phase == "accepted"`（即已本地提交）的迭代目录。
+若不指定路径，用 `bash "$SDLC_STATUS" find-latest accepted` 自动定位已本地提交的迭代（`SDLC_STATUS` 见 SKILL.md「迭代状态（phase）」）。
 
 ## 前置条件
 
@@ -19,7 +19,7 @@ PHASE=$(jq -r '.phase' "$STATUS_FILE")
 
 case "$PHASE" in
   "accepted")   echo "✅ 已本地提交，开始 push + 创建 PR" ;;
-  "pr_created") echo "⚠️ 该迭代已创建过 PR" ;;
+  "pr_created") echo "⚠️ 该迭代已创建过 PR：$(jq -r '.pr_url // "-"' "$STATUS_FILE")"; exit 1 ;;
   *)
     echo "❌ 当前 phase 为 $PHASE，请先运行 /sdlc-workflow:accept 完成本地提交"
     exit 1
@@ -140,8 +140,9 @@ echo "🔗 PR: $PR_URL"
 ### 3. 更新 status.json
 
 ```bash
-jq '.phase = "pr_created" | .pr_created_at = now | .pr_url = "<url>"' \
-  "$STATUS_FILE" > tmp.json && mv tmp.json "$STATUS_FILE"
+bash "$SDLC_STATUS" transition "$ITER_DIR" pr_created --by pr
+# pr_url 是进度字段，直接写
+jq --arg u "$PR_URL" '.pr_url = $u' "$STATUS_FILE" > "$STATUS_FILE.tmp" && mv "$STATUS_FILE.tmp" "$STATUS_FILE"
 
 # worktree 模式：同步注册表中的 pr_url（若注册表可达）
 echo "✅ PR: <url> | 分支: $CURRENT_BRANCH"

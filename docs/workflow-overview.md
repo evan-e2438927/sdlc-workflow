@@ -36,7 +36,7 @@ Claude Code                              Codex CLI
 
 - **消除自我验证盲区**：生成者对自身输出天然"过于自信"，独立审查者能发现生成者遗漏的安全漏洞、架构违规和逻辑缺陷。
 - **审查维度固定化**：Codex CLI 的审查 prompt 固定嵌入 OWASP Top 10、CODING_GUIDELINES、SECURITY 等规范，不会因上下文膨胀而跳过检查项。
-- **循环修订可控**：FAIL 后回退给 Claude Code 修订，再交 Codex CLI 重审，最多 N 轮（`REVIEW_MAX_ROUNDS`），超限自动上报人工。
+- **循环修订可控**：FAIL 后回退给 Claude Code 修订，再交 Codex CLI 重审，最多自动修复 N 轮（`REVIEW_MAX_ROUNDS`，默认 1，0 = 不自动修），超限停下转人工。
 
 ---
 
@@ -56,10 +56,10 @@ graph LR
 | 动作 | 说明 |
 |------|------|
 | 项目模式检测 | 自动识别 `fresh project` 或 `existing project` |
-| 脚手架生成 | 运行 `init-project.sh`，生成 `.claude/`、`docs/`、`tests/`、`.claude/.sdlc-config` 等基础结构 |
+| 脚手架生成 | 运行 `init-project.sh`，生成 `.agents/`、`docs/`、`tests/`、`.agents/.sdlc-config` 等基础结构 |
 | 基线采集 | existing project 额外生成 `PROJECT_BASELINE.md`、`EXISTING_STRUCTURE.md`、`TEST_BASELINE.md` |
 
-**产物**：`.claude/CLAUDE.md`、`.claude/ARCHITECTURE.md`、`.claude/SECURITY.md`、`.claude/CODING_GUIDELINES.md`、`.claude/.sdlc-config`
+**产物**：`.agents/AGENTS.md`、`.agents/ARCHITECTURE.md`、`.agents/SECURITY.md`、`.agents/CODING_GUIDELINES.md`、`.agents/.sdlc-config`
 
 ### 阶段二：需求设计（①②③④⑤）
 
@@ -74,8 +74,8 @@ graph LR
 | ⑤ | design-reviewer | **Codex CLI** | **Gate 1**: PASS / FAIL（可行性 / 安全 / 架构 / AC 覆盖度） |
 
 **关键规则**：
-- Gate 1 FAIL 时回退到步骤③重新生成设计，最多循环 N 轮
-- `proposal` 命令在 Gate 1 通过后暂停，写入 `status.json (phase: pending_review)`，等待人工审核
+- Gate 1 FAIL 时回退到步骤③修订设计，最多自动修复 N 轮
+- `proposal` 命令在 Gate 1 通过后暂停，写入 `status.json (phase: pending_review)`，等待人工审核；审核期间直接在对话里提修改意见，agent 原地联动修改三份文档
 - `doit` 命令在 Gate 1 通过后直接进入下一阶段
 
 ### 阶段三：开发审查（⑥⑦⑧）
@@ -91,7 +91,7 @@ graph LR
 **关键规则**：
 - 步骤⑥ 先由主 agent 打地基（infra / shared / 接口契约 / 新增依赖），再由 backend、frontend 角色开发；`AGENT_MODE=auto` 时前后端都有任务且运行时支持子 agent 即走多 agent 并行，否则主 agent 依次扮演各角色；步骤⑦ test 角色按 AC 查漏
 - Gate 2 审查维度：代码质量、安全漏洞（OWASP Top 10）、架构合规、编码规范、错误处理、目录结构、任务回写
-- Gate 2 FAIL 时回退到步骤⑥修复，最多循环 N 轮
+- Gate 2 FAIL 时回退到步骤⑥修复，最多自动修复 N 轮
 
 ### 阶段四：验收交付（qa → accept → pr）
 
@@ -100,7 +100,7 @@ graph LR
 | 命令 | 名称 | 执行者 | 产出 |
 |------|------|--------|------|
 | qa | 浏览器验收 | Claude Code | Playwright MCP 真实浏览器验收 + `tests/reports/<slug>-e2e-report.md` |
-| accept | 文档更新 + 本地提交 | Claude Code | 更新项目文档 + CLAUDE.md iterations 引用 → 本地 commit |
+| accept | 文档更新 + 本地提交 | Claude Code | 更新项目文档 + AGENTS.md iterations 引用 → 本地 commit |
 | pr | 推送建 PR | Claude Code | push → `gh pr create` |
 
 **测试分两处执行（无独立 CDP 阶段）**：
@@ -143,20 +143,20 @@ sdlc-workflow
 ### ① `init` — 初始化项目
 
 ```bash
-/sdlc-workflow init [review=1 branch=feat/ test-framework=vitest lint=eslint]
+/sdlc-init [review=1 branch=feat/ test-framework=vitest lint=eslint]
 ```
 
 | 项 | 说明 |
 |-----|------|
 | **何时用** | 首次将项目接入 SDLC 工作流 |
-| **做什么** | 检测项目类型 → 生成脚手架 → 采集基线 → 配置 `.claude/.sdlc-config` |
-| **产物** | `.claude/` 目录、`docs/`、`tests/`、`.claude/.sdlc-config` |
+| **做什么** | 检测项目类型 → 生成脚手架 → 采集基线 → 配置 `.agents/.sdlc-config` |
+| **产物** | `.agents/` 目录、`docs/`、`tests/`、`.agents/.sdlc-config` |
 | **阶段覆盖** | 阶段一 |
 
 ### ② `proposal` — 需求拆解
 
 ```bash
-/sdlc-workflow proposal <需求文本 | file:///path | URL>
+/sdlc-proposal <需求文本 | file:///path | URL>
 ```
 
 | 项 | 说明 |
@@ -170,7 +170,7 @@ sdlc-workflow
 ### ③ `apply` — 续跑开发（不含浏览器/提交）
 
 ```bash
-/sdlc-workflow apply [迭代目录路径]
+/sdlc-apply [迭代目录路径]
 ```
 
 | 项 | 说明 |
@@ -179,38 +179,38 @@ sdlc-workflow
 | **做什么** | 读取 status.json → ⑥ 开发（打地基 → 前后端角色 → 汇总）→ ⑦ 查漏（test 角色）→ [Gate 2] → lint + unit |
 | **产物** | 代码变更 + 单元测试（不提交、不 push） |
 | **阶段覆盖** | 阶段三 |
-| **前置条件** | status.json 中 `phase` 为 `pending_review` 或 `approved` |
+| **前置条件** | status.json 中 `phase` 为 `pending_review` 或 `approved`；为 `qa_failed` 时自动进入修复模式（按 `qa-failures.md` 修复缺陷 → lint + unit → 回到 `applied`） |
 
 ### ④ `qa` — 浏览器功能验收
 
 ```bash
-/sdlc-workflow qa [迭代目录路径]
+/sdlc-qa [迭代目录路径]
 ```
 
 | 项 | 说明 |
 |-----|------|
 | **何时用** | `apply` 完成后，做真实浏览器功能验收 |
 | **做什么** | 生成 Playwright 脚本 → Playwright MCP 真实浏览器执行 → 通过态截图 move 到 `tests/reports/<slug>/screenshots/`（gitignore） |
-| **产物** | `tests/reports/<slug>-e2e-report.md` + 证据截图 |
-| **前置条件** | `phase` 为 `applied` |
+| **产物** | `tests/reports/<slug>-e2e-report.md` + 证据截图；发现代码缺陷时另写 `qa-failures.md` |
+| **前置条件** | `phase` 为 `applied`；全部通过 → `qa_passed`，代码缺陷 → `qa_failed`（下一次 apply 修复） |
 
 ### ⑤ `accept` — 定稿本地提交
 
 ```bash
-/sdlc-workflow accept [迭代目录路径]
+/sdlc-accept [迭代目录路径]
 ```
 
 | 项 | 说明 |
 |-----|------|
 | **何时用** | qa 通过（或跳过 qa）后定稿 |
-| **做什么** | 总结变更 → 更新项目文档 + CLAUDE.md iterations 引用 → **本地 commit（不 push）** |
+| **做什么** | 总结变更 → 更新项目文档 + AGENTS.md iterations 引用 → **本地 commit（不 push）** |
 | **产物** | 本地 commit |
 | **前置条件** | `phase` 为 `qa_passed` 或 `applied` |
 
 ### ⑥ `pr` — 推送建 PR
 
 ```bash
-/sdlc-workflow pr [迭代目录路径]
+/sdlc-pr [迭代目录路径]
 ```
 
 | 项 | 说明 |
@@ -223,7 +223,7 @@ sdlc-workflow
 ### ⑦ `doit` — 全自动模式
 
 ```bash
-/sdlc-workflow doit <需求文本 | file:///path | URL>
+/sdlc-doit <需求文本 | file:///path | URL>
 ```
 
 | 项 | 说明 |
@@ -236,7 +236,7 @@ sdlc-workflow
 ### ⑧ `mini` — 小任务轻量流程
 
 ```bash
-/sdlc-workflow mini <小任务描述>
+/sdlc-mini <小任务描述>
 ```
 
 | 项 | 说明 |
@@ -249,9 +249,9 @@ sdlc-workflow
 ### ⑨ `worktree create` — 创建并行工作区
 
 ```bash
-/sdlc-workflow worktree create <slug> <type>
+/sdlc-worktree create <slug> <type>
 # 示例
-/sdlc-workflow worktree create user-login feature
+/sdlc-worktree create user-login feature
 ```
 
 | 项 | 说明 |
@@ -263,10 +263,10 @@ sdlc-workflow
 ### ⑩ `worktree manage` — 并行工作区管理
 
 ```bash
-/sdlc-workflow worktree list          # 列出所有并行工作区
-/sdlc-workflow worktree status        # 全局状态总览（聚合各 worktree 的 status.json）
-/sdlc-workflow worktree remove <seq>  # 移除已完成的工作区
-/sdlc-workflow worktree gc            # 清理已合并的工作区
+/sdlc-worktree list          # 列出所有并行工作区
+/sdlc-worktree status        # 全局状态总览（聚合各 worktree 的 status.json）
+/sdlc-worktree remove <seq>  # 移除已完成的工作区
+/sdlc-worktree gc            # 清理已合并的工作区
 ```
 
 | 项 | 说明 |
@@ -307,27 +307,27 @@ sdlc-workflow
 
 ```bash
 # 1. 初始化项目
-/sdlc-workflow init tg=123456789
+/sdlc-init
 
 # 2. 提交需求，AI 拆解设计后暂停等待审核
-/sdlc-workflow proposal "实现用户登录功能，支持邮箱和手机号"
+/sdlc-proposal "实现用户登录功能，支持邮箱和手机号"
 
 # 3. 审阅 iteration 目录中的 design.md / tasks.md
 #    确认后继续执行
-/sdlc-workflow apply docs/iterations/2026-04-16/001-user-login-feature/
+/sdlc-apply docs/iterations/2026-04-16/001-user-login-feature/
 ```
 
 ### 场景 B：全自动模式（doit）
 
 ```bash
-/sdlc-workflow doit "修复支付超时后重复扣款的 bug"
+/sdlc-doit "修复支付超时后重复扣款的 bug"
 # → 从需求到 PR 一步到位
 ```
 
 ### 场景 C：小任务快速修复（mini）
 
 ```bash
-/sdlc-workflow mini "将登录按钮颜色从蓝色改为绿色"
+/sdlc-mini "将登录按钮颜色从蓝色改为绿色"
 # → 轻量流程，仍有 Gate + 浏览器验收
 ```
 
@@ -335,13 +335,13 @@ sdlc-workflow
 
 ```bash
 # 创建两个独立工作区，互不干扰
-/sdlc-workflow worktree create user-login feature
-/sdlc-workflow worktree create payment-fix fix
+/sdlc-worktree create user-login feature
+/sdlc-worktree create payment-fix fix
 
 # 各自独立跑 pipeline
-cd ../wt-001-user-login-feature && /sdlc-workflow doit "用户登录"
-cd ../wt-002-payment-fix-fix   && /sdlc-workflow doit "支付修复"
+cd ../wt-001-user-login-feature && /sdlc-doit "用户登录"
+cd ../wt-002-payment-fix-fix   && /sdlc-doit "支付修复"
 
 # 完成后清理
-/sdlc-workflow worktree gc
+/sdlc-worktree gc
 ```

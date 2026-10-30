@@ -31,7 +31,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-CONFIG_FILE="$PROJECT_ROOT/.claude/.sdlc-config"
+CONFIG_FILE="$PROJECT_ROOT/.agents/.sdlc-config"
 CONFIG_TEMPLATE="$(cd "$(dirname "$0")/.." && pwd)/templates/sdlc-config.tpl"
 
 if [ ! -f "$CONFIG_FILE" ]; then

@@ -1,16 +1,16 @@
 #!/bin/bash
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-SKILL_DIR="$(cd "$HERE/../.." && pwd)"
+REPO_DIR="$(cd "$HERE/.." && pwd)"; SKILL_DIR="$REPO_DIR/sdlc-workflow"
 HOOK="$SKILL_DIR/templates/hooks/sdlc-pre-edit-guard.sh"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 fail=0
 
 ITER="docs/iterations/2026-09-24/001-demo-feature"
 setup() { # 重建一个处于 dev 阶段、守卫开启的项目
-  rm -rf "$TMP/p"; mkdir -p "$TMP/p/.claude" "$TMP/p/$ITER/tracks" "$TMP/p/apps/server/src/api" "$TMP/p/apps/web/src"
-  printf 'EDIT_GUARD=on\n' > "$TMP/p/.claude/.sdlc-config"
-  printf '%s\n' "$ITER" > "$TMP/p/.claude/.sdlc-active-iteration"
+  rm -rf "$TMP/p"; mkdir -p "$TMP/p/.agents" "$TMP/p/$ITER/tracks" "$TMP/p/apps/server/src/api" "$TMP/p/apps/web/src"
+  printf 'EDIT_GUARD=on\n' > "$TMP/p/.agents/.sdlc-config"
+  printf '%s\n' "$ITER" > "$TMP/p/.agents/.sdlc-active-iteration"
   printf '{\n  "phase": "approved",\n  "pipeline_stage": "dev"\n}\n' > "$TMP/p/$ITER/status.json"
   cat > "$TMP/p/$ITER/tracks/.allow-backend" <<EOF
 # backend allow list
@@ -33,11 +33,11 @@ BE="sdlc-backend-dev"; P="$TMP/p"
 
 setup
 [ "$(run - "$P/apps/web/src/x.ts")" = "0" ] || { echo "FAIL 1 主 agent 应放行"; fail=1; }
-printf 'EDIT_GUARD=off\n' > "$P/.claude/.sdlc-config"
+printf 'EDIT_GUARD=off\n' > "$P/.agents/.sdlc-config"
 [ "$(run $BE "$P/apps/web/src/x.ts")" = "0" ] || { echo "FAIL 2 EDIT_GUARD=off 应放行"; fail=1; }
 setup
 [ "$(run general-purpose "$P/apps/web/src/x.ts")" = "0" ] || { echo "FAIL 3 general-purpose 应放行"; fail=1; }
-rm "$P/.claude/.sdlc-active-iteration"
+rm "$P/.agents/.sdlc-active-iteration"
 [ "$(run $BE "$P/apps/web/src/x.ts")" = "0" ] || { echo "FAIL 4 无标记文件应放行"; fail=1; }
 setup; printf '{"pipeline_stage": "merge"}\n' > "$P/$ITER/status.json"
 [ "$(run $BE "$P/apps/web/src/x.ts")" = "0" ] || { echo "FAIL 5 非 dev/test-audit 阶段应放行"; fail=1; }
@@ -61,7 +61,7 @@ printf 'apps/server/src/api/system.ts\r\n' > "$P/$ITER/tracks/.allow-backend"
 # 16/17：无 jq 时走 grep 回退
 setup
 NOJQ="$TMP/nojq-bin"; mkdir -p "$NOJQ"
-for t in bash cat grep sed head tr cut dirname basename env; do ln -sf "$(command -v $t)" "$NOJQ/$t"; done
+for t in bash cat grep sed head tr cut dirname basename env awk; do ln -sf "$(command -v $t)" "$NOJQ/$t"; done
 [ "$(run $BE "$P/apps/server/src/api/system.ts" "$NOJQ")" = "0" ] || { echo "FAIL 16 无 jq 清单内应放行"; fail=1; }
 [ "$(run $BE "$P/apps/web/src/x.ts" "$NOJQ")" = "2" ] || { echo "FAIL 17 无 jq 清单外应拒绝"; fail=1; }
 
@@ -82,5 +82,49 @@ setup
 json='{"agent_type":"sdlc-backend-dev","tool_name":"Write","tool_input":{"file_path":"apps/server/src/api/system.ts"}}'
 rc=$(cd "$P/apps" && printf '%s' "$json" | CLAUDE_PROJECT_DIR="$P" /bin/bash "$HOOK" 2>"$TMP/err"; echo $?)
 [ "$rc" = "0" ] || { echo "FAIL 20 相对路径应按项目根（而非 cwd）解析"; fail=1; }
+
+# 21–25：Codex 格式（apply_patch，路径在 tool_input.command 的补丁头里，可能多个文件）
+# codex_run <agent_type|-> <patch> [PATH override]；补丁里的相对路径按 payload.cwd 解析
+codex_run() {
+  local at="$1" patch="$2" json
+  json=$(jq -n --arg at "$at" --arg p "$patch" --arg cwd "$P" \
+    '{session_id:"s",cwd:$cwd,hook_event_name:"PreToolUse",tool_name:"apply_patch",tool_input:{command:$p}} + (if $at=="-" then {} else {agent_type:$at} end)')
+  ( cd "$P" && printf '%s' "$json" | env ${3:+PATH="$3"} CLAUDE_PROJECT_DIR="$P" /bin/bash "$HOOK" 2>"$TMP/err" ); echo $?
+}
+setup
+PATCH_MIXED='*** Begin Patch
+*** Update File: apps/server/src/api/system.ts
+@@
+-a
++b
+*** Add File: apps/web/src/evil.ts
++x
+*** End Patch'
+PATCH_OK='*** Begin Patch
+*** Update File: apps/server/src/api/system.ts
+@@
+-a
++b
+*** Add File: apps/server/src/lib/new.ts
++x
+*** End Patch'
+PATCH_MOVE='*** Begin Patch
+*** Update File: apps/server/src/api/system.ts
+*** Move to: apps/web/src/moved.ts
+@@
+-a
++b
+*** End Patch'
+PATCH_DEL='*** Begin Patch
+*** Delete File: apps/web/src/version.ts
+*** End Patch'
+[ "$(codex_run $BE "$PATCH_MIXED")" = "2" ] || { echo "FAIL 21 Codex 多文件补丁中有越界文件应拒绝"; fail=1; }
+grep -q 'apps/web/src/evil.ts' "$TMP/err" || { echo "FAIL 21 stderr 应指出越界文件"; cat "$TMP/err"; fail=1; }
+[ "$(codex_run $BE "$PATCH_OK")" = "0" ] || { echo "FAIL 22 Codex 补丁全在清单内应放行"; cat "$TMP/err"; fail=1; }
+[ "$(codex_run $BE "$PATCH_MOVE")" = "2" ] || { echo "FAIL 23 Move to 目标越界应拒绝"; fail=1; }
+[ "$(codex_run $BE "$PATCH_DEL")" = "2" ] || { echo "FAIL 23b Delete File 越界应拒绝"; fail=1; }
+[ "$(codex_run - "$PATCH_MIXED")" = "0" ] || { echo "FAIL 24 无 agent_type 的 Codex 输入应放行"; fail=1; }
+JSON_NOJQ="$(codex_run $BE "$PATCH_MIXED" "$NOJQ")"
+[ "$JSON_NOJQ" = "2" ] || { echo "FAIL 25 无 jq 时 Codex 补丁越界应拒绝（得到 ${JSON_NOJQ}）"; fail=1; }
 
 [ "$fail" = "0" ] && echo PASS || exit 1

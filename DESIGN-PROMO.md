@@ -105,9 +105,9 @@ Real projects almost never start from scratch. Once the system detects an existi
 ```
 Detect package.json, .git/, src/ → classify as existing project
   ↓
-.claude/PROJECT_BASELINE.md     ← lock the current tech stack
-.claude/EXISTING_STRUCTURE.md   ← lock the current directory layout
-.claude/TEST_BASELINE.md        ← inventory the current test capability
+.agents/PROJECT_BASELINE.md     ← lock the current tech stack
+.agents/EXISTING_STRUCTURE.md   ← lock the current directory layout
+.agents/TEST_BASELINE.md        ← inventory the current test capability
   ↓
 All subsequent design must reference the baseline, no free-form refactor of the original project
 ```
@@ -123,7 +123,7 @@ Claude Code → generates code and design
 Codex CLI   → reviews independently (Gate 1 reviews design, Gate 2 reviews code)
 
 Gates are off by default, enabled with --review
-Once enabled: review fails → revise → re-review (up to REVIEW_MAX_ROUNDS rounds)
+Once enabled: review fails → revise → re-review (at most REVIEW_MAX_ROUNDS auto-fix rounds)
               review tool unavailable → abort, ❌ never silently skipped
 ```
 
@@ -150,7 +150,7 @@ Each requirement produces a structured iteration directory, with `status.json` r
 docs/iterations/2026-03-27/
   ├── 001-user-login-feature/
   │   ├── requirements.md / design.md / tasks.md
-  │   └── status.json   ← pending_review → applied → qa_passed → accepted → pr_created
+  │   └── status.json   ← pending_review → approved → applied → qa_passed (or qa_failed → applied) → accepted → pr_created
   └── 002-password-reset-fix/ ...
 ```
 
@@ -163,7 +163,7 @@ Real development involves multiple requirements, urgent hotfixes, and multi-agen
 ```
 git worktree add ../wt-001-user-login-feature
   ├── auto seq/slug/branch naming (aligned with the iteration directory)
-  ├── auto-copy the main repo's .claude/.sdlc-config* (gitignored, not carried over by worktree)
+  ├── auto-copy the main repo's .agents/.sdlc-config* (gitignored, not carried over by worktree)
   ├── auto-rewrite PORT=3000+seq, API_PORT=4000+seq
   ├── write .worktrees/worktree-registry.json (multi-agent coordination bus)
   └── subsequent proposal / apply / qa / accept / pr run independently inside the worktree
@@ -208,7 +208,9 @@ flowchart TD
     %% ===== qa / accept / pr =====
     A_END --> QA[⑩ qa · Playwright + MCP browser QA]
     QA -->|PASS| Q_END([qa_passed])
-    QA -->|FAIL · code defect| APPLY_START
+    QA -->|FAIL · code defect| QF([qa_failed · qa-failures.md])
+    QF --> REPAIR[apply repair mode<br/>fix listed defects → lint + unit]
+    REPAIR --> A_END
     Q_END --> ACCEPT[⑪⑫ summarize → docs → local commit]
     ACCEPT --> AC_END([accepted])
     AC_END --> PR[⑬ push → gh pr create]
@@ -253,15 +255,15 @@ flowchart TD
 ┌───────────────────▼───────────────────────────────────┐
 │  Project Runtime Layer (per-project, independent)      │
 │                                                       │
-│  .claude/CLAUDE.md         project-level AI instructions│
-│  .claude/ARCHITECTURE.md   architecture baseline      │
-│  .claude/SECURITY.md       security conventions       │
-│  .claude/CODING_GUIDELINES.md  coding conventions     │
-│  .claude/PROJECT_BASELINE.md   existing-project baseline│
-│  .claude/EXISTING_STRUCTURE.md existing directory layout│
-│  .claude/TEST_BASELINE.md      existing test baseline │
-│  .claude/.sdlc-config      runtime config (gitignored)│
-│  .claude/rules/            workflow rules             │
+│  .agents/AGENTS.md         project-level AI instructions│
+│  .agents/ARCHITECTURE.md   architecture baseline      │
+│  .agents/SECURITY.md       security conventions       │
+│  .agents/CODING_GUIDELINES.md  coding conventions     │
+│  .agents/PROJECT_BASELINE.md   existing-project baseline│
+│  .agents/EXISTING_STRUCTURE.md existing directory layout│
+│  .agents/TEST_BASELINE.md      existing test baseline │
+│  .agents/.sdlc-config      runtime config (gitignored)│
+│  .agents/rules/            workflow rules             │
 │  docs/iterations/          per-iteration artifacts    │
 │  tests/unit|e2e|reports/   test artifacts             │
 │  apps/web|server · packages/*  business code / shared modules│
@@ -305,7 +307,7 @@ Stage 4   Playwright MCP               real browser-interaction QA ← this is t
 
 ## Configuration at a glance
 
-All in `.claude/.sdlc-config` (`KEY=VALUE`, generated and gitignored by init; global defaults can go in `~/.claude/.sdlc-config`, with project-level overriding global):
+All in `.agents/.sdlc-config` (`KEY=VALUE`, generated and gitignored by init; global defaults can go in `~/.agents/.sdlc-config`, legacy `~/.claude/.sdlc-config` still read, with project-level overriding global):
 
 ```bash
 # All have defaults, override as needed
@@ -313,7 +315,7 @@ TEST_FRAMEWORK=jest          # jest | vitest | mocha
 LINT_TOOL=eslint             # eslint | biome
 E2E_FRAMEWORK=playwright     # browser QA framework (qa command)
 TEST_BOOTSTRAP_POLICY=report # report | auto | never
-REVIEW_MAX_ROUNDS=1          # max Gate/Test loop rounds (applies with --review)
+REVIEW_MAX_ROUNDS=1          # max auto-fix rounds after a failure (0 = no auto-fix; Gates run only with --review)
 GIT_BRANCH_PREFIX=feat/      # branch prefix
 COMMIT_TYPE=                 # empty infers from iteration type
 COMMIT_SCOPE=                # empty auto-infers
@@ -326,16 +328,16 @@ PR_TEMPLATE=                 # path to a custom PR body template
 
 ## Install
 
-> Supports both the **Claude Code** and **Codex** runtimes.
+> Works with **Claude Code** and **Codex** (and other tools that read `AGENTS.md`).
+
+### npx skills, project-level (recommended)
 
 ```bash
-# Claude Code (plugin marketplace, recommended)
-/plugin marketplace add evan-e2438927/sdlc-workflow
-/plugin install sdlc-full@sdlc-workflow
-
-# Codex / generic (skills CLI)
-npx skills add evan-e2438927/sdlc-workflow -y
+cd your-project
+npx skills add evan-e2438927/sdlc-workflow --skill '*' -a claude-code -a codex -y
 ```
+
+Commit `.agents/`, `.claude/skills/` and `skills-lock.json` so the whole team shares one version. For personal use, add `-g` to install globally, or use the Claude Code plugin (`/plugin marketplace add evan-e2438927/sdlc-workflow`, then `/plugin install sdlc-full@sdlc-workflow`). Details: [README · Install](./README.md#install).
 
 Verify: run `sdlc-init` in any project directory; seeing the init summary means the install succeeded.
 
@@ -368,9 +370,10 @@ Verify: run `sdlc-init` in any project directory; seeing the init summary means 
 - [x] proposal human review gate + clarification Gate (low-confidence clarified before design)
 - [x] status.json state management + structured iteration directories
 - [x] qa: Playwright + MCP browser QA as the final pass standard
-- [x] Unified context loading (global + project override) + config converged to `.claude/.sdlc-config`
+- [x] Unified context loading (global + project override) + config converged to `.agents/.sdlc-config`
 - [x] Git Worktree parallel-dev isolation (auto branch / port / config copy / registry)
 - [x] Published as an installable plugin (Claude Code plugin + skills CLI)
+- [x] AGENTS.md standard + npx skills: `.agents/` is the single source for Claude Code, Codex and Cursor; one sync command, `.agents/bin/sdlc-sync`
 - [x] Incremental update: drift-aware scaffold sync after a plugin upgrade
 
 ### Roadmap 🗺️

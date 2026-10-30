@@ -3,8 +3,8 @@
 ## 输入
 
 1. `docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/requirements.md`
-2. `.claude/ARCHITECTURE.md`
-3. `.claude/SECURITY.md`
+2. `.agents/ARCHITECTURE.md`
+3. `.agents/SECURITY.md`
 4. `docs/iterations/`（历史迭代，用于上下文）
 
 ## 输出
@@ -42,7 +42,7 @@ IF INTERACTIVE AND any(x.provenance == "never-asked" for x in MUST_ASK):
 
 ### 1. 读取历史上下文
 
-在生成新设计前，读取**最近 `HISTORY_ITER_DEPTH` 个迭代**（默认 2，`0`=全部；取自 `.claude/.sdlc-config`）
+在生成新设计前，读取**最近 `HISTORY_ITER_DEPTH` 个迭代**（默认 2，`0`=全部；取自 `.agents/.sdlc-config`）
 的 requirements.md + design.md，了解已有需求与设计：
 
 ```bash
@@ -65,7 +65,7 @@ done)
 ### 1.5 复核项目 skill 规范（CTX.skills）
 
 在生成设计前，复核统一上下文加载得到的 `CTX.skills`（来源 `~/.claude/skills/` 与
-`<project>/.claude/skills/`）：识别 `description` 与本设计相关的项目规范 skill。
+`<project>/.agents/skills/`）：识别 `description` 与本设计相关的项目规范 skill。
 
 - 设计必须与命中的项目规范一致；`design.md` 新增一节「## 遵循的项目规范」，逐条列出
   命中的 skill 名 + 依据要点。
@@ -79,7 +79,7 @@ done)
 
 | 优先级 | 条件 | 契约形态 | design.md 需写明 |
 |--------|------|----------|------------------|
-| 1 | 项目已有 `openapi.{yaml,yml,json}`，或 `.claude/PROJECT_BASELINE.md` 登记了 OpenAPI 文件 | `openapi` | OpenAPI 文件路径；本次新增/修改的接口同步写入该文件 |
+| 1 | 项目已有 `openapi.{yaml,yml,json}`，或 `.agents/PROJECT_BASELINE.md` 登记了 OpenAPI 文件 | `openapi` | OpenAPI 文件路径；本次新增/修改的接口同步写入该文件 |
 | 2 | TS monorepo：存在 `packages/` + `tsconfig*.json` + workspace 配置（`pnpm-workspace.yaml` / `package.json` 的 `workspaces` / `turbo.json`） | `ts-types` | 共享类型路径，默认 `packages/contracts/src/<slug>.ts`；existing project 已有共享类型包则沿用其位置 |
 | 3 | 其他 | `table` | 仅结构化接口表 |
 | — | 本次需求不涉及任何接口 | `none` | 「接口契约」写 "无" |
@@ -87,7 +87,7 @@ done)
 **existing project 沿用既有惯例**：命中优先级 2（TS monorepo）但项目**没有**任何共享契约/DTO 类型包、现有接口一贯是
 「后端 handler + 前端各自镜像类型文件」时，可改用 `table`，不为本次需求新建 `packages/contracts`。此时 design.md
 「接口契约」下必须写一段「契约形态判定说明」：列出现有惯例的证据（如现有接口的前端类型文件位置）和不新建共享包的理由；
-若 `.claude/EXISTING_STRUCTURE.md` 对新建包有审批门槛，一并引用。
+若 `.agents/EXISTING_STRUCTURE.md` 对新建包有审批门槛，一并引用。
 
 除 `none` 外，结构化接口表**必须写**：表格是所有形态的共同底线，`ts-types` / `openapi`
 是在表格之上追加的机器可校验形式。契约是 apply ⑥.2 前后端并行开发的唯一依据。
@@ -264,8 +264,8 @@ Claude Code 在生成设计时应参考：
 ```bash
 # 1. 读取输入
 REQ_FILE="docs/iterations/$DATE/$SEQ-$SLUG-$TYPE/requirements.md"
-ARCH_FILE=".claude/ARCHITECTURE.md"
-SEC_FILE=".claude/SECURITY.md"
+ARCH_FILE=".agents/ARCHITECTURE.md"
+SEC_FILE=".agents/SECURITY.md"
 
 # 2. 读取历史上下文（最近 HISTORY_ITER_DEPTH 个迭代，0=全部；读 requirements.md + design.md）
 DEPTH="${HISTORY_ITER_DEPTH:-2}"
@@ -306,8 +306,8 @@ echo "✅ 设计文档已生成: docs/iterations/$DATE/$SEQ-$SLUG-$TYPE/design.m
 
 - 输入：
   - requirements.md
-  - .claude/ARCHITECTURE.md
-  - .claude/SECURITY.md
+  - .agents/ARCHITECTURE.md
+  - .agents/SECURITY.md
   - docs/iterations/*/design.md（历史）
 - 输出：docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/design.md
 - 参考：

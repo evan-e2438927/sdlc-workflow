@@ -1,66 +1,110 @@
 #!/bin/bash
 set -euo pipefail
 
-# 把最新版插件的脚手架能力安全同步到已初始化的项目：
+# update-project.sh <项目根> — 把最新版 sdlc 的脚手架安全同步到已初始化的项目：
+#   - 旧布局（.claude/CLAUDE.md 等为实体文件）→ 先迁移到 .agents/（原文件备份到 .agents/.backup/<时间戳>/，
+#     路径改写为 .agents/，自定义 skill 移到 .agents/skills/，已有平台配置导入 .agents/config.json）
 #   - 补齐新目录结构（幂等）
-#   - 迁移 .claude/.sdlc-config（保留用户值，补新键，删废弃键）
-#   - 刷新插件托管的 workflow-rules.md（旧版备份）
+#   - 迁移 .agents/.sdlc-config（保留用户值，补新键，删废弃键）
+#   - 刷新 sdlc 托管的 workflow-rules.md（旧版备份）
 #   - 缺失的用户文档从模板补齐，但绝不覆盖已存在的用户内容
-# 可重复运行，安全幂等。
+#   - 执行同步（软链接、hooks、平台文件、.gitignore 托管块）
+# 可重复运行：已是新布局的项目只做同步和配置键迁移。
 
 PROJECT_ROOT="${1:-.}"
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-CLAUDE_DIR="$PROJECT_ROOT/.claude"
+SYNC="$SKILL_DIR/scripts/sdlc-sync-agents.sh"
+# shellcheck source=sdlc-migrate-lib.sh
+. "$SKILL_DIR/scripts/sdlc-migrate-lib.sh"
 
-# 安装 SDLC hooks（PostToolUse 编辑检查 + PreToolUse 越界守卫）并合并 settings.json（幂等）
-install_sdlc_hook() {
-  local root="$1"
-  mkdir -p "$root/.claude/hooks"
-  local h
-  for h in sdlc-post-edit-check.sh sdlc-pre-edit-guard.sh; do
-    cp "$SKILL_DIR/templates/hooks/$h" "$root/.claude/hooks/$h"
-    chmod +x "$root/.claude/hooks/$h"
-  done
-  local settings="$root/.claude/settings.json"
-  local tpl="$SKILL_DIR/templates/settings.json.tpl"
-  if [ ! -f "$settings" ]; then
-    cp "$tpl" "$settings"
-  elif command -v jq >/dev/null 2>&1; then
-    # 按事件分别检查：尚无我们的 hook 才从模板合并追加该事件的条目
-    local pair ev script tmp
-    for pair in PostToolUse:sdlc-post-edit-check PreToolUse:sdlc-pre-edit-guard; do
-      ev="${pair%%:*}"; script="${pair#*:}"
-      if ! jq -e --arg ev "$ev" --arg s "$script" '.hooks[$ev][]?.hooks[]? | select(.command|test($s))' "$settings" >/dev/null 2>&1; then
-        tmp="$(mktemp)"
-        jq --slurpfile add "$tpl" --arg ev "$ev" '
-          .hooks = (.hooks // {})
-          | .hooks[$ev] = ((.hooks[$ev] // []) + $add[0].hooks[$ev])
-        ' "$settings" > "$tmp" && mv "$tmp" "$settings" || rm -f "$tmp"
-      fi
-    done
-  else
-    echo "  ⚠ 已安装 hook 脚本，但缺少 jq 无法自动合并 settings.json；请手动把 templates/settings.json.tpl 的 PreToolUse / PostToolUse 合并进 $settings" >&2
-  fi
-}
+[ -d "$PROJECT_ROOT" ] || { echo "❌ 项目目录不存在: $PROJECT_ROOT"; exit 1; }
+PROJECT_ROOT="$(cd "$PROJECT_ROOT" && pwd)"
+A="$PROJECT_ROOT/.agents"
+C="$PROJECT_ROOT/.claude"
+BAK="$A/.backup/$(date +%Y%m%d-%H%M%S)"
 
-if [ ! -f "$CLAUDE_DIR/CLAUDE.md" ]; then
-  echo "❌ 项目尚未初始化（缺少 .claude/CLAUDE.md），请先运行 /sdlc-workflow:init"
+is_real() { [ -f "$1" ] && [ ! -L "$1" ]; }
+LEGACY=0
+if is_real "$C/CLAUDE.md" || is_real "$C/ARCHITECTURE.md"; then LEGACY=1; fi
+if [ "$LEGACY" = 0 ] && [ ! -f "$A/AGENTS.md" ]; then
+  echo "❌ 项目尚未初始化（缺少 .agents/AGENTS.md），请先运行 init（/sdlc-init）"
   exit 1
 fi
 
 echo "🔄 同步最新 SDLC 脚手架到项目: $PROJECT_ROOT"
 
+# ── 0. 旧布局迁移：.claude/ → .agents/ ─────────────────────────
+MOVED=""; KEPT=""
+# 文件内容中指向 .claude/ 下规则文件的路径改写为 .agents/（全局 ~/.claude/ 不动）
+rewrite_paths() {
+  perl -pi -e 's#(?<!~/)\.claude/CLAUDE\.md#.agents/AGENTS.md#g;
+    s#(?<!~/)\.claude/(ARCHITECTURE|SECURITY|CODING_GUIDELINES|PROJECT_BASELINE|EXISTING_STRUCTURE|TEST_BASELINE)\.md#.agents/$1.md#g;
+    s#(?<!~/)\.claude/(rules|skills|hooks)/#.agents/$1/#g;
+    s#(?<!~/)\.claude/\.sdlc-(config|active-iteration)#.agents/.sdlc-$1#g' "$@"
+}
+# move_item <.claude 下相对路径> <.agents 下相对路径>：备份后移动；目标已存在则不覆盖
+move_item() {
+  local src="$C/$1" dst="$A/$2" f
+  [ -e "$src" ] || [ -L "$src" ] || return 0
+  if [ -e "$dst" ] || [ -L "$dst" ]; then
+    KEPT="$KEPT .claude/$1"
+    echo "  ⚠ 未移动 .claude/$1：.agents/$2 已存在（两者都保留，请人工核对）"
+    return 0
+  fi
+  sdlc_backup "$PROJECT_ROOT" "$BAK" ".claude/$1"
+  mkdir -p "$(dirname "$dst")"
+  mv "$src" "$dst"
+  if [ -d "$dst" ]; then
+    find "$dst" -type f -name '*.md' | while IFS= read -r f; do rewrite_paths "$f"; done
+  else
+    case "$dst" in *.md) rewrite_paths "$dst" ;; esac
+  fi
+  MOVED="$MOVED"$'\n'"     .claude/$1 → .agents/$2"
+}
+
+if [ "$LEGACY" = 1 ]; then
+  echo "  🚚 检测到旧布局（.claude/），迁移到 .agents/（原文件备份: ${BAK#"$PROJECT_ROOT"/}/）"
+  mkdir -p "$A/rules" "$A/skills"
+  move_item CLAUDE.md AGENTS.md
+  for f in ARCHITECTURE SECURITY CODING_GUIDELINES PROJECT_BASELINE EXISTING_STRUCTURE TEST_BASELINE; do
+    move_item "$f.md" "$f.md"
+  done
+  for f in "$C"/rules/*; do
+    [ -e "$f" ] || continue
+    move_item "rules/$(basename "$f")" "rules/$(basename "$f")"
+  done
+  rmdir "$C/rules" 2>/dev/null || true
+  for f in .sdlc-config .sdlc-config.local .sdlc-active-iteration; do move_item "$f" "$f"; done
+  # sdlc 托管 hooks：备份后删除，由同步重建到 .agents/hooks/
+  for f in "$C"/hooks/sdlc-*.sh; do
+    [ -f "$f" ] || continue
+    sdlc_backup "$PROJECT_ROOT" "$BAK" ".claude/hooks/$(basename "$f")"
+    rm -f "$f"
+  done
+  rmdir "$C/hooks" 2>/dev/null || true
+  # 项目自定义 skill（实体目录）与占位 README 移到 .agents/skills/，原位置由同步改为软链接
+  for f in "$C"/skills/*; do
+    [ -e "$f" ] && [ ! -L "$f" ] || continue
+    n="$(basename "$f")"
+    if [ -d "$f" ] || [ "$n" = README.md ]; then move_item "skills/$n" "skills/$n"; fi
+  done
+  sdlc_absorb_root_doc "$PROJECT_ROOT" "$BAK" AGENTS.md
+  sdlc_absorb_root_doc "$PROJECT_ROOT" "$BAK" CLAUDE.md
+  [ -f "$A/config.json" ] || cp "$SKILL_DIR/templates/config.json.tpl" "$A/config.json"
+  sdlc_import_platform "$PROJECT_ROOT" "$BAK"
+  echo "  ✅ 规则文件已迁移到 .agents/"
+fi
+[ -f "$A/config.json" ] || { cp "$SKILL_DIR/templates/config.json.tpl" "$A/config.json"; echo "  ＋ 补齐 .agents/config.json"; }
+
 # ── 1. 目录结构（幂等）────────────────────────────────────────
-mkdir -p "$CLAUDE_DIR/rules"
-mkdir -p "$CLAUDE_DIR/skills"
+mkdir -p "$A/rules" "$A/skills"
 mkdir -p "$PROJECT_ROOT/docs/iterations"
 mkdir -p "$PROJECT_ROOT/tests/unit/web" "$PROJECT_ROOT/tests/unit/server" "$PROJECT_ROOT/tests/unit/packages"
-mkdir -p "$PROJECT_ROOT/tests/e2e"
-mkdir -p "$PROJECT_ROOT/tests/reports"
+mkdir -p "$PROJECT_ROOT/tests/e2e" "$PROJECT_ROOT/tests/reports"
 echo "  ✅ 目录结构已对齐"
 
-# ── 2. 迁移 .claude/.sdlc-config ──────────────────────────────
-CONFIG="$CLAUDE_DIR/.sdlc-config"
+# ── 2. 迁移 .agents/.sdlc-config ──────────────────────────────
+CONFIG="$A/.sdlc-config"
 TEMPLATE="$SKILL_DIR/templates/sdlc-config.tpl"
 # 已废弃、需主动删除的键
 OBSOLETE_KEYS="TG_USERNAME PARALLEL_TESTS"
@@ -71,7 +115,7 @@ is_obsolete() {
 
 if [ ! -f "$CONFIG" ]; then
   cp "$TEMPLATE" "$CONFIG"
-  echo "  ✅ .claude/.sdlc-config 不存在，已从模板生成"
+  echo "  ✅ .agents/.sdlc-config 不存在，已从模板生成"
 else
   cp "$CONFIG" "$CONFIG.bak"
   tmp="$(mktemp)"
@@ -106,7 +150,7 @@ else
   done < "$CONFIG"
 
   mv "$tmp" "$CONFIG"
-  echo "  ✅ .claude/.sdlc-config 已迁移（旧版备份: .sdlc-config.bak）"
+  echo "  ✅ .agents/.sdlc-config 已迁移（旧版备份: .sdlc-config.bak）"
   if [ -n "$added" ];     then echo "     ＋ 新增键:$added"; fi
   if [ -n "$preserved" ]; then echo "     ⊙ 保留自定义键:$preserved"; fi
   # 报告被移除的废弃键
@@ -117,8 +161,8 @@ else
   if [ -n "$removed" ]; then echo "     － 移除废弃键:$removed"; fi
 fi
 
-# ── 3. 刷新插件托管文件：workflow-rules.md（旧版备份）──────────
-RULES="$CLAUDE_DIR/rules/workflow-rules.md"
+# ── 3. 刷新 sdlc 托管文件：workflow-rules.md（旧版备份）──────────
+RULES="$A/rules/workflow-rules.md"
 RULES_TPL="$SKILL_DIR/templates/workflow-rules.md.tpl"
 if [ -f "$RULES" ]; then
   if cmp -s "$RULES" "$RULES_TPL"; then
@@ -141,52 +185,48 @@ ensure_user_doc() {
     echo "  ＋ 补齐缺失文档: $name"
   fi
 }
-ensure_user_doc "$SKILL_DIR/templates/CLAUDE.md.tpl"            "$CLAUDE_DIR/CLAUDE.md"            ".claude/CLAUDE.md"
-ensure_user_doc "$SKILL_DIR/templates/ARCHITECTURE.md.tpl"      "$CLAUDE_DIR/ARCHITECTURE.md"      ".claude/ARCHITECTURE.md"
-ensure_user_doc "$SKILL_DIR/templates/SECURITY.md.tpl"         "$CLAUDE_DIR/SECURITY.md"         ".claude/SECURITY.md"
-ensure_user_doc "$SKILL_DIR/templates/CODING_GUIDELINES.md.tpl" "$CLAUDE_DIR/CODING_GUIDELINES.md" ".claude/CODING_GUIDELINES.md"
+ensure_user_doc "$SKILL_DIR/templates/AGENTS.md.tpl"            "$A/AGENTS.md"            ".agents/AGENTS.md"
+ensure_user_doc "$SKILL_DIR/templates/ARCHITECTURE.md.tpl"      "$A/ARCHITECTURE.md"      ".agents/ARCHITECTURE.md"
+ensure_user_doc "$SKILL_DIR/templates/SECURITY.md.tpl"          "$A/SECURITY.md"          ".agents/SECURITY.md"
+ensure_user_doc "$SKILL_DIR/templates/CODING_GUIDELINES.md.tpl" "$A/CODING_GUIDELINES.md" ".agents/CODING_GUIDELINES.md"
 
-# ── 5. 自定义 skills 脚手架（占位说明 + CLAUDE.md 小节，幂等）──
-if [ ! -f "$CLAUDE_DIR/skills/README.md" ]; then
-  cat > "$CLAUDE_DIR/skills/README.md" <<'EOF'
+# ── 5. 自定义 skills 脚手架（占位说明 + AGENTS.md 小节，幂等）──
+if [ ! -f "$A/skills/README.md" ]; then
+  cat > "$A/skills/README.md" <<'EOF'
 # 自定义 Skills
 
-把项目专属 skill 放到本目录：`.claude/skills/<name>/SKILL.md`
+把项目专属 skill 放到本目录：`.agents/skills/<name>/SKILL.md`
 （frontmatter 需含 `name` 与 `description`）。
 
-SDLC pipeline 会自动发现并在与当前阶段相关时优先调用。
-详见项目根 `.claude/CLAUDE.md` 的「自定义 Skills」小节。
+SDLC pipeline 会自动发现并在与当前阶段相关时优先调用；Claude Code 通过同步生成的
+`.claude/skills/<name>` 软链接发现它们。详见 `.agents/AGENTS.md` 的「自定义 Skills」小节。
 EOF
-  echo "  ＋ 补齐 .claude/skills/README.md"
+  echo "  ＋ 补齐 .agents/skills/README.md"
 fi
-# CLAUDE.md 若缺「自定义 Skills」小节则追加（不覆盖已有内容）
-if ! grep -q '^## 自定义 Skills' "$CLAUDE_DIR/CLAUDE.md"; then
-  cp "$CLAUDE_DIR/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md.bak"
-  cat >> "$CLAUDE_DIR/CLAUDE.md" <<'EOF'
+AGENTSMD="$A/AGENTS.md"
+# AGENTS.md 若缺「自定义 Skills」小节则追加（不覆盖已有内容）
+if ! grep -q '^## 自定义 Skills' "$AGENTSMD"; then
+  cp "$AGENTSMD" "$AGENTSMD.bak"
+  cat >> "$AGENTSMD" <<'EOF'
 
 ## 自定义 Skills
-把项目专属 skill 放到 `.claude/skills/<name>/SKILL.md`（frontmatter 需含 `name` 与 `description`）。SDLC pipeline 会自动发现它们，并在 `description` 与当前阶段相关时**优先调用**（先 skill、后自造）。
-- Claude Code：harness 原生自动发现。
-- Codex：由统一上下文加载入口扫描目录索引后可用。
+把项目专属 skill 放到 `.agents/skills/<name>/SKILL.md`（frontmatter 需含 `name` 与 `description`）。SDLC pipeline 会自动发现它们，并在 `description` 与当前阶段相关时**优先调用**（先 skill、后自造）。
+- Claude Code：同步脚本自动生成 `.claude/skills/<name>` 软链接，harness 原生发现（软链接需提交）。
+- Codex：原生读取 `.agents/skills/`，并由统一上下文加载入口建立索引。
 - 想让某 skill 只在特定阶段用，在其 `description` 里点明阶段即可，无需额外配置。
 EOF
-  echo "  ＋ CLAUDE.md 追加「自定义 Skills」小节（旧版备份: CLAUDE.md.bak）"
+  echo "  ＋ AGENTS.md 追加「自定义 Skills」小节（旧版备份: AGENTS.md.bak）"
 fi
 
-# ── 5.1 迁移历史迭代深度指令（用户 CLAUDE.md 不被整体覆盖，做定向替换）──
-CLAUDEMD="$CLAUDE_DIR/CLAUDE.md"
-if grep -q '务必先阅读 `docs/iterations/` 下的历史迭代' "$CLAUDEMD"; then
-  [ -f "$CLAUDEMD.bak" ] || cp "$CLAUDEMD" "$CLAUDEMD.bak"
+# ── 5.1 迁移历史迭代深度指令（用户 AGENTS.md 不被整体覆盖，做定向替换）──
+if grep -q '务必先阅读 `docs/iterations/` 下的历史迭代' "$AGENTSMD"; then
+  [ -f "$AGENTSMD.bak" ] || cp "$AGENTSMD" "$AGENTSMD.bak"
   # 用 perl 做整行替换，避免 sed 在不同平台对中文/反引号的转义差异
-  perl -i -pe 's/\*\*在处理新需求时，务必先阅读 `docs\/iterations\/` 下的历史迭代\*\*/**在处理新需求时，先阅读 `docs\/iterations\/` 下最近 `HISTORY_ITER_DEPTH` 个迭代**（默认 2，`0`=全部；见 `.claude\/.sdlc-config`）的 requirements.md 与 design.md/g' "$CLAUDEMD"
-  echo "  ✅ CLAUDE.md 历史迭代指令已迁移为 HISTORY_ITER_DEPTH（旧版备份: CLAUDE.md.bak）"
+  perl -i -pe 's/\*\*在处理新需求时，务必先阅读 `docs\/iterations\/` 下的历史迭代\*\*/**在处理新需求时，先阅读 `docs\/iterations\/` 下最近 `HISTORY_ITER_DEPTH` 个迭代**（默认 2，`0`=全部；见 `.agents\/.sdlc-config`）的 requirements.md 与 design.md/g' "$AGENTSMD"
+  echo "  ✅ AGENTS.md 历史迭代指令已迁移为 HISTORY_ITER_DEPTH（旧版备份: AGENTS.md.bak）"
 fi
 
-# ── 5.2 安装/同步 PostToolUse 检查 hook（幂等）──
-install_sdlc_hook "$PROJECT_ROOT"
-echo "  ✅ PostToolUse 检查 hook 已安装/同步"
-
-# ── 6. .gitignore 兜底 ───────────────────────────────────────
+# ── 6. .gitignore：qa 产物（sdlc 生成文件由同步脚本的托管块维护）──
 ensure_gitignore() {
   local pattern="$1"
   if [ -f "$PROJECT_ROOT/.gitignore" ]; then
@@ -195,16 +235,31 @@ ensure_gitignore() {
     echo "$pattern" > "$PROJECT_ROOT/.gitignore"
   fi
 }
-ensure_gitignore ".claude/.sdlc-config"
-ensure_gitignore ".claude/.sdlc-config.local"
-ensure_gitignore ".claude/*.bak"
-ensure_gitignore ".claude/.sdlc-active-iteration"
-# qa 二进制产物不入库（保留 tests/reports/*.md 验收报告）
 ensure_gitignore "# SDLC qa 二进制产物（保留 tests/reports/*.md）"
 ensure_gitignore "tests/reports/**/screenshots/"
 ensure_gitignore "tests/reports/playwright/"
 ensure_gitignore "tests/reports/**/*.png"
 
+# ── 7. 同步：软链接、hooks、平台文件、.gitignore 托管块 ─────────
+rc=0
+bash "$SYNC" "$PROJECT_ROOT" || rc=$?
+case "$rc" in
+  0) ;;
+  1) echo "  ⚠ 同步有冲突未解决（见上方 ⚠），请处理后重新执行 update" ;;
+  *) echo "❌ 同步失败（退出码 ${rc}）" >&2; exit 2 ;;
+esac
+
 echo "✅ 同步完成。用户编辑的 ARCHITECTURE.md / SECURITY.md / CODING_GUIDELINES.md 未被改动；"
-echo "   CLAUDE.md 仅在缺少「自定义 Skills」小节时追加（不改动既有内容，旧版见 CLAUDE.md.bak）。"
+echo "   AGENTS.md 仅在缺少「自定义 Skills」小节时追加（不改动既有内容，旧版见 AGENTS.md.bak）。"
 echo "   如 workflow-rules.md / .sdlc-config 有自定义内容，请对照 .bak 备份回并。"
+echo "📌 改了 .agents/config.json（如 MCP 服务器）后，重启工具前执行 .agents/bin/sdlc-sync（加 --check 只检查不写入）"
+if [ "$LEGACY" = 1 ]; then
+  echo ""
+  echo "📋 迁移报告"
+  echo "   移动:${MOVED:- 无}"
+  [ -n "$KEPT" ] && echo "   未移动（目标已存在，需人工核对）:$KEPT"
+  echo "   备份: ${BAK#"$PROJECT_ROOT"/}/"
+  echo "   平台配置已并入 .agents/config.json；.claude/settings.json、.mcp.json、.codex/、.cursor/mcp.json 改为生成文件（已 gitignore）"
+  echo "   请提交: AGENTS.md、CLAUDE.md（软链接）、.agents/（除 gitignore 项）、.claude/skills/ 与 .claude/agents/ 下的软链接，以及 .claude/ 下旧文件的删除"
+  echo "   Codex 用户: 首次使用需在 /hooks 中信任本项目的 hooks"
+fi

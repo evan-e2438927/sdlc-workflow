@@ -13,7 +13,7 @@ metadata:
   openclaw:
     emoji: "🏭"
     requires:
-      bins: ["codex", "gh"]
+      bins: ["codex", "gh", "jq"]
     install:
       - id: codex
         kind: npm
@@ -83,12 +83,12 @@ sdlc-apply docs/iterations/2026-04-16/001-user-login-feature/
 sdlc-apply --review docs/iterations/2026-04-16/001-user-login-feature/
 ```
 
-若不指定路径，自动查找最近一个 `phase == "pending_review" | "approved"` 的迭代目录。
+若不指定路径，用 `bash "$SDLC_STATUS" find-latest pending_review approved qa_failed` 自动定位。
 
 前置检查：
 - status.json 存在且 `phase` 为 `pending_review`（视为审核通过）或 `approved`
-- `phase == applied` → 拒绝重复执行
-- `phase == rejected` → 提示修改后重新 proposal
+- `phase == qa_failed` → 进入修复模式（按 `qa-failures.md` 修复缺陷，再跑 ⑨）
+- 其他 phase（如 `applied`、`rejected`）→ 拒绝执行
 
 执行步骤 ⑥-⑨（默认跳过 Gate 2，加 `--review` 则执行 ⑧）：
 ```
@@ -121,7 +121,7 @@ sdlc-qa [<迭代目录>]
 
 apply（`phase == applied`）后运行。读取 tasks.md 中 `track: qa` 的任务，编写 Playwright
 脚本到 `tests/e2e/<slug>/`，通过 Playwright MCP 执行，产出 `tests/reports/<slug>-e2e-report.md`。
-全部通过后将 status.json 更新为 `phase: "qa_passed"`。
+全部通过 → `phase: "qa_passed"`；发现代码缺陷 → 写 `qa-failures.md`，`phase: "qa_failed"`，由 apply 修复模式处理。
 
 ### accept — 验收提交（更新文档 + 本地 commit）
 
@@ -223,7 +223,20 @@ sdlc-worktree.sh remove 001
 ```
 
 详细规范见 `references/parallel-dev.md`。
-脚本位置：`scripts/sdlc-worktree.sh`。
+脚本：`bash "$SDLC_CORE/scripts/sdlc-worktree.sh" <create|list|status|remove|gc>`（`SDLC_CORE` 见「核心目录（SDLC_CORE）」）。
+
+## 核心目录（SDLC_CORE）
+
+所有脚本都在核心 skill `sdlc-workflow` 的 `scripts/` 下，**一律以 `bash "$SDLC_CORE/scripts/<脚本>"` 调用**（不依赖可执行位）。
+`SDLC_CORE` 只在这里定义：先找**当前 skill 的同级目录** `../sdlc-workflow`（npx 安装与插件安装都成立——插件里是 `skills/sdlc-workflow` 软链接；同级优先保证用的是同一次安装、版本一致），再找 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow`（兜底）；两处都没有就报错停止：
+
+```bash
+SKILL_BASE="<当前 skill 所在目录>"; SDLC_CORE="$SKILL_BASE/../sdlc-workflow"; [ -f "$SDLC_CORE/scripts/sdlc-sync-agents.sh" ] || SDLC_CORE="${CLAUDE_PLUGIN_ROOT:-/nonexistent}/sdlc-workflow"; [ -f "$SDLC_CORE/scripts/sdlc-sync-agents.sh" ] || { echo '缺少核心 skill sdlc-workflow，请执行 `npx skills add evan-e2438927/sdlc-workflow --skill sdlc-workflow`' >&2; false; }
+```
+
+- `<当前 skill 所在目录>`：被调用的那个 skill（如 `sdlc-apply`）的 SKILL.md 所在目录（Claude Code 在加载 skill 时给出 "Base directory"，Codex 给出 skill 路径）。
+- shell 变量不跨 Bash 调用保留：每次调用脚本都在同一条命令里先执行上面这行，或直接写解析出的绝对路径。
+- 常用脚本：`bash "$SDLC_CORE/scripts/init-project.sh" .`、`bash "$SDLC_CORE/scripts/update-project.sh" .`、`bash "$SDLC_CORE/scripts/sdlc-sync-agents.sh" [--check] [--check-paths] .`、`bash "$SDLC_CORE/scripts/sdlc-worktree.sh" <子命令>`、状态脚本 `SDLC_STATUS`（见「迭代状态」）。
 
 ## 项目初始化
 
@@ -232,18 +245,17 @@ sdlc-worktree.sh remove 001
 1. 先判断当前项目是 fresh project 还是 existing project：
    - 若已存在 `apps/`、`packages/`、`src/`、`package.json`、`pnpm-workspace.yaml`、`turbo.json`、`.git/` 等业务/工程结构 → existing project
    - 若目录基本为空，仅准备首次接入 workflow → fresh project
-2. 检测 `.claude/CLAUDE.md` 和 `.claude/ARCHITECTURE.md` 是否存在
+2. 检测 `.agents/AGENTS.md` 和 `.agents/ARCHITECTURE.md` 是否存在；若发现旧布局（`.claude/CLAUDE.md` 是实体文件）→ 提示先执行 update 迁移（init 不处理旧布局）
 3. 若两者都存在 → 项目已初始化，跳过，直接进入 Part 2
 4. 若任一不存在 → 执行初始化：
-   - 运行本 skill 目录内的初始化脚本 `scripts/init-project.sh .`（相对 SKILL.md 所在目录）。
-     运行时路径按运行环境取：Claude Code 为 `${CLAUDE_PLUGIN_ROOT}/sdlc-workflow/scripts/init-project.sh`（变量由 Claude Code 注入）；Codex / 手动安装为该 skill 目录内的 `scripts/init-project.sh`
-   - 生成项目结构（.claude/, docs/, tests/）+ 配置文件 `.claude/.sdlc-config`
-   - 提醒用户：按需编辑 `.claude/.sdlc-config`（已自动加入 .gitignore）
+   - 运行初始化脚本 `bash "$SDLC_CORE/scripts/init-project.sh" .`（`SDLC_CORE` 见「核心目录（SDLC_CORE）」）。
+   - 生成项目结构（.agents/, docs/, tests/）+ 配置文件 `.agents/.sdlc-config` + 平台配置单一来源 `.agents/config.json`，并执行同步（生成根目录 `AGENTS.md` / `CLAUDE.md` 软链接、`.claude/skills/*` 软链接与各平台文件）
+   - 提醒用户：按需编辑 `.agents/.sdlc-config`（已自动加入 .gitignore）；提交软链接与 `.agents/`；Codex 用户首次需在 `/hooks` 中信任项目 hooks
 5. 若判定为 existing project，则初始化后必须先执行 `references/00-existing-project-intake.md`：
-   - 生成 `.claude/PROJECT_BASELINE.md`
-   - 生成 `.claude/EXISTING_STRUCTURE.md`
-   - 生成 `.claude/TEST_BASELINE.md`
-   - **基于真实代码填实** `.claude/ARCHITECTURE.md` 与 `.claude/SECURITY.md`（覆盖 init 拷贝的模板占位），并对齐 `CODING_GUIDELINES.md` / `CLAUDE.md`——非 monorepo 项目不得保留模板里的 `apps/web`/`apps/server`/`packages/*` 默认约定
+   - 生成 `.agents/PROJECT_BASELINE.md`
+   - 生成 `.agents/EXISTING_STRUCTURE.md`
+   - 生成 `.agents/TEST_BASELINE.md`
+   - **基于真实代码填实** `.agents/ARCHITECTURE.md` 与 `.agents/SECURITY.md`（覆盖 init 拷贝的模板占位），并对齐 `CODING_GUIDELINES.md` / `AGENTS.md`——非 monorepo 项目不得保留模板里的 `apps/web`/`apps/server`/`packages/*` 默认约定
    - 在基线完成前，不得直接进入 requirements/design/tasks
 
 ## 上下文加载（统一入口）
@@ -252,23 +264,29 @@ sdlc-worktree.sh remove 001
 
 加载层级（**后者覆盖前者**，项目级 > 全局级）：
 
-1. **全局级** `~/.claude/` — 用户跨项目通用规范
-2. **项目级** `<project>/.claude/` — 当前项目专属规范，覆盖全局同名约定
+| 层级 | 路径 |
+|------|------|
+| 1. 全局（旧） | `~/.claude/` |
+| 2. 全局 | `~/.agents/` |
+| 3. 项目 | `<project>/.agents/` |
 
-每层加载清单：`CLAUDE.md` / `ARCHITECTURE.md` / `SECURITY.md` / `CODING_GUIDELINES.md` /
+每层加载清单：`AGENTS.md`（全局旧层为 `CLAUDE.md`）/ `ARCHITECTURE.md` / `SECURITY.md` / `CODING_GUIDELINES.md` /
 `rules/*.md`；existing project 额外加载项目级 `PROJECT_BASELINE.md` / `EXISTING_STRUCTURE.md`
-/ `TEST_BASELINE.md`。运行时配置 `<project>/.claude/.sdlc-config`（缺省回退全局 `~/.claude/.sdlc-config` → 内置默认）。
+/ `TEST_BASELINE.md`。项目自定义 skill 从 `<project>/.agents/skills/` 发现（排除 sdlc 自身的 skill）。
+运行时配置 `<project>/.agents/.sdlc-config`（缺省回退全局 `~/.agents/.sdlc-config` → `~/.claude/.sdlc-config` → 内置默认）。
 命令运行时参数（`--review` / `--qa`）优先级最高。
 
-调用时机：步骤 ⓪ 之后、步骤 ① 之前统一调用一次；`/compact` 后重新进入 pipeline 须重新加载；
-worktree 内 `<project>` 指向该 worktree 根目录，全局级仍为 `~/.claude/`。
+加载完上下文后执行同步检查：`bash "$SDLC_CORE/scripts/sdlc-sync-agents.sh" --check .`，不一致时自动同步并说明改了什么（详见 context-loader「同步检查」）。
 
-> 完整规则见 `references/context-loader.md`。各步骤 reference 中出现的 `.claude/*` 仅表示该步骤
+调用时机：步骤 ⓪ 之后、步骤 ① 之前统一调用一次；`/compact` 后重新进入 pipeline 须重新加载；
+worktree 内 `<project>` 指向该 worktree 根目录，全局级不变。
+
+> 完整规则见 `references/context-loader.md`。各步骤 reference 中出现的 `.agents/*` 仅表示该步骤
 > **消费**哪些上下文，实际加载一律由本入口完成。
 
 ## 配置读取
 
-由上下文加载入口统一从 `<project>/.claude/.sdlc-config`（回退全局 `~/.claude/.sdlc-config`）读取。未设置的变量使用默认值：
+由上下文加载入口统一从 `<project>/.agents/.sdlc-config`（回退全局 `~/.agents/.sdlc-config` → `~/.claude/.sdlc-config`）读取。未设置的变量使用默认值：
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
@@ -304,13 +322,41 @@ worktree 内 `<project>` 指向该 worktree 根目录，全局级仍为 `~/.clau
 
 该目录下包含：requirements.md, design.md, tasks.md, status.json
 
+## 迭代状态（phase）
+
+phase 取值：pending_review | approved | applied | qa_failed | qa_passed | accepted | pr_created | rejected
+
+```
+（无）──①–④ 完成──▶ pending_review ──apply / doit·mini 自动──▶ approved ──⑨ 通过──▶ applied
+                       │  ▲                                                          │
+                       └──┘ 对话修改，phase 不变                                      ├─qa 全部通过─▶ qa_passed ─accept─▶ accepted ─pr─▶ pr_created
+                                                                                      ├─qa 代码缺陷─▶ qa_failed ─apply 修复模式 ⑨ 通过─▶ applied
+                                                                                      └─accept（跳过 qa）─────────────────▶ accepted
+accepted 之前任意 phase ──用户放弃──▶ rejected
+```
+
+- **唯一写入口**：`phase`、`*_at` 时间戳、`history`、`mode`、`flags` 只能经状态脚本写入，非法迁移由脚本拒绝并列出允许的下一步。
+  其余进度字段（`tracks`、`agent_mode`、`summary`、`pipeline_stage`、`pr_url`）照旧直接写。
+- **脚本路径** `SDLC_STATUS="$SDLC_CORE/scripts/sdlc-status.sh"`（`SDLC_CORE` 见「核心目录（SDLC_CORE）」），以 `bash "$SDLC_STATUS" …` 调用。迁移表单源：同目录 `state-machine.json`。
+  shell 变量不跨 Bash 调用保留：每次调用都在同一条命令里先赋值（先执行 `SDLC_CORE` 定义行，再 `SDLC_STATUS="$SDLC_CORE/scripts/sdlc-status.sh"; bash "$SDLC_STATUS" transition …`），或直接写完整路径。
+  脚本按 `$CLAUDE_PROJECT_DIR` → git 仓库根 → 当前目录定位项目根，迭代目录参数相对项目根。
+  - `bash "$SDLC_STATUS" transition "$ITER_DIR" <目标phase> --by <命令> [--note <说明>] [--flags '<json>']`
+  - `bash "$SDLC_STATUS" find-latest <phase>...` → 最近一个处于这些 phase 的迭代目录
+- **创建**：首次迁移（到 `pending_review`）时写入 `mode`（proposal / doit / mini）；doit / mini 同时用 `--flags` 记录 `review` / `qa` / `agents`。
+- **审核期间修改**：`pending_review` 时用户在对话里提修改意见，原地修改、phase 不变（规则见 `references/flow-proposal.md`「审核期间的修改（对话）」）。
+- **放弃**：用户表示放弃某个迭代时，`transition … rejected --by user`；工作区代码不回滚。
+- **旧迭代兼容**：缺 `mode` 视为 proposal（分步，只续完当前命令）；缺 `history` 视为空，首次迁移时开始记录；旧的 epoch 时间戳与
+  `pipeline_stage` 的历史取值读取时容忍，不改写；旧版 qa 失败留下的 `approved` + `qa_failed_at` 按普通 `approved` 处理。
+- **doit / mini 续跑**：用户要求继续一个 `mode=doit`（或 `mode=mini`）的迭代时，按当前 phase 与 `flags` 接续剩余步骤直到 `pr_created`
+  （`approved` 由 apply「断点续跑」接手；`applied` 后按 `flags.qa` 决定是否先跑 qa）。`mode=proposal` 只续完当前命令。
+
 ## Pipeline 编排
 
 ### 步骤概览
 
 | 步骤 | 名称 | 说明 | 命令归属 |
 |------|------|------|----------|
-| ⓪ | 初始化 + 模式识别 | fresh/existing 分流 → init-project.sh → existing intake → 统一上下文加载（.claude/.sdlc-config）→ 迭代目录 | proposal/doit |
+| ⓪ | 初始化 + 模式识别 | fresh/existing 分流 → init-project.sh → existing intake → 统一上下文加载（.agents/.sdlc-config）→ 迭代目录 | proposal/doit |
 | ① | requirements-ingestion | 识别输入类型 → 提取/读取/解析 → requirements.md | proposal/doit |
 | ② | requirements-clarifier | 逐条分析置信度，标注确认/假设/提问 | proposal/doit |
 | ③ | design-generator | 生成 design.md（引用历史 iterations） | proposal/doit |
@@ -323,7 +369,7 @@ worktree 内 `<project>` 指向该 worktree 根目录，全局级仍为 `~/.clau
 | ⑨ | test-pipeline | lint → unit（两阶段，不含浏览器 E2E） | apply/doit |
 | — | **apply 完成点** | 更新 status.json → phase: applied（不提交、不推 PR） | **仅 apply** |
 | ⑩ | qa | 编写并执行 qa track 的 Playwright 浏览器功能验收 → phase: qa_passed | qa / doit --qa |
-| ⑪ | docs-updater | 总结变更 → 更新文档 + CLAUDE.md iterations 引用 | accept/doit |
+| ⑪ | docs-updater | 总结变更 → 更新文档 + AGENTS.md iterations 引用 | accept/doit |
 | ⑫ | git-committer | branch → commit（**本地，不 push、不建 PR**）→ phase: accepted | accept/doit |
 | ⑬ | pr-creator | push → gh pr create → phase: pr_created | pr / doit |
 
@@ -333,19 +379,21 @@ worktree 内 `<project>` 指向该 worktree 根目录，全局级仍为 `~/.clau
 ```
 MODE=$(detect_project_mode)  # fresh | existing
 
-IF NOT (.claude/CLAUDE.md AND .claude/ARCHITECTURE.md):
-  RUN init-project.sh
+IF .claude/CLAUDE.md 是实体文件（旧布局）:
+  STOP，提示先执行 update 迁移到 .agents/
+IF NOT (.agents/AGENTS.md AND .agents/ARCHITECTURE.md):
+  RUN bash "$SDLC_CORE/scripts/init-project.sh" .
 
 IF MODE == existing:
   RUN existing-project-intake
-  REQUIRE .claude/PROJECT_BASELINE.md
-  REQUIRE .claude/EXISTING_STRUCTURE.md
-  REQUIRE .claude/TEST_BASELINE.md
+  REQUIRE .agents/PROJECT_BASELINE.md
+  REQUIRE .agents/EXISTING_STRUCTURE.md
+  REQUIRE .agents/TEST_BASELINE.md
 
 # 统一上下文加载（见 references/context-loader.md）：
-#   先 ~/.claude/ 再 <project>/.claude/（项目覆盖全局）
-#   读取 .claude/.sdlc-config（缺则由 init 从模板生成）
-LOAD_CONTEXT()   # 加载规范 + .claude/.sdlc-config
+#   ~/.claude/ → ~/.agents/ → <project>/.agents/（后者覆盖前者）
+#   读取 .agents/.sdlc-config（缺则由 init 从模板生成）
+LOAD_CONTEXT()   # 加载规范 + .agents/.sdlc-config，并执行同步检查（--check，不一致则自动同步）
 
 SLUG=$(generate_slug_from_requirements "$INPUT")  # 优先语义化英文 slug，失败则 req-<hash8>
 TYPE=$(infer_type "$INPUT")  # feature|fix|refactor|docs|test|chore
@@ -381,9 +429,9 @@ MKDIR -p "$ITER_DIR"
 
 #### ③ design-generator
 - **前置门禁**：先复核澄清 Gate——交互模式下若存在 never-asked 的设计影响项，停止并回到 ② 澄清，严禁凭未澄清假设直接做设计决策
-- 读取：requirements.md（含假设记录）+ .claude/ARCHITECTURE.md + .claude/SECURITY.md + docs/iterations/（历史）
+- 读取：requirements.md（含假设记录）+ .agents/ARCHITECTURE.md + .agents/SECURITY.md + docs/iterations/（历史）
 - 被假设驱动的设计决策须登记到 design.md 的「设计假设」小节（关联 ASM-ID + 理由 + 假设错误影响）
-- 若为 existing project，额外读取：`.claude/PROJECT_BASELINE.md` + `.claude/EXISTING_STRUCTURE.md` + `.claude/TEST_BASELINE.md`
+- 若为 existing project，额外读取：`.agents/PROJECT_BASELINE.md` + `.agents/EXISTING_STRUCTURE.md` + `.agents/TEST_BASELINE.md`
 - 设计必须声明代码落位：默认遵循 Better-T-Stack 风格 `apps/web` / `apps/server` / 条件启用的 `packages/*`
 - 若为 existing project，必须明确说明"沿用既有结构"还是"本轮经批准的结构调整"
 - 输出：docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/design.md
@@ -405,25 +453,15 @@ MKDIR -p "$ITER_DIR"
 IF NOT --review:
   SKIP Gate 1
 
-round=1
-WHILE round <= REVIEW_MAX_ROUNDS:
-  result=$(codex exec --full-auto "审查设计...
-    额外检查第 7 项: AC 覆盖度
-    - requirements.md 每个 AC-ID 是否在 tasks.md 被引用
-    - tasks.md AC 是否保留 Given-When-Then + 场景维度
-    - 是否存在模糊不可验证的 AC
-    - 每个 Requirement 是否至少覆盖 happy-path + error")
-  IF result == PASS:
-    LOG "✅ 设计 Review PASS"
-    BREAK
-  ELSE:
-    IF round < REVIEW_MAX_ROUNDS:
-      LOG "⚠️ 设计 Review 第{round}轮: <问题>"
-      CLAUDE 修订 design.md + tasks.md
-    ELSE:
-      LOG "❌ 设计 Review 超过 {N} 轮，需人工介入"
-      ABORT
-  round+=1
+# 循环按「修复轮数（唯一定义）」：检查 = Codex 设计审查，修复 = CLAUDE 修订 design.md + tasks.md
+result=$(codex exec --full-auto "审查设计...
+  额外检查第 7 项: AC 覆盖度
+  - requirements.md 每个 AC-ID 是否在 tasks.md 被引用
+  - tasks.md AC 是否保留 Given-When-Then + 场景维度
+  - 是否存在模糊不可验证的 AC
+  - 每个 Requirement 是否至少覆盖 happy-path + error")
+PASS → LOG "✅ 设计 Review PASS"
+超限 → LOG "❌ 设计 Review 已自动修复 N 轮仍未通过，需人工介入"; ABORT
 ```
 
 #### ⑤.1 Gate 1 后增量文档同步
@@ -431,22 +469,22 @@ WHILE round <= REVIEW_MAX_ROUNDS:
 Gate 1 通过后，若经过 ≥1 轮修订，必须同步更新受影响的文档：
 
 ```
-IF Gate 1 审查经过修订（round > 1）:
+IF Gate 1 审查经过修订（已修轮数 ≥ 1）:
   DIFF = diff(requirements.md + design.md + tasks.md 原始版本, 当前版本)
   IF DIFF 涉及需求范围变更:
     同步更新 requirements.md 中的 [⚠️ 假设] 标注
   IF DIFF 涉及架构决策变更:
-    同步更新 .claude/ARCHITECTURE.md 对应章节
+    同步更新 .agents/ARCHITECTURE.md 对应章节
   IF DIFF 涉及安全设计变更:
-    同步更新 .claude/SECURITY.md 对应章节
+    同步更新 .agents/SECURITY.md 对应章节
   IF DIFF 涉及目录结构调整:
-    同步更新 .claude/EXISTING_STRUCTURE.md（existing project）
+    同步更新 .agents/EXISTING_STRUCTURE.md（existing project）
   IF DIFF 涉及任务拆分/验收标准变更:
     确认 tasks.md 与修订后的 design.md 一致
   LOG "📄 Gate 1 修订已同步到基线文档"
 ```
 
-**原则**：只更新被修订影响的章节，不做全量重写。确保 ⑥ 开发阶段读取到的 .claude/ARCHITECTURE.md 与 design.md 决策一致。
+**原则**：只更新被修订影响的章节，不做全量重写。确保 ⑥ 开发阶段读取到的 .agents/ARCHITECTURE.md 与 design.md 决策一致。
 
 #### ⑤.2 Proposal 暂停（仅 proposal 命令）
 
@@ -457,20 +495,10 @@ IF 当前为 proposal 模式:
   TASK_COUNT=$(从 tasks.md 提取任务数)
   TOTAL_HOURS=$(从 tasks.md 提取总工时)
 
-  # 写入 status.json
-  WRITE "$ITER_DIR/status.json" {
-    "phase": "pending_review",
-    "proposal_at": "$(date -Iseconds)",
-    "reviewed_at": null,
-    "applied_at": null,
-    "reviewer": null,
-    "iter_dir": "$ITER_DIR",
-    "summary": {
-      "requirement_count": $REQ_COUNT,
-      "task_count": $TASK_COUNT,
-      "estimated_hours": $TOTAL_HOURS
-    }
-  }
+  # 写入 phase（脚本），再补 summary（进度字段，直接写）
+  bash "$SDLC_STATUS" transition "$ITER_DIR" pending_review --by proposal
+  jq --argjson r $REQ_COUNT --argjson t $TASK_COUNT --argjson h $TOTAL_HOURS \
+    '.summary = {requirement_count:$r, task_count:$t, estimated_hours:$h}' status.json > 临时文件 && mv
 
   LOG "📋 需求拆解完成，等待人工审核"
   LOG "   📂 迭代目录: $ITER_DIR"
@@ -479,8 +507,11 @@ IF 当前为 proposal 模式:
 
   STOP  # proposal 到此结束
 
-IF 当前为 doit 模式:
-  # 不写 status.json，直接继续步骤 ⑥
+IF 当前为 doit / mini 模式:
+  # 与 proposal 走同一条主线，只是不停顿；mode=doit 与 flags 供中断后续跑
+  bash "$SDLC_STATUS" transition "$ITER_DIR" pending_review --by doit --flags '{"review":<bool>,"qa":<bool>,"agents":"<auto|single|multi>"}'
+  bash "$SDLC_STATUS" transition "$ITER_DIR" approved --by doit       # mini 同理，--by mini
+  # 直接继续步骤 ⑥
 ```
 
 #### ⑤→⑥ 上下文检查点
@@ -488,7 +519,7 @@ IF 当前为 doit 模式:
 IF context_usage > 80%:
   确认 requirements.md / design.md / tasks.md / status.json 已持久化到迭代目录
   执行 /compact
-  重新加载: $ITER_DIR/{requirements,design,tasks}.md + .claude/{ARCHITECTURE,SECURITY}.md
+  重新加载: $ITER_DIR/{requirements,design,tasks}.md + .agents/{ARCHITECTURE,SECURITY}.md
 ```
 
 #### ⑥ Apply 入口检查（仅 apply 命令）
@@ -505,18 +536,18 @@ IF 当前为 apply 模式:
 
   IF PHASE == "pending_review":
     # 用户直接 apply 视为审核通过
-    UPDATE STATUS_FILE: phase="approved", reviewed_at=now, reviewer="cli-apply"
+    bash "$SDLC_STATUS" transition "$ITER_DIR" approved --by apply
     LOG "🚀 Proposal 审核通过，开始开发"
 
   ELSE IF PHASE == "approved":
-    LOG "🚀 开始执行需求开发"
+    LOG "🚀 开始执行需求开发（含断点续跑）"
 
-  ELSE IF PHASE == "applied":
-    ERROR "该 proposal 已执行过 apply"
-    ABORT
+  ELSE IF PHASE == "qa_failed":
+    LOG "🔧 QA 发现代码缺陷，进入修复模式"   # 见 references/flow-apply.md「修复模式（phase = qa_failed）」
 
-  ELSE IF PHASE == "rejected":
-    ERROR "该 proposal 已被拒绝，请修改后重新 proposal"
+  ELSE:
+    # applied / rejected 等：不能开始 apply，由脚本在后续迁移时拒绝；此处直接提示
+    ERROR "当前 phase=$PHASE，不能执行 apply"
     ABORT
 ```
 
@@ -569,20 +600,10 @@ Gate 2 的"状态漂移"检查只在 `--review` 时跑，但"勾选是否属实"
 IF NOT --review:
   SKIP Gate 2
 
-round=1
-WHILE round <= REVIEW_MAX_ROUNDS:
-  result=$(codex exec --full-auto "审查代码...")
-  IF result == PASS:
-    LOG "✅ Code Review PASS"
-    BREAK
-  ELSE:
-    IF round < REVIEW_MAX_ROUNDS:
-      LOG "⚠️ Code Review 第{round}轮: <问题>"
-      CLAUDE 修复代码
-    ELSE:
-      LOG "❌ Code Review 超过 {N} 轮，需人工介入"
-      ABORT
-  round+=1
+# 循环按「修复轮数（唯一定义）」：检查 = Codex 代码审查，修复 = CLAUDE 修复代码（flow-apply.md「修复回合」）
+result=$(codex exec --full-auto "审查代码...")
+PASS → LOG "✅ Code Review PASS"
+超限 → LOG "❌ Code Review 已自动修复 N 轮仍未通过，需人工介入"; ABORT
 ```
 
 Gate 2 还必须检查 `tasks.md` 状态是否与真实实现一致：
@@ -613,34 +634,29 @@ STAGE 1: npx $LINT_TOOL .        # 快速失败
 STAGE 2: npx $TEST_FRAMEWORK     # unit tests
 # 浏览器 E2E 不在此处——已独立为 qa 命令（步骤 ⑩）
 
-IF any failure:
-  IF round < REVIEW_MAX_ROUNDS:
-    LOG "⚠️ 失败用例: <列表>"
-    CLAUDE 修复
+# 失败时按「修复轮数（唯一定义）」循环；每轮修复：
+  LOG "⚠️ 失败用例: <列表>"
+  CLAUDE 修复（flow-apply.md「修复回合」）
 
-    # ⑨.1 测试修复后增量文档同步
-    IF 修复过程中修改了 design.md 或 tasks.md:
-      同步 .claude/ARCHITECTURE.md / .claude/SECURITY.md 受影响章节
+  # ⑨.1 测试修复后增量文档同步
+  IF 修复过程中修改了 design.md 或 tasks.md:
+    同步 .agents/ARCHITECTURE.md / .agents/SECURITY.md 受影响章节
 
-    # ⑨.2 上下文检查点
-    IF context_usage > 80%:
-      执行 /compact
-      重新加载: 失败测试报告 + tasks.md + git diff --cached 摘要
-
-    retry
-  ELSE:
-    LOG "❌ 测试修复超过 {N} 轮，需人工介入"
-    ABORT
+  # ⑨.2 上下文检查点
+  IF context_usage > 80%:
+    执行 /compact
+    重新加载: 失败测试报告 + tasks.md + git diff --cached 摘要
+超限 → LOG "❌ 测试已自动修复 N 轮仍未通过，需人工介入"; ABORT
 
 LOG "✅ 测试通过: <通过数>/<总数>"
 ```
 
-> **规则**：测试修复阶段如果涉及 design.md 或 tasks.md 变更，必须在 retry 前同步更新 .claude/ARCHITECTURE.md / .claude/SECURITY.md 中受影响的章节。
+> **规则**：测试修复阶段如果涉及 design.md 或 tasks.md 变更，必须在 retry 前同步更新 .agents/ARCHITECTURE.md / .agents/SECURITY.md 中受影响的章节。
 
 #### ⑨.3 Apply 完成（仅 apply / doit）
 ```
 # test-pipeline 通过即为 apply 终点——不提交、不推 PR
-UPDATE status.json: phase="applied", applied_at=now
+bash "$SDLC_STATUS" transition "$ITER_DIR" applied --by apply     # 修复模式：--note qa-fix
 LOG "✅ 开发完成: N 个任务 | 测试: lint + unit 全部通过"
 LOG "👉 浏览器验收: sdlc-qa   👉 提交: sdlc-accept"
 ```
@@ -659,20 +675,20 @@ FOR EACH qa 场景:
   失败时：同样 mv 诊断图到 tests/reports/<slug>/screenshots/
 执行完毕 teardown 后台 dev server（释放端口）
 生成 tests/reports/<slug>-e2e-report.md
-IF 全部 PASS: UPDATE status.json: phase="qa_passed"
+IF 全部 PASS: bash "$SDLC_STATUS" transition "$ITER_DIR" qa_passed --by qa
 ELSE: 按根因分流——
-  脚本/选择器问题 → qa 内就地修复重跑（≤REVIEW_MAX_ROUNDS），phase 保持 applied
-  代码缺陷 → phase 退回 approved（.qa_failed_at=now），提示修复后重跑 apply
-  超限 → 中止，输出失败列表 + 截图，人工介入
+  脚本/选择器问题 → qa 内就地修复重跑（按「修复轮数（唯一定义）」），phase 保持 applied
+  代码缺陷 → 写 $ITER_DIR/qa-failures.md → bash "$SDLC_STATUS" transition "$ITER_DIR" qa_failed --by qa
+            → 提示运行 sdlc-apply（自动进入修复模式）；doit --qa 时自动修复后重跑 qa（按修复轮数计数）
 ```
 
 #### ⑪ docs-updater（accept 命令 / doit）
 先基于 git diff + tasks.md 完成状态总结本次变更，再按变更更新：
 - README.md — 新增功能说明
-- .claude/ARCHITECTURE.md — 架构层面变更
-- .claude/SECURITY.md — 安全相关变更
-- .claude/CODING_GUIDELINES.md — 新模式/约定
-- .claude/CLAUDE.md — **更新 iterations 引用列表**
+- .agents/ARCHITECTURE.md — 架构层面变更
+- .agents/SECURITY.md — 安全相关变更
+- .agents/CODING_GUIDELINES.md — 新模式/约定
+- .agents/AGENTS.md — **更新 iterations 引用列表**
 
 #### ⑫ git-committer（accept 命令 / doit）— 本地提交，不 push、不建 PR
 ```bash
@@ -694,7 +710,7 @@ ELSE:
 #### ⑫.1 Accept 状态更新（accept 命令 / doit）
 
 ```
-UPDATE status.json: phase="accepted", accepted_at=now
+bash "$SDLC_STATUS" transition "$ITER_DIR" accepted --by accept
 LOG "✅ 已本地提交 | 变更: N files"
 LOG "👉 推送并创建 PR: sdlc-pr"
 ```
@@ -712,23 +728,44 @@ PR_URL=$(gh pr view --json url --jq .url)
 #### ⑬.1 PR 状态更新与完成输出
 
 ```
-UPDATE status.json: phase="pr_created", pr_created_at=now, pr_url=<url>
+bash "$SDLC_STATUS" transition "$ITER_DIR" pr_created --by pr
+jq '.pr_url = "<url>"' 写入 status.json（进度字段，直接写）
 LOG "✅ PR: <url> | 分支: $CURRENT_BRANCH"
 ```
 
 ## 循环与回退规则
 
-| 循环点 | 触发条件 | 回退到 | 最大轮数 | 超限行为 |
-|--------|----------|--------|----------|----------|
-| Gate 1 (⑤) | Codex 返回 FAIL（--review 时） | 步骤③ design-generator | REVIEW_MAX_ROUNDS | 控制台报错，中止 |
-| Gate 2 (⑧) | Codex 返回 FAIL（--review 时） | 步骤⑥ 开发（修复回合，见 flow-apply.md「修复回合」） | REVIEW_MAX_ROUNDS | 控制台报错，中止 |
-| Test (⑨) | 测试失败 | 步骤⑥ 开发（修复回合，见 flow-apply.md「修复回合」） | REVIEW_MAX_ROUNDS | 控制台报错，中止 |
+### 修复轮数（唯一定义）
+
+所有「检查 → 失败 → 修复 → 再检查」的循环都按这一条，其他文档只引用、不重写：
+
+```
+已修轮数 = 0
+循环：
+  执行检查
+  通过 → 结束
+  已修轮数 == N → 停下，phase 不变，输出失败项，转人工
+  修复；已修轮数 + 1
+```
+
+`N = REVIEW_MAX_ROUNDS`，默认 1（失败后修一次、再检查一次）；`0` = 不自动修复，失败即停。
+
+| 循环 | 何时生效 | 修复方式 | 计数范围 |
+|------|----------|----------|----------|
+| Gate 1 设计审查 (⑤) | 仅 `--review` | 修订 design.md + tasks.md | 一次 proposal / doit |
+| Gate 2 代码审查 (⑧) | 仅 `--review` | 修复回合，见 flow-apply.md「修复回合」 | 一次 apply（含修复模式） |
+| ⑨ lint + unit | 始终 | 修复回合，见 flow-apply.md「修复回合」 | 一次 apply |
+| qa 脚本 / 选择器修复 (⑩) | 始终 | 就地修脚本 | 一次 qa |
+| QA 缺陷回流（qa → 修复模式 → qa） | 仅 doit `--qa` 时自动 | apply 修复模式 | 一次 doit |
+
+- 计数不落盘：用户每次手动运行命令都从 0 开始（重新运行本身就是人工决定）。
+- doit 超限：停在当前 phase，不 accept、不 pr。
 
 ## 全局规则
 
 1. **执行模式**：apply 开发阶段（⑥ ⑦）支持单 agent / 多 agent 两种模式（`AGENT_MODE`，见 `references/flow-apply.md`），两种模式产出等价；其余步骤由主 agent 执行
 2. **双模型把关（可选）**：Claude Code 生成，Codex CLI 审查；`--review` 时启用 Gate 1 + Gate 2
-3. **循环上限**：每个 Gate/Test ≤ REVIEW_MAX_ROUNDS（默认 1，--review 时生效）
+3. **修复轮数**：失败后最多自动修复 REVIEW_MAX_ROUNDS 轮（默认 1；Gate 1/2 仅 `--review` 时运行），唯一定义见「修复轮数（唯一定义）」
 4. **Conventional Commits**：统一遵循 [Conventional Commits 1.0.0](https://www.conventionalcommits.org/zh-hans/v1.0.0/)，格式 `<type>[scope][!]: description`（type: feat/fix/docs/style/refactor/perf/test/build/ci/chore/revert；破坏性变更加 `!` 或 footer `BREAKING CHANGE:`）。权威定义见 `references/11-git-committer.md`
 5. **禁止直推**：所有变更通过 feature branch + PR
 6. **安全优先**：禁止在日志中泄露敏感信息
@@ -740,14 +777,14 @@ LOG "✅ PR: <url> | 分支: $CURRENT_BRANCH"
 12. **迭代可追溯**：docs/iterations/YYYY-MM-DD/<seq>-<slug>-<type>/
 13. **审查门禁不可降级**：Codex CLI 不可用时若指定 `--review` 必须中止，不能自动跳过 Gate
 14. **全栈目录约束**：默认采用 Better-T-Stack 风格 monorepo，业务代码不应随意落到根目录级 `web/`/`api/`/`server/`
-15. **文档统一放置**：ARCHITECTURE.md、SECURITY.md、CODING_GUIDELINES.md 与 CLAUDE.md 统一放在 `.claude/` 目录
-16. **proposal 状态管理**：proposal 完成后必须写入 status.json；apply 启动前必须校验 status.json
-17. **上下文管理**：Pipeline 步骤间检测上下文占用，超过 80% 时执行 `/compact`。关键检查点：开发前（④→⑥）、测试前（⑦→⑨）、测试修复 retry 前（⑨ 内）。compact 前必须确保当前步骤产物已写入文件，compact 后须经统一上下文加载入口重新加载迭代目录产物 + 全局/项目 `.claude/` 规范
-17.1 **统一上下文加载**：所有命令在步骤 ① 前经唯一入口加载规范——先全局 `~/.claude/` 再项目 `<project>/.claude/`（项目覆盖全局）；加载清单与优先级只在 `references/context-loader.md` 定义一次，命令与 reference 不得各自罗列 `.claude/*` 清单
+15. **文档统一放置**：ARCHITECTURE.md、SECURITY.md、CODING_GUIDELINES.md 与 AGENTS.md 统一放在 `.agents/` 目录
+16. **状态管理**：phase 迁移只经 `bash "$SDLC_STATUS"`（见「迭代状态（phase）」），不手写 `.phase`；各命令启动前先校验当前 phase
+17. **上下文管理**：Pipeline 步骤间检测上下文占用，超过 80% 时执行 `/compact`。关键检查点：开发前（④→⑥）、测试前（⑦→⑨）、测试修复 retry 前（⑨ 内）。compact 前必须确保当前步骤产物已写入文件，compact 后须经统一上下文加载入口重新加载迭代目录产物 + 全局/项目 `.agents/` 规范
+17.1 **统一上下文加载**：所有命令在步骤 ① 前经唯一入口加载规范——先全局 `~/.claude/` 再项目 `<project>/.agents/`（项目覆盖全局）；加载清单与优先级只在 `references/context-loader.md` 定义一次，命令与 reference 不得各自罗列 `.agents/*` 清单
 18. **角色分工**：⑥.1 主 agent 打地基（infra / shared / 契约 / 依赖）；⑥.2 backend 与 frontend 角色开发（多 agent 模式下并行）；⑦ test 角色查漏；⑨ test-pipeline 串行（lint → unit）
 19. **Worktree 并行开发**：通过 `worktree create` 创建隔离工作区，每个 worktree 独立运行 pipeline；详见 `references/parallel-dev.md`
 20. **Worktree 端口隔离**：并行工作区的 dev server 端口按 `PORT=3000+seq, API_PORT=4000+seq` 分配，避免冲突
 21. **Worktree 注册表**：`.worktrees/worktree-registry.json` 记录所有并行工作区元数据，`pr-creator` 完成后更新 `pr_url`
 22. **Worktree 文件冲突检测**：创建并行工作区前检查目标文件与已有工作区的交集，存在冲突时警告
-23. **五命令分工**：apply 只到 lint + unit（phase: applied，不提交）；`qa` 做 Playwright 浏览器功能验收（phase: qa_passed，可跳过）；`accept` 总结变更 → 更新文档 → 本地 commit（phase: accepted，不 push、不建 PR）；`pr` push + gh pr create（phase: pr_created，唯一远程动作）。doit 自动串联，`--qa` 时含 qa 步骤
+23. **五命令分工**：apply 只到 lint + unit（phase: applied，不提交）；`qa` 做 Playwright 浏览器功能验收（phase: qa_passed；代码缺陷 → qa_failed → apply 修复模式；可跳过）；`accept` 总结变更 → 更新文档 → 本地 commit（phase: accepted，不 push、不建 PR）；`pr` push + gh pr create（phase: pr_created，唯一远程动作）。doit 自动串联，`--qa` 时含 qa 步骤
 24. **Track 拆分**：task-generator 必须将任务按 `track: frontend|backend|shared|infra|unit-test|qa` 拆分（定义见 `references/04-task-generator.md` §2.0）。执行归属：infra / shared → apply ⑥.1 主 agent；backend / frontend → ⑥.2 开发角色；unit-test → ⑦ 测试角色；qa → `qa` 命令

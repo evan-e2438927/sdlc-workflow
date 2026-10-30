@@ -62,7 +62,7 @@
 ## 开发前置：复用可用 skills
 
 改任何代码前，先查**统一上下文加载**得到的自定义 skill 索引 `CTX.skills`（来源 `~/.claude/skills/`
-与 `<project>/.claude/skills/`）：与本次改动相关的 skill **优先调用（先 skill、后自造）**。
+与 `<project>/.agents/skills/`）：与本次改动相关的 skill **优先调用（先 skill、后自造）**。
 mini 流程务必先经 `LOAD_CONTEXT`（见 `references/context-loader.md`）加载该索引——Codex 无 harness
 自动发现 skills，漏了这步开发就看不到用户扩展的 skills。
 
@@ -74,7 +74,7 @@ mini 模式下：
 2. Gate 2 不取消，只聚焦误改和越界变更
 3. 若改动只涉及纯视觉样式，可不强制新增 unit test
 4. 若改动涉及逻辑，则必须补最小 unit test
-5. 最终通过结论仍然必须基于 **Playwright MCP** 的真实浏览器验收；`--qa` 时按
+5. 加 `--qa` 时，最终通过结论基于 **Playwright MCP** 的真实浏览器验收，按
    `references/flow-qa.md` 执行，含**通过态截图** → `tests/reports/<slug>/screenshots/`（gitignore，
    由 pr 经 `pr-assets` 分支嵌入 PR）
 
@@ -125,7 +125,7 @@ doit 全自动模式下不应依赖多轮 ask/response。若缺少验证能力�
 
 ## 升级规则
 
-若执行过程中发现以下任一情况，必须立即升级到标准 `/sdlc-workflow doit`：
+若执行过程中发现以下任一情况，必须立即升级到标准 `/sdlc-workflow doit`（已写入 phase 时先 `transition … rejected --by mini --note upgraded-to-doit`，细节见 flow-mini.md Step 5.5）：
 
 1. 需求影响超过 3 个目标文件
 2. 需要新增共享包或新目录
