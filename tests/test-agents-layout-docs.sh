@@ -80,5 +80,15 @@ for f in README.md README.zh-CN.md DESIGN-PROMO.md DESIGN-PROMO.zh-CN.md docs/wo
   [ -z "$bad" ] || { echo "FAIL D9 $f 仍用旧命令写法："; echo "$bad" | sed 's/^/    /'; fail=1; }
 done
 
+# D11：examples/30-second-demo.md 含全流程使用教程（安装 → init → 配置 → 五阶段 → 并行 / 升级 → 速查）
+T="$REPO_DIR/examples/30-second-demo.md"
+for k in "npx skills add evan-e2438927/sdlc-workflow --skill '*' -a claude-code -a codex -y" \
+         '/sdlc-init' '/sdlc-proposal' '/sdlc-apply' '/sdlc-qa' '/sdlc-accept' '/sdlc-pr' '/sdlc-doit' '/sdlc-mini' \
+         '/sdlc-worktree create' '/sdlc-update' 'npx skills update -p -y' '.agents/bin/sdlc-sync' '.agents/config.json' \
+         '.agents/.sdlc-config' 'qa_failed' '/hooks' '## 全流程使用教程' '## 30 秒版本' '## 速查表'; do
+  has "$T" "$k"
+done
+for f in "$REPO_DIR/README.md" "$REPO_DIR/README.zh-CN.md"; do lacks "$f" '30-second start</a>'; lacks "$f" '30 秒上手</a>'; done
+
 # ── END ──
 [ "$fail" = "0" ] && echo PASS || exit 1
