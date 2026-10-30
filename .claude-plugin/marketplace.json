@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "AI-driven SDLC automation pipeline (proposal → apply → qa → accept → pr) with dual-model review gates",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "plugins": [
     {
