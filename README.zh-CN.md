@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="./DESIGN-PROMO.zh-CN.md#它的设计哲学">💡 设计理念</a> ·
-  <a href="./examples/30-second-demo.md">⚡ 30 秒上手</a> ·
+  <a href="./examples/30-second-demo.md">⚡ 上手教程 · 30 秒演示</a> ·
   <a href="./sdlc-workflow/SKILL.md">🔧 核心规范</a>
 </p>
 

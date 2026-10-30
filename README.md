@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="./DESIGN-PROMO.md#design-philosophy">💡 Design philosophy</a> ·
-  <a href="./examples/30-second-demo.md">⚡ 30-second start</a> ·
+  <a href="./examples/30-second-demo.md">⚡ Tutorial &amp; 30-second demo (Chinese)</a> ·
   <a href="./sdlc-workflow/SKILL.md">🔧 Core spec</a>
 </p>
 
