@@ -143,7 +143,7 @@ sdlc-workflow
 ### ① `init` — 初始化项目
 
 ```bash
-/sdlc-workflow init [review=1 branch=feat/ test-framework=vitest lint=eslint]
+/sdlc-init [review=1 branch=feat/ test-framework=vitest lint=eslint]
 ```
 
 | 项 | 说明 |
@@ -156,7 +156,7 @@ sdlc-workflow
 ### ② `proposal` — 需求拆解
 
 ```bash
-/sdlc-workflow proposal <需求文本 | file:///path | URL>
+/sdlc-proposal <需求文本 | file:///path | URL>
 ```
 
 | 项 | 说明 |
@@ -170,7 +170,7 @@ sdlc-workflow
 ### ③ `apply` — 续跑开发（不含浏览器/提交）
 
 ```bash
-/sdlc-workflow apply [迭代目录路径]
+/sdlc-apply [迭代目录路径]
 ```
 
 | 项 | 说明 |
@@ -184,7 +184,7 @@ sdlc-workflow
 ### ④ `qa` — 浏览器功能验收
 
 ```bash
-/sdlc-workflow qa [迭代目录路径]
+/sdlc-qa [迭代目录路径]
 ```
 
 | 项 | 说明 |
@@ -197,7 +197,7 @@ sdlc-workflow
 ### ⑤ `accept` — 定稿本地提交
 
 ```bash
-/sdlc-workflow accept [迭代目录路径]
+/sdlc-accept [迭代目录路径]
 ```
 
 | 项 | 说明 |
@@ -210,7 +210,7 @@ sdlc-workflow
 ### ⑥ `pr` — 推送建 PR
 
 ```bash
-/sdlc-workflow pr [迭代目录路径]
+/sdlc-pr [迭代目录路径]
 ```
 
 | 项 | 说明 |
@@ -223,7 +223,7 @@ sdlc-workflow
 ### ⑦ `doit` — 全自动模式
 
 ```bash
-/sdlc-workflow doit <需求文本 | file:///path | URL>
+/sdlc-doit <需求文本 | file:///path | URL>
 ```
 
 | 项 | 说明 |
@@ -236,7 +236,7 @@ sdlc-workflow
 ### ⑧ `mini` — 小任务轻量流程
 
 ```bash
-/sdlc-workflow mini <小任务描述>
+/sdlc-mini <小任务描述>
 ```
 
 | 项 | 说明 |
@@ -249,9 +249,9 @@ sdlc-workflow
 ### ⑨ `worktree create` — 创建并行工作区
 
 ```bash
-/sdlc-workflow worktree create <slug> <type>
+/sdlc-worktree create <slug> <type>
 # 示例
-/sdlc-workflow worktree create user-login feature
+/sdlc-worktree create user-login feature
 ```
 
 | 项 | 说明 |
@@ -263,10 +263,10 @@ sdlc-workflow
 ### ⑩ `worktree manage` — 并行工作区管理
 
 ```bash
-/sdlc-workflow worktree list          # 列出所有并行工作区
-/sdlc-workflow worktree status        # 全局状态总览（聚合各 worktree 的 status.json）
-/sdlc-workflow worktree remove <seq>  # 移除已完成的工作区
-/sdlc-workflow worktree gc            # 清理已合并的工作区
+/sdlc-worktree list          # 列出所有并行工作区
+/sdlc-worktree status        # 全局状态总览（聚合各 worktree 的 status.json）
+/sdlc-worktree remove <seq>  # 移除已完成的工作区
+/sdlc-worktree gc            # 清理已合并的工作区
 ```
 
 | 项 | 说明 |
@@ -307,27 +307,27 @@ sdlc-workflow
 
 ```bash
 # 1. 初始化项目
-/sdlc-workflow init tg=123456789
+/sdlc-init
 
 # 2. 提交需求，AI 拆解设计后暂停等待审核
-/sdlc-workflow proposal "实现用户登录功能，支持邮箱和手机号"
+/sdlc-proposal "实现用户登录功能，支持邮箱和手机号"
 
 # 3. 审阅 iteration 目录中的 design.md / tasks.md
 #    确认后继续执行
-/sdlc-workflow apply docs/iterations/2026-04-16/001-user-login-feature/
+/sdlc-apply docs/iterations/2026-04-16/001-user-login-feature/
 ```
 
 ### 场景 B：全自动模式（doit）
 
 ```bash
-/sdlc-workflow doit "修复支付超时后重复扣款的 bug"
+/sdlc-doit "修复支付超时后重复扣款的 bug"
 # → 从需求到 PR 一步到位
 ```
 
 ### 场景 C：小任务快速修复（mini）
 
 ```bash
-/sdlc-workflow mini "将登录按钮颜色从蓝色改为绿色"
+/sdlc-mini "将登录按钮颜色从蓝色改为绿色"
 # → 轻量流程，仍有 Gate + 浏览器验收
 ```
 
@@ -335,13 +335,13 @@ sdlc-workflow
 
 ```bash
 # 创建两个独立工作区，互不干扰
-/sdlc-workflow worktree create user-login feature
-/sdlc-workflow worktree create payment-fix fix
+/sdlc-worktree create user-login feature
+/sdlc-worktree create payment-fix fix
 
 # 各自独立跑 pipeline
-cd ../wt-001-user-login-feature && /sdlc-workflow doit "用户登录"
-cd ../wt-002-payment-fix-fix   && /sdlc-workflow doit "支付修复"
+cd ../wt-001-user-login-feature && /sdlc-doit "用户登录"
+cd ../wt-002-payment-fix-fix   && /sdlc-doit "支付修复"
 
 # 完成后清理
-/sdlc-workflow worktree gc
+/sdlc-worktree gc
 ```

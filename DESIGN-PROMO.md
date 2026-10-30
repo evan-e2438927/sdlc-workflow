@@ -307,7 +307,7 @@ Stage 4   Playwright MCP               real browser-interaction QA ← this is t
 
 ## Configuration at a glance
 
-All in `.agents/.sdlc-config` (`KEY=VALUE`, generated and gitignored by init; global defaults can go in `~/.claude/.sdlc-config`, with project-level overriding global):
+All in `.agents/.sdlc-config` (`KEY=VALUE`, generated and gitignored by init; global defaults can go in `~/.agents/.sdlc-config`, legacy `~/.claude/.sdlc-config` still read, with project-level overriding global):
 
 ```bash
 # All have defaults, override as needed
@@ -328,16 +328,16 @@ PR_TEMPLATE=                 # path to a custom PR body template
 
 ## Install
 
-> Supports both the **Claude Code** and **Codex** runtimes.
+> Works with **Claude Code** and **Codex** (and other tools that read `AGENTS.md`).
+
+### npx skills, project-level (recommended)
 
 ```bash
-# Claude Code (plugin marketplace, recommended)
-/plugin marketplace add evan-e2438927/sdlc-workflow
-/plugin install sdlc-full@sdlc-workflow
-
-# Codex / generic (skills CLI)
-npx skills add evan-e2438927/sdlc-workflow -y
+cd your-project
+npx skills add evan-e2438927/sdlc-workflow --skill '*' -a claude-code -a codex -y
 ```
+
+Commit `.agents/`, `.claude/skills/` and `skills-lock.json` so the whole team shares one version. For personal use, add `-g` to install globally, or use the Claude Code plugin (`/plugin marketplace add evan-e2438927/sdlc-workflow`, then `/plugin install sdlc-full@sdlc-workflow`). Details: [README · Install](./README.md#install).
 
 Verify: run `sdlc-init` in any project directory; seeing the init summary means the install succeeded.
 
@@ -373,6 +373,7 @@ Verify: run `sdlc-init` in any project directory; seeing the init summary means 
 - [x] Unified context loading (global + project override) + config converged to `.agents/.sdlc-config`
 - [x] Git Worktree parallel-dev isolation (auto branch / port / config copy / registry)
 - [x] Published as an installable plugin (Claude Code plugin + skills CLI)
+- [x] AGENTS.md standard + npx skills: `.agents/` is the single source for Claude Code, Codex and Cursor; one sync command, `.agents/bin/sdlc-sync`
 - [x] Incremental update: drift-aware scaffold sync after a plugin upgrade
 
 ### Roadmap 🗺️

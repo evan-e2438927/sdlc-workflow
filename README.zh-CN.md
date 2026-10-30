@@ -53,8 +53,9 @@
 - 🧍 **人工审核门**：proposal 后暂停，设计经人工确认再开发，避免 AI 全权拍板
 - 🔒 **双模型把关**：Claude Code 生成，Codex CLI 独立审查（`--review` 启用，不降级、不跳过）
 - 🧪 **证据链验收**：qa 用 Playwright 脚本 + Playwright MCP 做浏览器功能验收并出报告，通过态截图存 `tests/reports/`（gitignore、不入主干）并由 pr 经隔离 `pr-assets` 分支嵌入 PR 正文当证据，不靠"我测完了"
-- 🧭 **统一上下文加载**：规范来源（全局 `~/.claude/` + 项目 `.agents/`，项目覆盖全局）只定义一次，单一入口收敛
+- 🧭 **统一上下文加载**：规范来源（全局 `~/.agents/` + 项目 `.agents/`，项目覆盖全局；旧的 `~/.claude/` 仍会读取）只定义一次，单一入口收敛
 - 🧩 **自定义 skills 发现**：项目 `.agents/skills/<name>/SKILL.md` 会被统一上下文加载发现，pipeline 在相关阶段优先调用（先 skill、后自造），Claude Code / Codex 双运行时通用
+- 🔗 **所有工具一个来源**：规则、MCP 服务器、项目 skill、hooks 都放在 `.agents/`；`AGENTS.md`、`CLAUDE.md` 和 Claude Code / Codex / Cursor 的配置都由它生成
 - 📦 **配置收敛**：项目配置统一放 `.agents/.sdlc-config`，无散落的根目录 `.env`
 - 🔧 **可恢复**：每轮需求生成结构化 iteration 目录，`status.json` 记录 phase，会话中断后下个 session 可续跑
 - 🛡️ **老项目安全**：existing project 先 intake 生成 baseline，防止 AI 重建你的目录结构
@@ -99,23 +100,11 @@
 
 ## 安装
 
-> 支持 **Claude Code** 与 **Codex** 两种运行时。
+> 支持 **Claude Code** 与 **Codex**（以及其他读取 `AGENTS.md` 的工具）。需要 `git`、`bash`、[jq](https://jqlang.org/) 和 Node.js（用于 `npx`）。
 
-### Claude Code（plugin marketplace，推荐）
+### npx skills 项目级安装（推荐）
 
-在 Claude Code 终端中执行：
-
-```bash
-# 1. 注册 marketplace
-/plugin marketplace add evan-e2438927/sdlc-workflow
-
-# 2. 安装全套 skill
-/plugin install sdlc-full@sdlc-workflow
-```
-
-### npx skills（项目级，团队推荐）
-
-装进项目本身，团队统一版本，Claude Code 与 Codex 都能用：
+装进项目本身，团队统一锁定一个版本，Claude Code 与 Codex 都能用：
 
 ```bash
 cd your-project
@@ -125,56 +114,51 @@ npx skills add evan-e2438927/sdlc-workflow --skill '*' -a claude-code -a codex -
 会生成（全部提交）：
 
 - `.agents/skills/<name>/` —— 12 个 skill 的实体文件
-- `.agents/skills/<name>` → `../../.agents/skills/<name>` 软链接 —— Claude Code 只从 `.agents/skills/` 发现 skill
+- `.claude/skills/<name>` → `../../.agents/skills/<name>` 软链接 —— Claude Code 只从 `.claude/skills/` 发现 skill
 - `skills-lock.json` —— 锁定版本
 
-然后执行 `sdlc-init`（Claude Code 里 `/sdlc-init`）。同事 clone 后立即能看到规则和 `/sdlc-*` 命令；被 gitignore 的平台文件在第一次执行任意 sdlc 命令时自动补齐。
+然后在 Claude Code 里执行 `/sdlc-init`（Codex 里说「用 sdlc 跑 init」），并提交生成的文件。同事 clone 后立即能看到规则和 `/sdlc-*` 命令；被 gitignore 的平台文件在第一次执行任意 sdlc 命令或 `.agents/bin/sdlc-sync` 时自动补齐。
 
-> Claude Code 插件与 npx 安装可以并存，但同一个项目不要同时启用：命令会重复、版本可能不一致。sdlc 发现两者并存时会提示。
+### npx skills 全局安装（个人）
+
+本机所有项目都能用，不往仓库里加东西：
+
+```bash
+npx skills add evan-e2438927/sdlc-workflow -g --skill '*' -a claude-code -a codex -y
+```
+
+全局安装不会注册多 agent 的角色子 agent（`sdlc-backend-dev` / `sdlc-frontend-dev` / `sdlc-test-dev`）；要用 `apply --agents multi`，请用项目级安装或插件。
+
+### Claude Code 插件（个人）
+
+```bash
+/plugin marketplace add evan-e2438927/sdlc-workflow
+/plugin install sdlc-full@sdlc-workflow
+```
+
+> 每个项目只用一种安装方式。项目里已经有 npx 安装时，请在这个项目停用插件，否则命令会重复、版本可能不一致（sdlc 发现两者并存时会提示）。
 
 安装后即可使用 `sdlc-*` 系列 skill：`sdlc-init` / `sdlc-update` / `sdlc-proposal` / `sdlc-apply` / `sdlc-qa` / `sdlc-accept` / `sdlc-pr` / `sdlc-doit` / `sdlc-mini` / `sdlc-review` / `sdlc-worktree`。
 
 > **统一入口**：Claude Code 与 Codex **共用同一套 skill**，不再维护单独的 slash 命令集。触发方式：说出意图（如「用 sdlc 跑 proposal：…」），或在 Claude Code 里 `/sdlc-proposal`。`sdlc-workflow` 是总览/编排 skill，各阶段 skill 是薄入口，指向同一批 `references/`，逻辑单源。
 
-### 手动安装（备选）
-
-<details>
-<summary>点击展开</summary>
-
-**全局安装（所有项目可用）**
-
-```bash
-git clone https://github.com/evan-e2438927/sdlc-workflow.git ~/.claude/sdlc-workflow-repo
-mkdir -p ~/.claude/skills
-ln -sf ~/.claude/sdlc-workflow-repo/sdlc-workflow ~/.claude/skills/sdlc-workflow
-```
-
-**项目级安装（仅当前项目）**
-
-```bash
-cd your-project
-git clone https://github.com/evan-e2438927/sdlc-workflow.git .claude/sdlc-workflow-repo
-mkdir -p .claude/skills
-ln -sf .claude/sdlc-workflow-repo/sdlc-workflow .claude/skills/sdlc-workflow
-```
-
-</details>
-
 ### 更新
 
-- **Claude Code**：`/plugin update sdlc-full@sdlc-workflow`，再在各项目里跑 `sdlc-update` 同步脚手架
-- **npx skills（项目级）**：`npx skills update`，再执行 `/sdlc-update`（或 `sdlc-update`）同步脚手架，并提交变更
-- **手动安装**：在 clone 目录 `git pull`，再执行 `sdlc-update`
+- **npx 项目级**：`npx skills update -p -y`（或重新执行安装命令），再执行 `/sdlc-update`，并提交变更
+- **npx 全局**：`npx skills update -g -y`，再在各项目里执行 `/sdlc-update`
+- **Claude Code 插件**：`/plugin update sdlc-full@sdlc-workflow`，再在各项目里执行 `/sdlc-update`
 
 ### 依赖项
 
 | 工具 | 用途 | 安装 |
 |------|------|------|
-| [Claude Code](https://claude.ai/code) | AI 开发代理 | 官网安装 |
+| [Claude Code](https://claude.ai/code) / [Codex](https://github.com/openai/codex) | AI 开发 agent | 官网安装 |
+| [jq](https://jqlang.org/) | 同步脚本与状态脚本依赖 | `brew install jq` |
+| [Node.js](https://nodejs.org/) | `npx skills` 安装、Playwright MCP | 官网安装 |
 | [Codex CLI](https://github.com/openai/codex) | Gate 1/2 独立审查（`--review`） | `npm i -g @openai/codex` |
 | [GitHub CLI](https://cli.github.com/) | `pr` 命令创建 PR | `brew install gh` |
-| [Playwright MCP](https://github.com/microsoft/playwright-mcp) | `qa` 浏览器功能验收 | Claude Code 挂载 MCP |
-| [GitHub MCP](https://github.com/github/github-mcp-server)（可选） | PR 增强 | Claude Code 挂载 MCP |
+| [Playwright MCP](https://github.com/microsoft/playwright-mcp) | `qa` 浏览器功能验收 | `.agents/config.json` 已预置，同步生成到 Claude Code / Codex / Cursor |
+| [GitHub MCP](https://github.com/github/github-mcp-server)（可选） | PR 增强 | 加到 `.agents/config.json` 的 `mcpServers`，再执行 `.agents/bin/sdlc-sync` |
 
 > Gate 是可选的（`--review` 时启用）；但一旦启用，Codex CLI 不可用必须中止，不会自动跳过。
 

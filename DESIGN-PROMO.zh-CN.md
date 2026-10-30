@@ -307,7 +307,7 @@ Stage 4   Playwright MCP               真实浏览器交互验收 ← 这才是
 
 ## 配置一览
 
-统一放在 `.agents/.sdlc-config`（`KEY=VALUE`，init 自动生成并 gitignore；全局默认可放 `~/.claude/.sdlc-config`，项目级覆盖全局）：
+统一放在 `.agents/.sdlc-config`（`KEY=VALUE`，init 自动生成并 gitignore；全局默认可放 `~/.agents/.sdlc-config`（旧位置 `~/.claude/.sdlc-config` 仍会读取），项目级覆盖全局）：
 
 ```bash
 # 均有默认值，按需覆盖
@@ -328,16 +328,16 @@ PR_TEMPLATE=                 # 自定义 PR body 模板路径
 
 ## 安装
 
-> 支持 **Claude Code** 与 **Codex** 两种运行时。
+> 支持 **Claude Code** 与 **Codex**（以及其他读取 `AGENTS.md` 的工具）。
+
+### npx skills 项目级安装（推荐）
 
 ```bash
-# Claude Code（plugin marketplace，推荐）
-/plugin marketplace add evan-e2438927/sdlc-workflow
-/plugin install sdlc-full@sdlc-workflow
-
-# Codex / 通用（skills CLI）
-npx skills add evan-e2438927/sdlc-workflow -y
+cd your-project
+npx skills add evan-e2438927/sdlc-workflow --skill '*' -a claude-code -a codex -y
 ```
+
+提交 `.agents/`、`.claude/skills/` 和 `skills-lock.json`，团队共用一个版本。个人使用可加 `-g` 全局安装，或用 Claude Code 插件（`/plugin marketplace add evan-e2438927/sdlc-workflow`，再 `/plugin install sdlc-full@sdlc-workflow`）。详见 [README · 安装](./README.zh-CN.md#安装)。
 
 验证：在任意项目目录执行 `sdlc-init`，看到 init 摘要输出即为安装成功。
 
@@ -373,6 +373,7 @@ npx skills add evan-e2438927/sdlc-workflow -y
 - [x] 统一上下文加载（全局 + 项目覆盖）+ 配置收敛到 `.agents/.sdlc-config`
 - [x] Git Worktree 并行开发隔离（自动分支 / 端口 / 配置复制 / 注册表）
 - [x] 发布为可安装插件（Claude Code plugin + skills CLI）
+- [x] AGENTS.md 标准 + npx skills：`.agents/` 作为 Claude Code / Codex / Cursor 的唯一来源，同步只用一条命令 `.agents/bin/sdlc-sync`
 - [x] 增量 update：插件升级后漂移感知同步脚手架
 
 ### 路线图 🗺️

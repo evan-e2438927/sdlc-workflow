@@ -53,8 +53,9 @@ Plus a few auxiliary lines:
 - 🧍 **Human review gate**: pause after proposal so the design is human-confirmed before coding, so the AI never decides everything alone
 - 🔒 **Dual-model gating**: Claude Code generates, Codex CLI reviews independently (enabled by `--review`; never downgraded, never silently skipped)
 - 🧪 **Evidence-chain acceptance**: qa runs real browser verification with Playwright scripts + Playwright MCP and produces a report; success screenshots are stored under `tests/reports/` (gitignored, kept out of the main branch) and embedded into the PR body by `pr` via an isolated `pr-assets` branch — not "trust me, I tested it"
-- 🧭 **Unified context loading**: the source of conventions (global `~/.claude/` + project `.agents/`, project overrides global) is defined exactly once, converged at a single entry
+- 🧭 **Unified context loading**: the source of conventions (global `~/.agents/` + project `.agents/`, project overrides global; the legacy `~/.claude/` is still read) is defined exactly once, converged at a single entry
 - 🧩 **Custom skills discovery**: a project's `.agents/skills/<name>/SKILL.md` is discovered by unified context loading, and the pipeline prefers it at relevant stages (skill first, hand-rolled second); works across both Claude Code and Codex
+- 🔗 **One source for every tool**: rules, MCP servers, project skills and hooks live in `.agents/`; `AGENTS.md`, `CLAUDE.md` and the Claude Code / Codex / Cursor config are generated from it
 - 📦 **Config convergence**: project config lives in one place, `.agents/.sdlc-config`, with no scattered root-level `.env`
 - 🔧 **Resumable**: each requirement produces a structured iteration directory; `status.json` records the phase, so the next session can continue after an interruption
 - 🛡️ **Safe for existing projects**: existing projects run an intake to generate a baseline first, preventing the AI from rebuilding your directory structure
@@ -99,23 +100,11 @@ You are already coding with Claude Code / Cursor / Codex, but you have probably 
 
 ## Install
 
-> Supports both the **Claude Code** and **Codex** runtimes.
+> Works with **Claude Code** and **Codex** (and other tools that read `AGENTS.md`). Needs `git`, `bash`, [jq](https://jqlang.org/) and Node.js (for `npx`).
 
-### Claude Code (plugin marketplace, recommended)
+### npx skills, project-level (recommended)
 
-Run in the Claude Code terminal:
-
-```bash
-# 1. Register the marketplace
-/plugin marketplace add evan-e2438927/sdlc-workflow
-
-# 2. Install the full skill set
-/plugin install sdlc-full@sdlc-workflow
-```
-
-### npx skills (project-level, recommended for teams)
-
-Installs into the project itself, so the whole team uses one version — in Claude Code and Codex alike:
+Installs sdlc into the project itself, so the whole team uses one pinned version — in Claude Code and Codex alike:
 
 ```bash
 cd your-project
@@ -125,56 +114,51 @@ npx skills add evan-e2438927/sdlc-workflow --skill '*' -a claude-code -a codex -
 It creates (commit all of it):
 
 - `.agents/skills/<name>/` — the 12 skills as real files
-- `.agents/skills/<name>` → `../../.agents/skills/<name>` symlinks — Claude Code only discovers skills under `.agents/skills/`
+- `.claude/skills/<name>` → `../../.agents/skills/<name>` symlinks — Claude Code only discovers skills under `.claude/skills/`
 - `skills-lock.json` — the pinned versions
 
-Then run `sdlc-init` (`/sdlc-init` in Claude Code). Teammates who clone the repo see the rules and the `/sdlc-*` commands right away; the gitignored platform files are regenerated the first time anyone runs an sdlc command.
+Then run `/sdlc-init` in Claude Code (in Codex, say "run sdlc init") and commit what it generates. Teammates who clone the repo see the rules and the `/sdlc-*` commands right away; the gitignored platform files are regenerated the first time anyone runs an sdlc command or `.agents/bin/sdlc-sync`.
 
-> The Claude Code plugin and the npx install can coexist, but don't enable both for the same project: the commands show up twice and the versions can differ. sdlc warns when it sees both.
+### npx skills, global (personal)
+
+Available in every project on your machine, nothing added to a repo:
+
+```bash
+npx skills add evan-e2438927/sdlc-workflow -g --skill '*' -a claude-code -a codex -y
+```
+
+A global install does not register the multi-agent role sub-agents (`sdlc-backend-dev` / `sdlc-frontend-dev` / `sdlc-test-dev`); for `apply --agents multi`, use the project-level install or the plugin.
+
+### Claude Code plugin (personal)
+
+```bash
+/plugin marketplace add evan-e2438927/sdlc-workflow
+/plugin install sdlc-full@sdlc-workflow
+```
+
+> Use one install per project. If a project has the npx install, disable the plugin there — otherwise the commands show up twice and the versions can differ (sdlc warns when it sees both).
 
 After installing you can use the `sdlc-*` skills: `sdlc-init` / `sdlc-update` / `sdlc-proposal` / `sdlc-apply` / `sdlc-qa` / `sdlc-accept` / `sdlc-pr` / `sdlc-doit` / `sdlc-mini` / `sdlc-review` / `sdlc-worktree`.
 
 > **Single entry point**: Claude Code and Codex **share one skill set** — there is no separate slash-command set. Trigger by stating intent (e.g. "run sdlc proposal: …") or, in Claude Code, `/sdlc-proposal`. `sdlc-workflow` is the overview/orchestration skill; each stage skill is a thin entry pointing at the same `references/`, single source of truth.
 
-### Manual install (fallback)
-
-<details>
-<summary>Click to expand</summary>
-
-**Global install (available to all projects)**
-
-```bash
-git clone https://github.com/evan-e2438927/sdlc-workflow.git ~/.claude/sdlc-workflow-repo
-mkdir -p ~/.claude/skills
-ln -sf ~/.claude/sdlc-workflow-repo/sdlc-workflow ~/.claude/skills/sdlc-workflow
-```
-
-**Project-level install (current project only)**
-
-```bash
-cd your-project
-git clone https://github.com/evan-e2438927/sdlc-workflow.git .claude/sdlc-workflow-repo
-mkdir -p .claude/skills
-ln -sf .claude/sdlc-workflow-repo/sdlc-workflow .claude/skills/sdlc-workflow
-```
-
-</details>
-
 ### Updating
 
-- **Claude Code**: `/plugin update sdlc-full@sdlc-workflow`, then run `sdlc-update` in each project to sync the scaffold
-- **npx skills (project)**: `npx skills update`, then `/sdlc-update` (or `sdlc-update`) to sync the scaffold; commit the result
-- **Manual install**: `git pull` in the clone directory, then `sdlc-update`
+- **npx, project-level**: `npx skills update -p -y` (or re-run the install command), then `/sdlc-update`; commit the result
+- **npx, global**: `npx skills update -g -y`, then `/sdlc-update` in each project
+- **Claude Code plugin**: `/plugin update sdlc-full@sdlc-workflow`, then `/sdlc-update` in each project
 
 ### Dependencies
 
 | Tool | Purpose | Install |
 |------|---------|---------|
-| [Claude Code](https://claude.ai/code) | AI development agent | via official site |
+| [Claude Code](https://claude.ai/code) / [Codex](https://github.com/openai/codex) | AI development agent | via official sites |
+| [jq](https://jqlang.org/) | required by the sync and status scripts | `brew install jq` |
+| [Node.js](https://nodejs.org/) | `npx skills` install, Playwright MCP | via official site |
 | [Codex CLI](https://github.com/openai/codex) | Independent Gate 1/2 review (`--review`) | `npm i -g @openai/codex` |
 | [GitHub CLI](https://cli.github.com/) | `pr` command creates the PR | `brew install gh` |
-| [Playwright MCP](https://github.com/microsoft/playwright-mcp) | `qa` browser QA | mount the MCP in Claude Code |
-| [GitHub MCP](https://github.com/github/github-mcp-server) (optional) | PR enhancements | mount the MCP in Claude Code |
+| [Playwright MCP](https://github.com/microsoft/playwright-mcp) | `qa` browser QA | preconfigured in `.agents/config.json`, generated for Claude Code / Codex / Cursor |
+| [GitHub MCP](https://github.com/github/github-mcp-server) (optional) | PR enhancements | add it to `mcpServers` in `.agents/config.json`, then run `.agents/bin/sdlc-sync` |
 
 > Gates are optional (enabled with `--review`); but once enabled, an unavailable Codex CLI aborts the run rather than being silently skipped.
 
